@@ -1,0 +1,54 @@
+.problem {
+  padding-top: 80px;
+  padding-bottom: 80px;
+  border-top: 1px solid var(--color-border);
+}
+
+.problem-header {
+  margin-bottom: 48px;
+  max-width: 600px;
+}
+
+.problem-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 24px;
+}
+
+.problem-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.problem-icon {
+  width: 48px;
+  height: 48px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text);
+  margin-bottom: 8px;
+}
+
+.problem-card h3 {
+  font-size: 16px;
+}
+
+.problem-card p {
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+@media (max-width: 1024px) {
+  .problem-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 640px) {
+  .problem-grid {
+    grid-template-columns: 1fr;
+  }
+}

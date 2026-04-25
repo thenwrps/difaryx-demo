@@ -1,0 +1,68 @@
+.final-cta {
+  padding-top: 80px;
+  padding-bottom: 80px;
+}
+
+.cta-box {
+  background-color: var(--color-bg-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  display: flex;
+  position: relative;
+  overflow: hidden;
+  min-height: 300px;
+}
+
+.cta-content {
+  position: relative;
+  z-index: 2;
+  padding: 60px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.cta-content h2 {
+  font-size: 32px;
+  margin-bottom: 32px;
+  max-width: 600px;
+}
+
+.cta-actions {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.cta-sub {
+  font-size: 14px;
+  color: var(--color-text-muted);
+}
+
+.cta-motif {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 50%;
+  z-index: 1;
+}
+
+.motif-svg {
+  width: 100%;
+  height: 100%;
+}
+
+@media (max-width: 768px) {
+  .cta-content {
+    padding: 40px 24px;
+  }
+  .cta-actions {
+    flex-direction: column;
+  }
+  .cta-motif {
+    width: 100%;
+    opacity: 0.2;
+  }
+}
