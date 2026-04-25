@@ -1,123 +1,349 @@
 import React, { useMemo } from 'react';
 import {
-  LineChart,
+  CartesianGrid,
   Line,
+  LineChart,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  ReferenceArea
 } from 'recharts';
 
+type SpectrumType = 'xrd' | 'xps' | 'ftir' | 'raman';
+
 interface GraphProps {
-  type?: 'xrd' | 'xps' | 'ftir' | 'raman';
+  type?: SpectrumType;
   height?: number | string;
   showCalculated?: boolean;
   showBackground?: boolean;
   showResidual?: boolean;
 }
 
-// Function to generate realistic looking spectral data with noise and peaks
-function generateData(type: string) {
-  const data = [];
-  const points = 500;
-  
-  // Define some peaks (center, height, width)
-  const peaks = [
-    { c: 100, h: 50, w: 5 },
-    { c: 250, h: 90, w: 3 },
-    { c: 260, h: 40, w: 4 },
-    { c: 350, h: 70, w: 6 },
-    { c: 420, h: 30, w: 8 },
-  ];
-
-  for (let i = 0; i < points; i++) {
-    // x axis varies by type
-    const x = type === 'xrd' ? 10 + (i * 70) / points // 2theta 10-80
-      : type === 'xps' ? 1000 - (i * 1000) / points // binding energy 1000-0
-      : type === 'ftir' ? 4000 - (i * 3600) / points // wavenumbers 4000-400
-      : 100 + (i * 3900) / points; // raman shift 100-4000
-
-    let observed = 0;
-    
-    // Add background (smooth curve or sloped line)
-    const background = type === 'xrd' ? 15 - (i * 10) / points 
-      : type === 'xps' ? 50 + (i * 20) / points 
-      : 10;
-
-    observed += background;
-
-    // Add peaks (Lorentzian/Gaussian shape)
-    for (const p of peaks) {
-      // Gaussian
-      observed += p.h * Math.exp(-Math.pow(i - p.c, 2) / (2 * Math.pow(p.w, 2)));
-    }
-
-    // Calculated is smooth, observed has noise
-    const calculated = observed;
-    
-    // Add noise to observed
-    const noise = (Math.random() - 0.5) * 5;
-    observed += noise;
-
-    const residual = observed - calculated;
-
-    data.push({
-      x: Number(x.toFixed(1)),
-      observed: Number(observed.toFixed(2)),
-      calculated: Number(calculated.toFixed(2)),
-      background: Number(background.toFixed(2)),
-      residual: Number(residual.toFixed(2)) - 20, // Offset residual downwards for display
-    });
-  }
-  return data;
+interface SpectrumPoint {
+  x: number;
+  observed: number;
+  calculated: number;
+  background: number;
+  residual: number;
+  residualDisplay: number;
 }
 
-export function Graph({ type = 'xrd', height = 400, showCalculated = true, showBackground = false, showResidual = true }: GraphProps) {
-  const data = useMemo(() => generateData(type), [type]);
+const SETTINGS: Record<
+  SpectrumType,
+  {
+    range: [number, number];
+    reversed: boolean;
+    xLabel: string;
+    yLabel: string;
+    yDomain: [number, number];
+    residualOffset: number;
+    color: string;
+  }
+> = {
+  xrd: {
+    range: [10, 80],
+    reversed: false,
+    xLabel: '2\u03b8 (\u00b0)',
+    yLabel: 'Intensity (a.u.)',
+    yDomain: [-8, 115],
+    residualOffset: 4,
+    color: '#2563eb',
+  },
+  xps: {
+    range: [0, 1200],
+    reversed: true,
+    xLabel: 'Binding energy (eV)',
+    yLabel: 'Counts (a.u.)',
+    yDomain: [-8, 145],
+    residualOffset: 7,
+    color: '#8b5cf6',
+  },
+  ftir: {
+    range: [400, 4000],
+    reversed: true,
+    xLabel: 'Wavenumber (cm\u207b\u00b9)',
+    yLabel: 'Transmittance (%)',
+    yDomain: [24, 102],
+    residualOffset: 31,
+    color: '#ef4444',
+  },
+  raman: {
+    range: [100, 3200],
+    reversed: false,
+    xLabel: 'Raman shift (cm\u207b\u00b9)',
+    yLabel: 'Intensity (a.u.)',
+    yDomain: [-8, 120],
+    residualOffset: 5,
+    color: '#10b981',
+  },
+};
 
-  const xLabel = type === 'xrd' ? '2θ (°)' 
-    : type === 'xps' ? 'Binding Energy (eV)' 
-    : type === 'ftir' ? 'Wavenumber (cm⁻¹)' 
-    : 'Raman Shift (cm⁻¹)';
+function gaussian(x: number, center: number, width: number) {
+  const scaled = (x - center) / width;
+  return Math.exp(-0.5 * scaled * scaled);
+}
+
+function lorentzian(x: number, center: number, width: number) {
+  const scaled = (x - center) / width;
+  return 1 / (1 + scaled * scaled);
+}
+
+function pseudoVoigt(x: number, center: number, width: number, mix = 0.35) {
+  return mix * lorentzian(x, center, width) + (1 - mix) * gaussian(x, center, width);
+}
+
+function instrumentNoise(index: number, x: number, amplitude: number) {
+  return amplitude * (
+    0.48 * Math.sin(index * 1.73) +
+    0.31 * Math.sin(index * 0.47 + 1.6) +
+    0.21 * Math.sin(x * 0.91)
+  );
+}
+
+function xrdSignal(x: number, index: number) {
+  const background = 7.5 + 2.2 * Math.exp(-(x - 10) / 35) + 0.8 * Math.sin(x * 0.18);
+  const peaks = [
+    { c: 17.1, h: 76, w: 0.16 },
+    { c: 20.8, h: 24, w: 0.2 },
+    { c: 25.6, h: 18, w: 0.22 },
+    { c: 29.7, h: 34, w: 0.2 },
+    { c: 35.6, h: 96, w: 0.18 },
+    { c: 36.5, h: 38, w: 0.16 },
+    { c: 40.7, h: 26, w: 0.21 },
+    { c: 52.4, h: 58, w: 0.2 },
+    { c: 57.2, h: 29, w: 0.2 },
+    { c: 61.6, h: 36, w: 0.19 },
+    { c: 65.1, h: 20, w: 0.22 },
+    { c: 74.2, h: 15, w: 0.24 },
+  ];
+
+  const calculated = peaks.reduce((sum, peak) => {
+    const main = peak.h * pseudoVoigt(x, peak.c, peak.w, 0.28);
+    const kAlpha2 = peak.h * 0.18 * pseudoVoigt(x, peak.c + 0.12, peak.w * 1.25, 0.35);
+    return sum + main + kAlpha2;
+  }, background);
+
+  return {
+    background,
+    calculated,
+    observed: calculated + instrumentNoise(index, x, 1.15),
+  };
+}
+
+function xpsSignal(x: number, index: number) {
+  const background = 20 + 18 * Math.exp(-x / 520) + 10 * (1 - x / 1200);
+  const peaks = [
+    { c: 55, h: 18, w: 4.8 },
+    { c: 133, h: 34, w: 5.2 },
+    { c: 285, h: 40, w: 6.2 },
+    { c: 531, h: 72, w: 7.4 },
+    { c: 710, h: 82, w: 8.8 },
+    { c: 724, h: 56, w: 9.5 },
+    { c: 933, h: 52, w: 8.8 },
+    { c: 953, h: 36, w: 10.5 },
+  ];
+
+  const calculated = peaks.reduce(
+    (sum, peak) => sum + peak.h * pseudoVoigt(x, peak.c, peak.w, 0.58),
+    background,
+  );
+
+  return {
+    background,
+    calculated,
+    observed: calculated + instrumentNoise(index, x, 1.8),
+  };
+}
+
+function ftirSignal(x: number, index: number) {
+  const background = 94 - 1.8 * Math.sin((x - 400) / 620) - 2.4 * Math.exp(-(4000 - x) / 900);
+  const bands = [
+    { c: 3420, h: 18, w: 150 },
+    { c: 2920, h: 7, w: 45 },
+    { c: 2850, h: 5, w: 42 },
+    { c: 1715, h: 22, w: 55 },
+    { c: 1625, h: 10, w: 62 },
+    { c: 1385, h: 8, w: 48 },
+    { c: 1110, h: 31, w: 72 },
+    { c: 1035, h: 22, w: 48 },
+    { c: 620, h: 18, w: 42 },
+    { c: 565, h: 15, w: 36 },
+  ];
+
+  const calculated = bands.reduce(
+    (sum, band) => sum - band.h * gaussian(x, band.c, band.w),
+    background,
+  );
+
+  return {
+    background,
+    calculated,
+    observed: calculated + instrumentNoise(index, x, 0.55),
+  };
+}
+
+function ramanSignal(x: number, index: number) {
+  const background = 8 + 18 * Math.exp(-(x - 100) / 1650) + 2.5 * Math.sin(x / 430);
+  const peaks = [
+    { c: 220, h: 12, w: 12 },
+    { c: 382, h: 20, w: 16 },
+    { c: 585, h: 42, w: 18 },
+    { c: 690, h: 70, w: 20 },
+    { c: 960, h: 26, w: 22 },
+    { c: 1348, h: 35, w: 34 },
+    { c: 1582, h: 48, w: 38 },
+    { c: 2690, h: 24, w: 52 },
+  ];
+
+  const calculated = peaks.reduce(
+    (sum, peak) => sum + peak.h * pseudoVoigt(x, peak.c, peak.w, 0.45),
+    background,
+  );
+
+  return {
+    background,
+    calculated,
+    observed: calculated + instrumentNoise(index, x, 1.25),
+  };
+}
+
+function getSignal(type: SpectrumType, x: number, index: number) {
+  if (type === 'xps') return xpsSignal(x, index);
+  if (type === 'ftir') return ftirSignal(x, index);
+  if (type === 'raman') return ramanSignal(x, index);
+  return xrdSignal(x, index);
+}
+
+function generateData(type: SpectrumType): SpectrumPoint[] {
+  const settings = SETTINGS[type];
+  const [min, max] = settings.range;
+  const points = type === 'xrd' ? 760 : 620;
+
+  return Array.from({ length: points }, (_, index) => {
+    const fraction = index / (points - 1);
+    const x = min + (max - min) * fraction;
+    const signal = getSignal(type, x, index);
+    const residual = signal.observed - signal.calculated;
+
+    return {
+      x: Number(x.toFixed(type === 'xrd' ? 2 : 1)),
+      observed: Number(signal.observed.toFixed(3)),
+      calculated: Number(signal.calculated.toFixed(3)),
+      background: Number(signal.background.toFixed(3)),
+      residual: Number(residual.toFixed(3)),
+      residualDisplay: Number((settings.residualOffset + residual * 2).toFixed(3)),
+    };
+  });
+}
+
+const tooltipNames: Record<string, string> = {
+  observed: 'Observed',
+  calculated: 'Calculated',
+  background: 'Background',
+  residualDisplay: 'Residual (offset)',
+};
+
+export function Graph({
+  type = 'xrd',
+  height = 400,
+  showCalculated = true,
+  showBackground = false,
+  showResidual = true,
+}: GraphProps) {
+  const data = useMemo(() => generateData(type), [type]);
+  const settings = SETTINGS[type];
+  const residualOnly = showResidual && !showCalculated && !showBackground;
+  const yDomain: [number, number] = residualOnly
+    ? [settings.residualOffset - 8, settings.residualOffset + 8]
+    : settings.yDomain;
 
   return (
     <div style={{ height, width: '100%' }}>
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-          <XAxis 
-            dataKey="x" 
-            stroke="#9CA3AF" 
-            tick={{ fill: '#9CA3AF', fontSize: 12 }}
-            label={{ value: xLabel, position: 'bottom', fill: '#9CA3AF', fontSize: 12 }}
+        <LineChart data={data} margin={{ top: 18, right: 24, bottom: 24, left: 24 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" vertical={false} />
+          <XAxis
+            dataKey="x"
+            stroke="#94a3b8"
+            tick={{ fill: '#94a3b8', fontSize: 12 }}
+            tickLine={{ stroke: '#64748b' }}
+            axisLine={{ stroke: '#334155' }}
+            label={{ value: settings.xLabel, position: 'bottom', fill: '#94a3b8', fontSize: 12 }}
             type="number"
-            domain={['dataMin', 'dataMax']}
-            reversed={type === 'xps' || type === 'ftir'} // XPS and FTIR are usually plotted reversed
+            domain={settings.range}
+            reversed={settings.reversed}
           />
-          <YAxis 
-            stroke="#9CA3AF" 
-            tick={{ fill: '#9CA3AF', fontSize: 12 }}
-            label={{ value: 'Intensity (a.u.)', angle: -90, position: 'left', fill: '#9CA3AF', fontSize: 12 }}
-            domain={['auto', 'auto']}
+          <YAxis
+            stroke="#94a3b8"
+            tick={{ fill: '#94a3b8', fontSize: 12 }}
+            tickLine={{ stroke: '#64748b' }}
+            axisLine={{ stroke: '#334155' }}
+            label={{ value: settings.yLabel, angle: -90, position: 'left', fill: '#94a3b8', fontSize: 12 }}
+            domain={yDomain}
+            allowDataOverflow
           />
-          <Tooltip 
-            contentStyle={{ backgroundColor: '#101622', borderColor: 'rgba(255,255,255,0.08)', borderRadius: '8px' }}
-            itemStyle={{ color: '#fff' }}
+          <Tooltip
+            formatter={(value, name) => [
+              typeof value === 'number' ? value.toFixed(2) : value,
+              tooltipNames[String(name)] ?? name,
+            ]}
+            labelFormatter={(value) => `${settings.xLabel}: ${Number(value).toFixed(2)}`}
+            contentStyle={{
+              backgroundColor: '#0f172a',
+              borderColor: 'rgba(148,163,184,0.25)',
+              borderRadius: '8px',
+              color: '#e2e8f0',
+              boxShadow: '0 12px 30px rgba(15,23,42,0.35)',
+            }}
+            itemStyle={{ color: '#e2e8f0' }}
+            labelStyle={{ color: '#cbd5e1' }}
           />
-          
+
           {showResidual && (
-             <Line type="step" dataKey="residual" stroke="#ef4444" dot={false} strokeWidth={1} isAnimationActive={false} />
+            <>
+              <ReferenceLine y={settings.residualOffset} stroke="#64748b" strokeDasharray="2 4" />
+              <Line
+                type="monotone"
+                dataKey="residualDisplay"
+                stroke="#f97316"
+                dot={false}
+                strokeWidth={1}
+                isAnimationActive={false}
+              />
+            </>
           )}
-          {showBackground && (
-             <Line type="monotone" dataKey="background" stroke="#6b7280" dot={false} strokeWidth={1} isAnimationActive={false} strokeDasharray="5 5" />
+          {showBackground && !residualOnly && (
+            <Line
+              type="monotone"
+              dataKey="background"
+              stroke="#64748b"
+              dot={false}
+              strokeWidth={1.25}
+              strokeDasharray="5 5"
+              isAnimationActive={false}
+            />
           )}
-          {showCalculated && (
-            <Line type="monotone" dataKey="calculated" stroke="#1D4ED8" dot={false} strokeWidth={2} isAnimationActive={false} />
+          {showCalculated && !residualOnly && (
+            <Line
+              type="monotone"
+              dataKey="calculated"
+              stroke="#e2e8f0"
+              dot={false}
+              strokeWidth={1.75}
+              isAnimationActive={false}
+            />
           )}
-          <Line type="monotone" dataKey="observed" stroke="#06B6D4" dot={false} strokeWidth={1} isAnimationActive={false} />
-          
+          {!residualOnly && (
+            <Line
+              type="monotone"
+              dataKey="observed"
+              stroke={settings.color}
+              dot={false}
+              strokeWidth={1.15}
+              isAnimationActive={false}
+            />
+          )}
         </LineChart>
       </ResponsiveContainer>
     </div>
