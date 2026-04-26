@@ -352,6 +352,7 @@ export function Graph({
       externalChartData[externalChartData.length - 1]?.x ?? settings.range[1],
     ];
 
+    const markers = peakMarkers ?? [];
     const heightClass = height === '100%' ? 'h-full' : height === 100 ? 'h-[100px]' : 'h-[400px]';
 
     return (
