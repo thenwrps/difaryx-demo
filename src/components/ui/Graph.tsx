@@ -12,13 +12,36 @@ import {
 
 type SpectrumType = 'xrd' | 'xps' | 'ftir' | 'raman';
 
+// ── External data props (new — for scientific engine) ────────────────
+
+interface ExternalPoint {
+  x: number;
+  y: number;
+}
+
+interface PeakMarker {
+  position: number;
+  intensity: number;
+  label?: string;
+}
+
+// ── Component props ──────────────────────────────────────────────────
+
 interface GraphProps {
   type?: SpectrumType;
   height?: number | string;
   showCalculated?: boolean;
   showBackground?: boolean;
   showResidual?: boolean;
+  /** When provided, renders this data instead of internally generated data */
+  externalData?: ExternalPoint[];
+  /** Baseline curve to overlay */
+  baselineData?: ExternalPoint[];
+  /** Peak position markers */
+  peakMarkers?: PeakMarker[];
 }
+
+// ── Internal data types ──────────────────────────────────────────────
 
 interface SpectrumPoint {
   x: number;
@@ -27,6 +50,12 @@ interface SpectrumPoint {
   background: number;
   residual: number;
   residualDisplay: number;
+}
+
+interface ExternalSpectrumPoint {
+  x: number;
+  observed: number;
+  baseline?: number;
 }
 
 const SETTINGS: Record<
@@ -237,12 +266,53 @@ function generateData(type: SpectrumType): SpectrumPoint[] {
   });
 }
 
+// ── Convert external data to chart format ────────────────────────────
+
+function convertExternalData(
+  data: ExternalPoint[],
+  baseline?: ExternalPoint[],
+): ExternalSpectrumPoint[] {
+  return data.map((pt, i) => ({
+    x: pt.x,
+    observed: pt.y,
+    baseline: baseline && baseline[i] ? baseline[i].y : undefined,
+  }));
+}
+
 const tooltipNames: Record<string, string> = {
   observed: 'Observed',
   calculated: 'Calculated',
   background: 'Background',
+  baseline: 'Baseline',
   residualDisplay: 'Residual (offset)',
 };
+
+// ── Custom peak marker dot ───────────────────────────────────────────
+
+function PeakMarkerDot(props: {
+  cx?: number;
+  cy?: number;
+  payload?: ExternalSpectrumPoint;
+  peakMarkers: PeakMarker[];
+}) {
+  const { cx, cy, payload, peakMarkers } = props;
+  if (!cx || !cy || !payload) return null;
+
+  const isPeak = peakMarkers.some(
+    (m) => Math.abs(m.position - payload.x) < 0.15,
+  );
+  if (!isPeak) return null;
+
+  return (
+    <g>
+      <circle cx={cx} cy={cy} r={4} fill="#f59e0b" stroke="#fbbf24" strokeWidth={1.5} />
+      <line x1={cx} y1={cy} x2={cx} y2={cy - 16} stroke="#f59e0b" strokeWidth={1} strokeDasharray="2 2" />
+      <circle cx={cx} cy={cy - 18} r={2} fill="#fbbf24" />
+    </g>
+  );
+}
+
+// ── Main Component ───────────────────────────────────────────────────
 
 export function Graph({
   type = 'xrd',
@@ -250,9 +320,131 @@ export function Graph({
   showCalculated = true,
   showBackground = false,
   showResidual = true,
+  externalData,
+  baselineData,
+  peakMarkers,
 }: GraphProps) {
-  const data = useMemo(() => generateData(type), [type]);
+  const useExternal = !!externalData && externalData.length > 0;
+
+  // Internal data path (backward compat)
+  const internalData = useMemo(() => generateData(type), [type]);
+
+  // External data path
+  const externalChartData = useMemo(
+    () => (useExternal ? convertExternalData(externalData!, baselineData) : []),
+    [useExternal, externalData, baselineData],
+  );
+
   const settings = SETTINGS[type];
+
+  if (useExternal) {
+    // External data rendering mode
+    const yValues = externalChartData.map((d) => d.observed);
+    const yMin = Math.min(...yValues);
+    const yMax = Math.max(...yValues);
+    const yPadding = (yMax - yMin) * 0.1 || 5;
+    const yDomain: [number, number] = [
+      Math.max(0, yMin - yPadding),
+      yMax + yPadding,
+    ];
+    const xDomain: [number, number] = [
+      externalChartData[0]?.x ?? settings.range[0],
+      externalChartData[externalChartData.length - 1]?.x ?? settings.range[1],
+    ];
+
+    const markers = peakMarkers ?? [];
+
+    return (
+      <div style={{ height, width: '100%' }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={externalChartData} margin={{ top: 18, right: 24, bottom: 24, left: 24 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" vertical={false} />
+            <XAxis
+              dataKey="x"
+              stroke="#94a3b8"
+              tick={{ fill: '#94a3b8', fontSize: 12 }}
+              tickLine={{ stroke: '#64748b' }}
+              axisLine={{ stroke: '#334155' }}
+              label={{ value: settings.xLabel, position: 'bottom', fill: '#94a3b8', fontSize: 12 }}
+              type="number"
+              domain={xDomain}
+            />
+            <YAxis
+              stroke="#94a3b8"
+              tick={{ fill: '#94a3b8', fontSize: 12 }}
+              tickLine={{ stroke: '#64748b' }}
+              axisLine={{ stroke: '#334155' }}
+              label={{ value: settings.yLabel, angle: -90, position: 'left', fill: '#94a3b8', fontSize: 12 }}
+              domain={yDomain}
+              allowDataOverflow
+            />
+            <Tooltip
+              formatter={(value, name) => [
+                typeof value === 'number' ? value.toFixed(2) : value,
+                tooltipNames[String(name)] ?? name,
+              ]}
+              labelFormatter={(value) => `${settings.xLabel}: ${Number(value).toFixed(2)}`}
+              contentStyle={{
+                backgroundColor: '#0f172a',
+                borderColor: 'rgba(148,163,184,0.25)',
+                borderRadius: '8px',
+                color: '#e2e8f0',
+                boxShadow: '0 12px 30px rgba(15,23,42,0.35)',
+              }}
+              itemStyle={{ color: '#e2e8f0' }}
+              labelStyle={{ color: '#cbd5e1' }}
+            />
+
+            {/* Peak position reference lines */}
+            {markers.map((m, i) => (
+              <ReferenceLine
+                key={`peak-line-${i}`}
+                x={m.position}
+                stroke="#f59e0b"
+                strokeDasharray="3 3"
+                strokeOpacity={0.4}
+              />
+            ))}
+
+            {/* Baseline */}
+            {showBackground && baselineData && (
+              <Line
+                type="monotone"
+                dataKey="baseline"
+                stroke="#64748b"
+                dot={false}
+                strokeWidth={1.25}
+                strokeDasharray="5 5"
+                isAnimationActive={false}
+              />
+            )}
+
+            {/* Spectrum line with peak marker dots */}
+            <Line
+              type="monotone"
+              dataKey="observed"
+              stroke={settings.color}
+              dot={
+                markers.length > 0
+                  ? (dotProps: any) => (
+                      <PeakMarkerDot
+                        key={`dot-${dotProps.index}`}
+                        {...dotProps}
+                        peakMarkers={markers}
+                      />
+                    )
+                  : false
+              }
+              strokeWidth={1.25}
+              isAnimationActive={false}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    );
+  }
+
+  // ── Internal data rendering (original, unchanged) ──────────────────
   const residualOnly = showResidual && !showCalculated && !showBackground;
   const yDomain: [number, number] = residualOnly
     ? [settings.residualOffset - 8, settings.residualOffset + 8]
@@ -261,7 +453,7 @@ export function Graph({
   return (
     <div style={{ height, width: '100%' }}>
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data} margin={{ top: 18, right: 24, bottom: 24, left: 24 }}>
+        <LineChart data={internalData} margin={{ top: 18, right: 24, bottom: 24, left: 24 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" vertical={false} />
           <XAxis
             dataKey="x"

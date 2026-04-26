@@ -2,7 +2,7 @@ import React from 'react';
 
 export default function Footer() {
   return (
-    <footer className="py-12 bg-slate-900 text-slate-400">
+    <footer id="stay-updated" className="py-12 bg-slate-900 text-slate-400">
       <div className="max-w-[1280px] mx-auto px-8">
         <div className="grid grid-cols-2 md:grid-cols-5 gap-8 mb-8">
           {/* Brand */}

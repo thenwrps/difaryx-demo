@@ -1,4 +1,5 @@
 import React from 'react';
+import { PLATFORM_URL } from '../../constants/platform';
 
 function DashboardMockup() {
   return (
@@ -136,14 +137,28 @@ export default function HeroSection() {
             <p className="text-[15px] text-slate-500 leading-relaxed mb-7 max-w-[400px]">
               DIFARYX is a next-generation platform for materials characterization, analysis, and lab knowledge organization.
             </p>
-            <div className="flex flex-wrap gap-3">
-              <button className="inline-flex items-center gap-2 h-10 px-5 rounded-lg bg-slate-900 text-white text-[13px] font-semibold hover:bg-slate-800 hover:shadow-lg hover:shadow-slate-900/20 transition-all duration-200">
-                JOIN CLOSED BETA
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-              </button>
-              <button className="inline-flex items-center h-10 px-5 rounded-lg bg-white/80 backdrop-blur-sm border border-slate-200 text-slate-700 text-[13px] font-semibold hover:bg-white hover:border-slate-300 hover:shadow-sm transition-all duration-200">
-                VIEW PLATFORM
-              </button>
+            <div className="flex flex-wrap items-center gap-3">
+              <a
+                href={PLATFORM_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="group inline-flex items-center gap-2 h-11 px-5 rounded-lg bg-slate-900 text-white text-[13px] font-semibold shadow-[0_18px_36px_-20px_rgba(15,23,42,0.95)] ring-1 ring-slate-900/90 transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-600 hover:shadow-[0_22px_45px_-20px_rgba(37,99,235,0.5)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2"
+              >
+                View Platform
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="transition-transform duration-200 group-hover:translate-x-0.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+              </a>
+              <a
+                href="#workflow"
+                className="inline-flex items-center h-11 px-5 rounded-lg bg-white/85 backdrop-blur-sm border border-slate-200 text-slate-700 text-[13px] font-semibold transition-all duration-200 hover:bg-white hover:border-slate-300 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:ring-offset-2"
+              >
+                See Workflow
+              </a>
+              <a
+                href="#stay-updated"
+                className="inline-flex items-center h-11 px-2 text-[13px] font-semibold text-slate-500 transition-colors duration-200 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:ring-offset-2"
+              >
+                Join Closed Beta
+              </a>
             </div>
           </div>
           {/* Right */}

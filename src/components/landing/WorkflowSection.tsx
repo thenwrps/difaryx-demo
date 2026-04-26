@@ -10,7 +10,7 @@ const steps = [
 
 export default function WorkflowSection() {
   return (
-    <section className="py-14 bg-gradient-to-b from-slate-50/50 to-white">
+    <section id="workflow" className="py-14 bg-gradient-to-b from-slate-50/50 to-white">
       <div className="max-w-[1280px] mx-auto px-8">
         <p className="text-[11px] font-bold tracking-[0.15em] text-slate-400 uppercase mb-8">What You Can Do With DIFARYX</p>
 
