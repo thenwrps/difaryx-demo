@@ -352,10 +352,10 @@ export function Graph({
       externalChartData[externalChartData.length - 1]?.x ?? settings.range[1],
     ];
 
-    const markers = peakMarkers ?? [];
+    const heightClass = height === '100%' ? 'h-full' : height === 100 ? 'h-[100px]' : 'h-[400px]';
 
     return (
-      <div style={{ height, width: '100%' }}>
+      <div className={`w-full ${heightClass}`}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={externalChartData} margin={{ top: 18, right: 24, bottom: 24, left: 24 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" vertical={false} />
@@ -450,8 +450,9 @@ export function Graph({
     ? [settings.residualOffset - 8, settings.residualOffset + 8]
     : settings.yDomain;
 
+  const heightClass = height === '100%' ? 'h-full' : height === 100 ? 'h-[100px]' : 'h-[400px]';
   return (
-    <div style={{ height, width: '100%' }}>
+    <div className={`w-full ${heightClass}`}>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={internalData} margin={{ top: 18, right: 24, bottom: 24, left: 24 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" vertical={false} />

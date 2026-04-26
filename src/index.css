@@ -1,15 +1,7 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-@theme {
-  --font-sans: 'Inter', system-ui, sans-serif;
-  --color-navy: #0B1120;
-}
-
-html,
-body,
-#root {
+html, body, #root {
   margin: 0;
   min-height: 100%;
 }
@@ -23,23 +15,20 @@ body {
 }
 
 ::selection {
-  background: rgba(99, 102, 241, 0.15);
+  background: rgba(37, 99, 235, 0.15);
 }
 
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
-
 ::-webkit-scrollbar-track {
   background: transparent;
 }
-
 ::-webkit-scrollbar-thumb {
   background: #cbd5e1;
   border-radius: 9999px;
 }
-
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }

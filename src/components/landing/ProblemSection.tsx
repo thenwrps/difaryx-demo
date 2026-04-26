@@ -2,16 +2,16 @@ import React from 'react';
 import { FileText, StickyNote, RefreshCw, Unplug, HelpCircle } from 'lucide-react';
 
 const problems = [
-  { title: 'Raw files', desc: 'Data scattered across instruments and formats.', Icon: FileText, tint: 'border-red-100 hover:border-red-200' },
-  { title: 'Scattered notes', desc: 'Important insights lost in disconnected places.', Icon: StickyNote, tint: 'border-amber-100 hover:border-amber-200' },
-  { title: 'Repeated steps', desc: 'Manual work and inconsistent analysis every time.', Icon: RefreshCw, tint: 'border-orange-100 hover:border-orange-200' },
-  { title: 'Disconnected tools', desc: 'Too many software, no unified workflow.', Icon: Unplug, tint: 'border-rose-100 hover:border-rose-200' },
-  { title: 'Hard to reproduce', desc: 'Results and context are difficult to trace.', Icon: HelpCircle, tint: 'border-slate-200 hover:border-slate-300' },
+  { title: 'Raw files', desc: 'Data scattered across instruments and formats.', Icon: FileText },
+  { title: 'Scattered notes', desc: 'Important insights lost in disconnected places.', Icon: StickyNote },
+  { title: 'Repeated steps', desc: 'Manual work and inconsistent analysis every time.', Icon: RefreshCw },
+  { title: 'Disconnected tools', desc: 'Too many software, no unified workflow.', Icon: Unplug },
+  { title: 'Hard to reproduce', desc: 'Results and context are difficult to trace.', Icon: HelpCircle },
 ];
 
 export default function ProblemSection() {
   return (
-    <section id="product" className="py-16 bg-gradient-to-b from-white to-slate-50/80">
+    <section id="product" className="py-16 border-t border-slate-100 bg-white">
       <div className="max-w-[1280px] mx-auto px-8">
         <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-10 items-start">
           <div>
@@ -21,9 +21,9 @@ export default function ProblemSection() {
             </h2>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-            {problems.map(({ title, desc, Icon, tint }) => (
-              <div key={title} className={`border ${tint} rounded-xl p-4 bg-white text-center flex flex-col items-center transition-all duration-200 hover:-translate-y-1 hover:shadow-md cursor-default`}>
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200/60 flex items-center justify-center mb-3 shadow-sm">
+            {problems.map(({ title, desc, Icon }) => (
+              <div key={title} className="border border-slate-200 rounded-xl p-4 bg-white text-center flex flex-col items-center">
+                <div className="w-10 h-10 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center mb-3">
                   <Icon size={18} className="text-slate-500" />
                 </div>
                 <h3 className="text-[13px] font-bold text-slate-900 mb-1">{title}</h3>
