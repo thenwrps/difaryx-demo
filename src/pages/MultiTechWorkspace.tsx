@@ -141,6 +141,32 @@ export default function MultiTechWorkspace() {
   return (
     <DashboardLayout>
       <div className="flex-1 overflow-y-auto bg-background p-6">
+        <div className="mb-6 rounded-xl border border-primary/20 bg-surface p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                  Used by DIFARYX Agent
+                </span>
+                <span className="rounded-full border border-cyan/30 bg-cyan/10 px-3 py-1 text-xs font-semibold text-cyan">
+                  Agent Ready
+                </span>
+              </div>
+              <p className="mt-3 text-sm font-semibold text-text-main">Project: CuFe2O4 Spinel Formation</p>
+              <p className="mt-1 text-xs text-text-muted">Role: Multi-tech evidence fusion readiness</p>
+              <p className="mt-2 text-[11px] font-medium uppercase tracking-wider text-text-dim">
+                Goal → Plan → Execute → Evidence → Decision
+              </p>
+            </div>
+            <Link
+              to="/demo/agent?project=cu-fe2o4-spinel"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-gradient-to-r from-blue-600 to-indigo-600 px-4 text-sm font-semibold text-white shadow-lg shadow-blue-600/15 transition-all hover:-translate-y-0.5 hover:shadow-indigo-600/20"
+            >
+              <Sparkles size={16} /> Run in Agent Mode
+            </Link>
+          </div>
+        </div>
+
         <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-wider text-primary">Multi-Tech Hub</p>
@@ -184,6 +210,34 @@ export default function MultiTechWorkspace() {
 
         <div className="grid grid-cols-1 gap-6 2xl:grid-cols-[1fr_360px]">
           <div className="space-y-6">
+            <Card className="p-5">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Sparkles size={16} className="text-primary" />
+                    <h2 className="text-sm font-semibold">Evidence Output Panel</h2>
+                  </div>
+                  <p className="mt-2 text-xs text-text-muted">What this multi-tech tool contributes to the DIFARYX agent.</p>
+                </div>
+                <span className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                  Ready for fusion
+                </span>
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+                {[
+                  ['XRD', 'Ready'],
+                  ['Raman', 'Ready'],
+                  ['FTIR', 'Ready'],
+                  ['XPS', 'Partial'],
+                ].map(([technique, status]) => (
+                  <div key={technique} className="rounded-md border border-border bg-background p-3">
+                    <div className="text-sm font-semibold text-text-main">{technique}</div>
+                    <div className={`mt-1 text-xs font-semibold ${status === 'Partial' ? 'text-amber-500' : 'text-primary'}`}>{status}</div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
               {project.techniques.map((technique) => {
                 const techniqueDatasets = getDatasetsByTechnique(project.id, technique);
@@ -201,6 +255,14 @@ export default function MultiTechWorkspace() {
                         </span>
                       </div>
                       <p className="mt-2 min-h-[42px] text-xs text-text-muted">{techniqueClaims[technique]}</p>
+                      <div className="mt-3 flex flex-wrap gap-1.5">
+                        <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                          Agent-compatible output
+                        </span>
+                        <span className="rounded-full border border-cyan/20 bg-cyan/10 px-2 py-0.5 text-[10px] font-semibold text-cyan">
+                          Ready for fusion
+                        </span>
+                      </div>
                     </div>
                     <div className="p-4">
                       <div className="h-36 rounded-md border border-border bg-background p-2">

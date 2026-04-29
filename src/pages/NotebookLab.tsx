@@ -137,6 +137,17 @@ export default function NotebookLab() {
     showFeedback(`${run.technique} run attached`);
   };
 
+  const copyAgentSummary = async () => {
+    const summary =
+      'Ferrite spinel formation is supported with high confidence. Catalytic activation is provisionally supported but requires XPS oxidation-state validation.';
+    try {
+      await navigator.clipboard.writeText(summary);
+      showFeedback('Summary copied');
+    } catch {
+      showFeedback('Summary ready to copy');
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="flex-1 h-full flex overflow-hidden bg-background">
@@ -272,6 +283,163 @@ export default function NotebookLab() {
           )}
 
           <div className="p-8 max-w-3xl w-full mx-auto space-y-8">
+            <section className="space-y-4">
+              <div className="rounded-xl border border-primary/20 bg-surface p-5">
+                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <h3 className="text-base font-bold text-text-main">Attached Agent Run</h3>
+                    <p className="mt-2 text-sm text-text-muted">Project: CuFe2O4 Spinel Formation</p>
+                    <p className="mt-1 text-sm text-text-main">
+                      Goal: Determine whether the ferrite spinel phase formed and whether the evidence supports catalytic activation.
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-right">
+                    <div className="text-[11px] font-semibold uppercase tracking-wider text-primary">Status</div>
+                    <div className="mt-1 text-sm font-bold text-text-main">Report-ready trace</div>
+                  </div>
+                </div>
+                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {[
+                    ['Mode', 'Deep Analysis'],
+                    ['Confidence', 'High for spinel formation / Medium for catalytic activation'],
+                    ['Run ID', 'AG-RUN-CF-042'],
+                    ['Timestamp', '2026-04-29 17:30'],
+                    ['Source', 'DIFARYX Agent Demo'],
+                  ].map(([label, value]) => (
+                    <div key={label} className="rounded-md border border-border bg-background p-3">
+                      <div className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">{label}</div>
+                      <div className="mt-1 text-sm font-semibold text-text-main">{value}</div>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {['Agent-attached', 'Evidence-linked', 'Report-ready', 'Provenance preserved'].map((badge) => (
+                    <span key={badge} className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                      {badge}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            <section className="space-y-3">
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted border-b border-border pb-2">Agent Evidence Summary</h3>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {[
+                  {
+                    technique: 'XRD',
+                    evidence: 'Spinel diffraction peaks matched',
+                    strength: 'High',
+                    dataset: 'cu-fe2o4-spinel_xrd.xy',
+                    caveat: 'Compare against reference CuFe2O4 pattern before final citation.',
+                  },
+                  {
+                    technique: 'Raman',
+                    evidence: 'A1g/T2g vibrational modes support spinel structure',
+                    strength: 'High',
+                    dataset: 'cu-fe2o4-spinel_raman.txt',
+                    caveat: 'Mode assignment supports phase but does not replace XRD.',
+                  },
+                  {
+                    technique: 'FTIR',
+                    evidence: 'Metal-oxygen/support bonding signatures present',
+                    strength: 'Medium',
+                    dataset: 'cu-fe2o4-support_ftir.csv',
+                    caveat: 'Bonding signatures are supportive, not standalone proof.',
+                  },
+                  {
+                    technique: 'XPS',
+                    evidence: 'Partial; oxidation-state validation still required',
+                    strength: 'Partial',
+                    dataset: 'cu-fe2o4_surface_xps.spe',
+                    caveat: 'Run Fe 2p / Cu 2p deconvolution for activation claims.',
+                  },
+                ].map((item) => (
+                  <div key={item.technique} className="rounded-lg border border-border bg-surface p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-sm font-bold text-text-main">{item.technique}</span>
+                      <span className={`text-xs font-semibold ${item.strength === 'Partial' ? 'text-amber-600' : item.strength === 'High' ? 'text-primary' : 'text-cyan'}`}>
+                        {item.strength}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm text-text-main">{item.evidence}</p>
+                    <p className="mt-2 text-xs font-medium text-text-muted">Linked dataset: {item.dataset}</p>
+                    <p className="mt-1 text-xs text-text-muted">{item.caveat}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="space-y-3">
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted border-b border-border pb-2">Scientific Interpretation</h3>
+              <div className="rounded-lg border border-border bg-surface p-4">
+                <p className="text-sm leading-relaxed text-text-main">
+                  XRD and Raman evidence support ferrite spinel formation. FTIR confirms support-related bonding signatures. XPS remains required for stronger claims regarding surface oxidation-state distribution and catalytic activation.
+                </p>
+                <div className="mt-4 rounded-md border border-primary/20 bg-primary/5 p-3">
+                  <div className="text-[11px] font-semibold uppercase tracking-wider text-primary">Decision statement</div>
+                  <p className="mt-1 text-sm font-semibold text-text-main">
+                    Ferrite spinel formation is supported with high confidence. Catalytic activation is provisionally supported but requires XPS oxidation-state validation.
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            <section className="space-y-3">
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted border-b border-border pb-2">Provenance / Traceability</h3>
+              <div className="rounded-lg border border-border bg-surface p-4">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {[
+                    ['Run ID', 'AG-RUN-CF-042'],
+                    ['Project ID', 'cu-fe2o4-spinel'],
+                    ['Techniques used', 'XRD, Raman, FTIR, XPS'],
+                    ['Data status', '3 ready / 1 partial'],
+                  ].map(([label, value]) => (
+                    <div key={label} className="rounded-md border border-border bg-background p-3">
+                      <div className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">{label}</div>
+                      <div className="mt-1 text-sm font-semibold text-text-main">{value}</div>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-4 rounded-md border border-primary/20 bg-primary/5 p-3 text-center text-xs font-semibold uppercase tracking-wider text-primary">
+                  Goal → Plan → Execute → Evidence → Reason → Decision → Report
+                </div>
+              </div>
+            </section>
+
+            <section className="space-y-3">
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted border-b border-border pb-2">Caveats and Next Steps</h3>
+              <div className="space-y-2">
+                {[
+                  'Run XPS Fe 2p / Cu 2p deconvolution',
+                  'Compare with reference CuFe2O4 spinel pattern',
+                  'Verify reproducibility with replicate dataset',
+                  'Attach final evidence packet to export report',
+                ].map((item, index) => (
+                  <div key={item} className="flex items-start gap-3 rounded-md border border-border bg-surface p-3 text-sm text-text-muted">
+                    <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
+                      {index + 1}
+                    </div>
+                    {item}
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="space-y-3">
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted border-b border-border pb-2">Agent Report Exports</h3>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {(['pdf', 'docx', 'csv'] as DemoExportFormat[]).map((format) => (
+                  <Button key={format} variant="outline" className="gap-2" onClick={() => exportNotebook(format)}>
+                    <Download size={14} /> Export {format.toUpperCase()}
+                  </Button>
+                ))}
+                <Button variant="outline" className="gap-2" onClick={copyAgentSummary}>
+                  <Share2 size={14} /> Copy Summary
+                </Button>
+              </div>
+            </section>
+
             <section className="space-y-3">
               <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted border-b border-border pb-2">Summary</h3>
               <p className="text-sm text-text-main leading-relaxed">{notebook.summary}</p>
@@ -420,6 +588,23 @@ export default function NotebookLab() {
 
         <div className="w-[360px] border-l border-border bg-background flex flex-col shrink-0 overflow-y-auto">
           <div className="p-6">
+            <Card className="mb-6 p-5">
+              <div className="text-xs font-semibold uppercase tracking-wider text-text-muted">Judge View Summary</div>
+              <div className="mt-4 space-y-3 text-sm">
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wider text-primary">Problem</div>
+                  <p className="mt-1 text-text-muted">Fragmented characterization workflows</p>
+                </div>
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wider text-primary">Agent action</div>
+                  <p className="mt-1 text-text-muted">Planned, executed, and fused multi-tech evidence</p>
+                </div>
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wider text-primary">Output</div>
+                  <p className="mt-1 text-text-muted">Traceable scientific decision with caveats and next experiment</p>
+                </div>
+              </div>
+            </Card>
             <div className="mb-4 text-xs font-semibold text-text-muted uppercase tracking-wider">AI Insight</div>
             <AIInsightPanel result={getProjectInsight(project)} />
           </div>

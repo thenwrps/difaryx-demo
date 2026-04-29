@@ -331,6 +331,22 @@ export default function TechniqueWorkspace() {
       ? ['Send this run to Notebook.', 'Run Agent with the saved evidence.']
       : ['Import data, detect features, then save evidence.'],
   };
+  const agentRoleLabel = activeTechnique === 'XRD'
+    ? 'Role: Phase screening (crystallographic validation)'
+    : `Role: ${activeTechnique} evidence preparation`;
+  const evidenceOutputRows = activeTechnique === 'XRD'
+    ? [
+        ['Detected peaks', '9 diffraction peaks'],
+        ['Candidate phase', 'CuFe2O4 spinel'],
+        ['Confidence contribution', 'High'],
+        ['Caveat', 'Requires surface validation (XPS)'],
+      ]
+    : [
+        ['Tool output', `${activeTechnique} evidence packet`],
+        ['Agent status', 'Ready for fusion'],
+        ['Confidence contribution', featuresAvailable ? 'Medium' : 'Pending'],
+        ['Caveat', 'Review alongside XRD and multi-tech context'],
+      ];
 
   const appendLog = (message: string) => {
     setLog((current) => [`${localTimeStamp()} - ${message}`, ...current]);
@@ -741,6 +757,33 @@ export default function TechniqueWorkspace() {
         </aside>
 
         <section className="flex-1 flex flex-col min-w-0 overflow-hidden">
+          <div className="border-b border-border bg-surface/60 px-6 py-4">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                    Used by DIFARYX Agent
+                  </span>
+                  <span className="rounded-full border border-cyan/30 bg-cyan/10 px-3 py-1 text-xs font-semibold text-cyan">
+                    Agent Ready
+                  </span>
+                </div>
+                <p className="mt-2 text-sm font-semibold text-text-main">Project: CuFe2O4 Spinel Formation</p>
+                <p className="mt-1 text-xs text-text-muted">{agentRoleLabel}</p>
+                <p className="mt-2 text-[11px] font-medium uppercase tracking-wider text-text-dim">
+                  Goal → Plan → Execute → Evidence → Decision
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate('/demo/agent?project=cu-fe2o4-spinel')}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-gradient-to-r from-blue-600 to-indigo-600 px-4 text-sm font-semibold text-white shadow-lg shadow-blue-600/15 transition-all hover:-translate-y-0.5 hover:shadow-indigo-600/20"
+              >
+                <Sparkles size={16} /> Run in Agent Mode
+              </button>
+            </div>
+          </div>
+
           <div className="p-6 border-b border-border bg-surface/40">
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -807,6 +850,14 @@ export default function TechniqueWorkspace() {
                       <p className="text-xs text-text-muted mt-1">
                         {imported ? 'Imported trace with active processing state' : 'Raw built-in trace preview'}
                       </p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                          Agent-compatible output
+                        </span>
+                        <span className="rounded-full border border-cyan/20 bg-cyan/10 px-2 py-0.5 text-[10px] font-semibold text-cyan">
+                          Ready for fusion
+                        </span>
+                      </div>
                     </div>
                     {activeTechnique === 'XPS' && (
                       <select
@@ -1058,6 +1109,22 @@ export default function TechniqueWorkspace() {
               </div>
 
               <aside className="space-y-6">
+                <Card className="p-5">
+                  <div className="flex items-center gap-2">
+                    <Sparkles size={16} className="text-primary" />
+                    <h3 className="text-sm font-semibold">Evidence Output Panel</h3>
+                  </div>
+                  <p className="mt-2 text-xs text-text-muted">What this workspace contributes to the DIFARYX agent.</p>
+                  <div className="mt-4 space-y-2">
+                    {evidenceOutputRows.map(([label, value]) => (
+                      <div key={label} className="flex items-start justify-between gap-4 rounded-md border border-border bg-background px-3 py-2 text-sm">
+                        <span className="text-text-muted">{label}</span>
+                        <span className="max-w-[180px] text-right font-semibold text-text-main">{value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+
                 <AIInsightPanel result={insight} />
 
                 <Card className="p-5">

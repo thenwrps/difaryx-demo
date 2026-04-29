@@ -52,6 +52,72 @@ const PIPELINE_STEPS: { id: AgentState; label: string }[] = [
   { id: 'complete', label: 'Complete' },
 ];
 
+const EXECUTION_STEPS = [
+  {
+    label: 'Parse scientific goal',
+    summary: 'Extract target phase, catalytic activation question, and required evidence.',
+  },
+  {
+    label: 'Build analysis plan',
+    summary: 'Map selected datasets to XRD, Raman, FTIR, and XPS reasoning modules.',
+  },
+  {
+    label: 'Validate dataset context',
+    summary: 'Confirm project identity, file coverage, and technique readiness.',
+  },
+  {
+    label: 'Run XRD phase screening',
+    summary: 'Compare diffraction peaks against ferrite spinel reference positions.',
+  },
+  {
+    label: 'Run Raman validation',
+    summary: 'Check vibrational modes for spinel fingerprint support.',
+  },
+  {
+    label: 'Run FTIR bonding check',
+    summary: 'Review metal-oxygen and surface bonding bands.',
+  },
+  {
+    label: 'Review XPS evidence',
+    summary: 'Assess oxidation-state support and note incomplete surface evidence.',
+  },
+  {
+    label: 'Fuse multi-tech evidence',
+    summary: 'Combine phase, vibrational, bonding, and surface evidence.',
+  },
+  {
+    label: 'Generate conclusion',
+    summary: 'Produce confidence, caveats, and the next recommended step.',
+  },
+];
+
+const EVIDENCE_SUMMARY = [
+  {
+    technique: 'XRD',
+    feature: 'spinel peaks matched',
+    contribution: 'High',
+    caveat: 'Compact reference library in demo mode.',
+  },
+  {
+    technique: 'Raman',
+    feature: 'A1g mode supports spinel',
+    contribution: 'High',
+    caveat: 'Mode assignment is deterministic demo evidence.',
+  },
+  {
+    technique: 'FTIR',
+    feature: 'metal-oxygen band present',
+    contribution: 'Medium',
+    caveat: 'Bonding evidence supports but does not prove phase alone.',
+  },
+  {
+    technique: 'XPS',
+    feature: 'surface oxidation evidence partial',
+    contribution: 'Medium',
+    caveat: 'Catalytic activation remains pending full XPS validation.',
+  },
+];
+
 function wait(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
@@ -87,8 +153,10 @@ function promptFocus(prompt: string) {
 export default function AgentDemo() {
   const [searchParams] = useSearchParams();
   const project = getProject(searchParams.get('project'));
-  const [goal, setGoal] = useState(`Generate a traceable decision for ${project.name}`);
+  const [goal, setGoal] = useState('Determine whether the ferrite spinel phase formed and whether the evidence supports catalytic activation.');
+  const [agentMode, setAgentMode] = useState('Deep Analysis');
   const [agentState, setAgentState] = useState<AgentState>('idle');
+  const [timelineIndex, setTimelineIndex] = useState(-1);
   const [logs, setLogs] = useState<{ time: string; msg: string; type?: string }[]>([]);
   const [result, setResult] = useState<AgentRunResult | null>(null);
   const [isComplete, setIsComplete] = useState(false);
@@ -107,12 +175,15 @@ export default function AgentDemo() {
   const previewRun = useMemo(() => buildAgentRun(project, selectedTechniques), [project, selectedTechniques]);
   const stagedEvidence = getTechniqueEvidence(project, selectedTechniques).slice(0, evidenceCountForState(agentState));
   const activeGraphIndex = activeGraphIndexForState(agentState, selectedDatasetRows.length);
+  const statusLabel = isComplete ? 'Complete' : agentState === 'input' || agentState === 'context' ? 'Planning' : isRunning ? 'Running' : 'Idle';
 
   useEffect(() => {
     const nextDatasets = getProjectDatasets(project.id);
-    setGoal(`Generate a traceable decision for ${project.name}`);
+    setGoal('Determine whether the ferrite spinel phase formed and whether the evidence supports catalytic activation.');
+    setAgentMode('Deep Analysis');
     setSelectedDatasetIds(nextDatasets.filter((dataset) => project.techniques.includes(dataset.technique)).map((dataset) => dataset.id));
     setAgentState('idle');
+    setTimelineIndex(-1);
     setLogs([]);
     setResult(null);
     setIsComplete(false);
@@ -172,34 +243,55 @@ export default function AgentDemo() {
     setResult(null);
     setIsComplete(false);
     setShowReasoningTrace(false);
+    setTimelineIndex(0);
 
     setAgentState('input');
     addLog(`Goal received: "${goal}"`, 'info');
     addLog(`Datasets selected: ${selectedDatasetRows.map((dataset) => dataset.fileName).join(', ') || 'none'}`, 'info');
-    await wait(550);
+    await wait(450);
 
     setAgentState('context');
+    setTimelineIndex(1);
+    addLog(`Analysis plan created in ${agentMode} mode`, 'info');
+    await wait(450);
+
+    setTimelineIndex(2);
     addLog(`Loaded project context: ${project.name}`, 'info');
     addLog(`Material system: ${project.material}`, 'info');
-    await wait(650);
+    await wait(450);
 
     setAgentState('execution');
+    setTimelineIndex(3);
     addLog(`Executing ${selectedTechniques.join(' + ') || 'no'} evidence modules`, 'system');
     addLog(selectedTechniques.includes('XRD') ? `Detected ${project.xrdPeaks.length} XRD peaks` : 'XRD peak matching skipped', 'system');
     selectedDatasetRows.forEach((dataset) => addLog(`Graph queued: ${dataset.technique} / ${dataset.fileName}`, 'system'));
-    await wait(750);
+    await wait(420);
+
+    setTimelineIndex(4);
+    addLog(selectedTechniques.includes('Raman') ? 'Raman validation module complete' : 'Raman validation skipped', 'system');
+    await wait(420);
+
+    setTimelineIndex(5);
+    addLog(selectedTechniques.includes('FTIR') ? 'FTIR bonding check complete' : 'FTIR bonding check skipped', 'system');
+    await wait(420);
+
+    setTimelineIndex(6);
+    addLog(selectedTechniques.includes('XPS') ? 'XPS surface evidence reviewed' : 'XPS evidence marked partial', 'system');
+    await wait(420);
 
     setAgentState('fusion');
+    setTimelineIndex(7);
     addLog('Fusing selected technique evidence', 'info');
     run.evidence.forEach((item) => addLog(`Evidence: ${item}`, 'success'));
-    await wait(700);
+    await wait(600);
 
     setAgentState('reasoning');
     addLog('Reasoning over confidence, missing evidence, and recommendations', 'system');
     run.warnings.forEach((warning) => addLog(`Warning: ${warning}`, 'error'));
-    await wait(750);
+    await wait(550);
 
     setAgentState('decision');
+    setTimelineIndex(8);
     setResult(run);
     setRunHistory((current) => [
       {
@@ -217,6 +309,7 @@ export default function AgentDemo() {
     await wait(650);
 
     setAgentState('complete');
+    setTimelineIndex(EXECUTION_STEPS.length);
     addLog('Run complete; notebook result prepared', 'success');
     await wait(400);
     setIsComplete(true);
@@ -226,8 +319,9 @@ export default function AgentDemo() {
     setIsComplete(false);
     setResult(null);
     setAgentState('idle');
+    setTimelineIndex(-1);
     setShowReasoningTrace(false);
-    setGoal(`Generate a new traceable decision for ${project.name}`);
+    setGoal('Determine whether the ferrite spinel phase formed and whether the evidence supports catalytic activation.');
     setLogs((prev) => [
       ...prev,
       {
@@ -238,7 +332,7 @@ export default function AgentDemo() {
     ]);
   };
 
-  if (isComplete && result) {
+  if (false && isComplete && result) {
     const matrixTechniques = (['XRD', 'Raman', 'XPS', 'FTIR'] as Technique[]).filter(
       (technique) => project.techniques.includes(technique) || result.selectedDatasets.includes(technique),
     );
@@ -537,6 +631,66 @@ export default function AgentDemo() {
         </div>
       </header>
 
+      <section className="shrink-0 border-b border-slate-800 bg-[#0A0F1A] px-6 py-4">
+        <div className="grid gap-4 xl:grid-cols-[220px_1fr_300px_auto] xl:items-end">
+          <div className="rounded-lg border border-slate-800 bg-[#070B12] p-3">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Project</p>
+            <p className="mt-1 text-sm font-semibold text-white">CuFe2O4 Spinel Formation</p>
+          </div>
+          <label className="block">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Goal</span>
+            <textarea
+              value={goal}
+              onChange={(event) => setGoal(event.target.value)}
+              disabled={isRunning}
+              className="mt-1 h-16 w-full resize-none rounded-lg border border-slate-800 bg-[#070B12] px-3 py-2 text-sm text-slate-200 outline-none transition-colors focus:border-primary disabled:opacity-70"
+            />
+          </label>
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Mode selector</p>
+            <div className="mt-1 grid grid-cols-3 gap-1">
+              {['Quick Insight', 'Deep Analysis', 'Autonomous Workflow'].map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setAgentMode(mode)}
+                  disabled={isRunning}
+                  className={`min-h-10 rounded-md border px-2 text-center text-[10px] font-semibold transition-colors ${
+                    agentMode === mode
+                      ? 'border-cyan/50 bg-cyan/10 text-cyan'
+                      : 'border-slate-800 bg-[#070B12] text-slate-400 hover:border-slate-600 hover:text-slate-200'
+                  }`}
+                >
+                  {mode}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex flex-col gap-2">
+            <span
+              className={`inline-flex h-8 items-center justify-center rounded-full border px-3 text-xs font-semibold ${
+                statusLabel === 'Complete'
+                  ? 'border-emerald-400/40 bg-emerald-400/10 text-emerald-300'
+                  : statusLabel === 'Running' || statusLabel === 'Planning'
+                    ? 'border-cyan/40 bg-cyan/10 text-cyan'
+                    : 'border-slate-700 bg-[#070B12] text-slate-400'
+              }`}
+            >
+              {statusLabel}
+            </span>
+            <button
+              type="button"
+              onClick={runAgent}
+              disabled={isRunning || !goal.trim()}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-4 text-sm font-bold text-white shadow-lg shadow-blue-600/20 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-indigo-600/25 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isRunning ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} fill="currentColor" />}
+              Run Agent
+            </button>
+          </div>
+        </div>
+      </section>
+
       <div className="flex-1 flex overflow-hidden">
         <div className="w-80 border-r border-slate-800 bg-[#0A0F1A]/50 p-5 flex flex-col gap-6 shrink-0 overflow-y-auto">
           <div className="rounded-lg border border-slate-800 bg-[#070B12] p-3">
@@ -694,13 +848,12 @@ export default function AgentDemo() {
               )}
 
               {isRunning && (
-                <div className="pointer-events-none absolute inset-0 bg-[#0A0F1A]/20 backdrop-blur-[1px] flex items-center justify-center rounded-xl">
-                  <div className="bg-[#070B12] border border-cyan/30 rounded-lg p-6 shadow-2xl shadow-cyan/10 text-center max-w-sm">
-                    <div className="w-12 h-12 rounded-full bg-cyan/10 border border-cyan/30 flex items-center justify-center mx-auto mb-4">
-                      <Loader2 size={24} className="text-cyan animate-spin" />
-                    </div>
-                    <h3 className="text-white font-semibold mb-1">Agent is analyzing</h3>
-                    <p className="text-sm text-cyan animate-pulse">
+                <div className="pointer-events-none absolute right-6 top-6 rounded-lg border border-cyan/30 bg-[#070B12]/90 px-3 py-2 shadow-lg shadow-cyan/10">
+                  <div className="flex items-center gap-2">
+                    <Loader2 size={14} className="text-cyan animate-spin" />
+                    <div>
+                      <h3 className="text-xs font-semibold text-white">Agent is analyzing</h3>
+                      <p className="text-[11px] text-cyan animate-pulse">
                       {agentState === 'execution'
                         ? 'Extracting selected evidence...'
                         : agentState === 'fusion'
@@ -708,7 +861,8 @@ export default function AgentDemo() {
                           : agentState === 'reasoning'
                             ? 'Evaluating confidence and caveats...'
                             : 'Preparing run state...'}
-                    </p>
+                      </p>
+                    </div>
                   </div>
                 </div>
               )}
@@ -746,6 +900,73 @@ export default function AgentDemo() {
           <h2 className="text-sm font-semibold text-white flex items-center gap-2">
             <FileText size={16} className="text-primary" /> Final Decision
           </h2>
+
+          <div className="rounded-xl border border-slate-800 bg-[#070B12] p-4">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Agent Timeline</h3>
+              <span className="rounded-full border border-slate-700 px-2 py-0.5 text-[10px] font-semibold text-slate-400">
+                Goal → Plan → Execute → Evidence → Decision
+              </span>
+            </div>
+            <div className="space-y-2">
+              {EXECUTION_STEPS.map((step, index) => {
+                const running = isRunning && index === timelineIndex;
+                const complete = isComplete || index < timelineIndex;
+                const status = running ? 'running' : complete ? 'complete' : 'pending';
+
+                return (
+                  <div key={step.label} className="rounded-lg border border-slate-800 bg-[#0A0F1A] p-3">
+                    <div className="flex items-start gap-3">
+                      <span
+                        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[10px] font-bold ${
+                          status === 'complete'
+                            ? 'border-emerald-400/50 bg-emerald-400/10 text-emerald-300'
+                            : status === 'running'
+                              ? 'border-cyan/60 bg-cyan/10 text-cyan'
+                              : 'border-slate-700 bg-slate-900 text-slate-500'
+                        }`}
+                      >
+                        {status === 'complete' ? '✓' : index + 1}
+                      </span>
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-xs font-semibold text-white">{step.label}</p>
+                          <span
+                            className={`rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${
+                              status === 'complete'
+                                ? 'bg-emerald-400/10 text-emerald-300'
+                                : status === 'running'
+                                  ? 'bg-cyan/10 text-cyan'
+                                  : 'bg-slate-800 text-slate-500'
+                            }`}
+                          >
+                            {status}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-[11px] leading-snug text-slate-500">{step.summary}</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-800 bg-[#070B12] p-4">
+            <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">Evidence Summary</h3>
+            <div className="space-y-2">
+              {EVIDENCE_SUMMARY.map((item) => (
+                <div key={item.technique} className="rounded-lg border border-slate-800 bg-[#0A0F1A] p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-xs font-semibold text-cyan">{item.technique}</span>
+                    <span className="text-[10px] font-semibold text-emerald-300">{item.contribution}</span>
+                  </div>
+                  <p className="mt-1 text-sm font-semibold text-white">{item.feature}</p>
+                  <p className="mt-1 text-[11px] leading-snug text-slate-500">{item.caveat}</p>
+                </div>
+              ))}
+            </div>
+          </div>
 
           {agentState === 'idle' && (
             <div className="flex-1 flex flex-col items-center justify-center text-center opacity-50">
@@ -805,6 +1026,38 @@ export default function AgentDemo() {
               </div>
             </div>
           )}
+
+          <div className="rounded-xl border border-slate-800 bg-[#070B12] p-4">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Final Result</h3>
+            <div className="mt-3 space-y-3">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Conclusion</p>
+                <p className="mt-1 text-sm leading-relaxed text-slate-200">
+                  {result
+                    ? 'Ferrite spinel formation is strongly supported by XRD and Raman evidence, while catalytic activation remains medium-confidence pending XPS validation.'
+                    : 'Run the agent to generate a traceable scientific conclusion.'}
+                </p>
+              </div>
+              <div className="flex items-center justify-between rounded-lg border border-slate-800 bg-[#0A0F1A] px-3 py-2">
+                <span className="text-xs text-slate-500">Confidence</span>
+                <span className="text-xs font-semibold text-emerald-300">{result ? result.confidenceLabel : 'Pending'}</span>
+              </div>
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Caveats</p>
+                <p className="mt-1 text-xs leading-relaxed text-amber-200/80">
+                  {result?.warnings.length
+                    ? result.warnings.join(' ')
+                    : 'Catalytic activation requires complete XPS validation before final reporting.'}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Next recommended step</p>
+                <p className="mt-1 text-xs leading-relaxed text-slate-400">
+                  {result ? result.recommendations[0] : 'Start the run, then review workspace evidence and notebook report output.'}
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

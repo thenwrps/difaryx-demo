@@ -2,17 +2,17 @@ import React from 'react';
 import { Microscope, Layers, Link2, FileOutput, ArrowRight } from 'lucide-react';
 
 const steps = [
-  { title: 'Analyze', desc: 'Run advanced analysis on multiple techniques.', Icon: Microscope, bg: 'bg-blue-50', text: 'text-blue-600' },
-  { title: 'Structure', desc: 'Convert raw data into structured datasets.', Icon: Layers, bg: 'bg-violet-50', text: 'text-violet-600' },
-  { title: 'Connect', desc: 'Link analysis with notebook context.', Icon: Link2, bg: 'bg-indigo-50', text: 'text-indigo-600' },
-  { title: 'Export', desc: 'Generate publication-ready reports and figures.', Icon: FileOutput, bg: 'bg-slate-50', text: 'text-slate-600' },
+  { title: 'Plan', desc: 'Translate the scientific goal into a multi-technique workflow.', Icon: Microscope, bg: 'bg-blue-50', text: 'text-blue-600' },
+  { title: 'Execute', desc: 'Process raw signals and detect technique-specific features.', Icon: Layers, bg: 'bg-violet-50', text: 'text-violet-600' },
+  { title: 'Evidence', desc: 'Link conclusions to spectra, methods, confidence, and caveats.', Icon: Link2, bg: 'bg-indigo-50', text: 'text-indigo-600' },
+  { title: 'Report', desc: 'Generate a traceable decision ready for notebook review.', Icon: FileOutput, bg: 'bg-slate-50', text: 'text-slate-600' },
 ];
 
 export default function WorkflowSection() {
   return (
     <section className="py-14 border-t border-slate-100 bg-white">
       <div className="max-w-[1280px] mx-auto px-8">
-        <p className="text-[11px] font-bold tracking-[0.15em] text-slate-400 uppercase mb-8">What You Can Do With DIFARYX</p>
+        <p className="text-[11px] font-bold tracking-[0.15em] text-slate-400 uppercase mb-8">Agentic Scientific Workflow</p>
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           {steps.map((step, i) => (
             <React.Fragment key={step.title}>

@@ -25,6 +25,10 @@ export default function Dashboard() {
   const [localExperiments, setLocalExperiments] = useState<DemoExperiment[]>([]);
   const [experimentModalOpen, setExperimentModalOpen] = useState(false);
   const [experimentProjectId, setExperimentProjectId] = useState(DEFAULT_PROJECT_ID);
+  const [agentGoal, setAgentGoal] = useState(
+    'Determine whether the ferrite spinel phase formed and whether the evidence supports catalytic activation.',
+  );
+  const [agentMode, setAgentMode] = useState('Deep Analysis');
 
   useEffect(() => {
     const timer = window.setTimeout(() => setIsInitializing(false), 1400);
@@ -36,6 +40,115 @@ export default function Dashboard() {
     <>
     <DashboardLayout>
       <div className="p-8 h-full overflow-y-auto">
+        <section className="mb-8 grid grid-cols-1 gap-4 xl:grid-cols-[1.4fr_0.7fr_0.9fr]">
+          <Card className="border-primary/20 bg-gradient-to-br from-primary/10 via-surface to-surface p-5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-primary/20 bg-primary/10 text-primary">
+                    <Sparkles size={16} />
+                  </span>
+                  <div>
+                    <h2 className="text-xl font-bold tracking-tight text-text-main">DIFARYX Scientific Agent</h2>
+                    <p className="mt-1 text-sm text-text-muted">Plan, execute, and validate multi-technique characterization workflows</p>
+                  </div>
+                </div>
+                <div className="mt-4 rounded-lg border border-primary/15 bg-background/60 p-3">
+                  <div className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">Project</div>
+                  <div className="mt-1 text-sm font-semibold text-text-main">CuFe2O4 Spinel Formation</div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate('/demo/agent?project=cu-fe2o4-spinel')}
+                className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-md bg-gradient-to-r from-blue-600 to-indigo-600 px-4 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition-all hover:-translate-y-0.5 hover:shadow-indigo-600/25"
+              >
+                <Sparkles size={16} /> Run Autonomous Agent
+              </button>
+            </div>
+
+            <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-[1fr_280px]">
+              <label className="block">
+                <span className="text-xs font-semibold uppercase tracking-wider text-text-muted">Goal input</span>
+                <textarea
+                  value={agentGoal}
+                  onChange={(event) => setAgentGoal(event.target.value)}
+                  className="mt-2 h-24 w-full resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm text-text-main outline-none transition-colors focus:border-primary"
+                />
+              </label>
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wider text-text-muted">Mode selector</div>
+                <div className="mt-2 grid gap-2">
+                  {['Quick Insight', 'Deep Analysis', 'Autonomous Workflow'].map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => setAgentMode(mode)}
+                      className={`rounded-md border px-3 py-2 text-left text-xs font-semibold transition-colors ${
+                        agentMode === mode
+                          ? 'border-primary/40 bg-primary/10 text-primary'
+                          : 'border-border bg-background text-text-muted hover:border-primary/30 hover:text-text-main'
+                      }`}
+                    >
+                      {mode}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          <Card className="p-5">
+            <div className="text-xs font-semibold uppercase tracking-wider text-text-muted">Dataset Readiness Panel</div>
+            <div className="mt-4 space-y-3">
+              {[
+                ['XRD', 'Ready'],
+                ['Raman', 'Ready'],
+                ['FTIR', 'Ready'],
+                ['XPS', 'Partial'],
+              ].map(([technique, status]) => (
+                <div key={technique} className="flex items-center justify-between rounded-lg border border-border bg-background px-3 py-2">
+                  <span className="text-sm font-semibold text-text-main">{technique}</span>
+                  <span className={`text-xs font-semibold ${status === 'Partial' ? 'text-amber-500' : 'text-primary'}`}>{status}</span>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          <Card className="p-5">
+            <div className="text-xs font-semibold uppercase tracking-wider text-text-muted">Recent Agent Runs</div>
+            <div className="mt-4 space-y-3">
+              {[
+                {
+                  goal: 'Confirm spinel phase formation',
+                  confidence: 'High',
+                  conclusion: 'XRD and Raman support ferrite formation.',
+                },
+                {
+                  goal: 'Assess catalytic activation evidence',
+                  confidence: 'Medium',
+                  conclusion: 'Surface evidence requires XPS review.',
+                },
+                {
+                  goal: 'Prepare report-ready trace',
+                  confidence: 'High',
+                  conclusion: 'Notebook evidence is ready for export.',
+                },
+              ].map((run) => (
+                <div key={run.goal} className="rounded-lg border border-border bg-background p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-semibold text-text-main">{run.goal}</span>
+                    <span className={`shrink-0 text-xs font-semibold ${run.confidence === 'High' ? 'text-primary' : 'text-cyan'}`}>
+                      {run.confidence}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs leading-relaxed text-text-muted">{run.conclusion}</p>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </section>
+
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Project Dashboard</h1>

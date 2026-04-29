@@ -2,11 +2,11 @@ import React from 'react';
 import { FileText, StickyNote, RefreshCw, Unplug, HelpCircle } from 'lucide-react';
 
 const problems = [
-  { title: 'Raw files', desc: 'Data scattered across instruments and formats.', Icon: FileText },
-  { title: 'Scattered notes', desc: 'Important insights lost in disconnected places.', Icon: StickyNote },
-  { title: 'Repeated steps', desc: 'Manual work and inconsistent analysis every time.', Icon: RefreshCw },
-  { title: 'Disconnected tools', desc: 'Too many software, no unified workflow.', Icon: Unplug },
-  { title: 'Hard to reproduce', desc: 'Results and context are difficult to trace.', Icon: HelpCircle },
+  { title: 'Raw files', desc: 'Instrument signals arrive across formats, folders, and naming conventions.', Icon: FileText },
+  { title: 'Scattered notes', desc: 'Interpretation depends on context spread across notebooks and messages.', Icon: StickyNote },
+  { title: 'Repeated steps', desc: 'Manual processing makes evidence review slow and inconsistent.', Icon: RefreshCw },
+  { title: 'Disconnected tools', desc: 'XRD, Raman, FTIR, and XPS work rarely share one reasoning path.', Icon: Unplug },
+  { title: 'Hard to reproduce', desc: 'Decisions need linked methods, caveats, confidence, and provenance.', Icon: HelpCircle },
 ];
 
 export default function ProblemSection() {
@@ -17,7 +17,7 @@ export default function ProblemSection() {
           <div>
             <p className="text-[11px] font-bold tracking-[0.15em] text-slate-400 uppercase mb-4">The Problem</p>
             <h2 className="text-[28px] lg:text-[32px] font-bold leading-[1.2] text-slate-900">
-              Scientific data is everywhere.<br />The workflow is still fragmented.
+              Scientific interpretation is fragmented across tools, files, and expertise.
             </h2>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
