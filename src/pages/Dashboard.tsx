@@ -2,7 +2,7 @@ import React from 'react';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
 import { Card, CardContent } from '../components/ui/Card';
 import { Graph } from '../components/ui/Graph';
-import { Plus, Clock, FileText } from 'lucide-react';
+import { Plus, Clock, FileText, Sparkles } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { useNavigate } from 'react-router-dom';
 
@@ -25,9 +25,14 @@ export default function Dashboard() {
             <h1 className="text-2xl font-bold tracking-tight">Project Dashboard</h1>
             <p className="text-text-muted mt-1 text-sm">Manage your characterization workflows and experiments.</p>
           </div>
-          <Button variant="primary" className="gap-2">
-            <Plus size={16} /> New Project
-          </Button>
+          <div className="flex gap-3">
+            <Button variant="secondary" className="gap-2 border-primary/30 text-primary hover:bg-primary/10" onClick={() => navigate('/demo/agent')}>
+              <Sparkles size={16} /> Run Autonomous Agent
+            </Button>
+            <Button variant="primary" className="gap-2">
+              <Plus size={16} /> New Project
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">

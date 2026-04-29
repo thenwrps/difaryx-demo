@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 
 function DashboardMockup() {
   return (
@@ -127,14 +128,12 @@ export default function HeroSection() {
             
             <div className="flex flex-col gap-3 items-start">
               <div className="flex flex-wrap gap-3">
-                <a 
-                  href="https://demo-difaryx.vercel.app/"
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <Link 
+                  to="/demo/agent"
                   className="inline-flex items-center justify-center h-11 px-6 rounded-lg bg-blue-700 text-white text-[14px] font-bold shadow-sm hover:shadow-lg hover:shadow-blue-500/25 hover:scale-[1.03] transition-all duration-200"
                 >
                   ▶ RUN AGENT DEMO
-                </a>
+                </Link>
                 <button className="inline-flex items-center gap-2 h-11 px-5 rounded-lg bg-white border border-slate-200 text-slate-700 text-[13px] font-semibold hover:bg-slate-50 transition-colors">
                   JOIN CLOSED BETA
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>

@@ -4,6 +4,7 @@ import Landing from "./pages/Landing";
 import Dashboard from "./pages/Dashboard";
 import MultiTechWorkspace from "./pages/MultiTechWorkspace";
 import NotebookLab from "./pages/NotebookLab";
+import AgentDemo from "./pages/AgentDemo";
 
 function App() {
   return (
@@ -13,6 +14,7 @@ function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/workspace/multi" element={<MultiTechWorkspace />} />
         <Route path="/notebook" element={<NotebookLab />} />
+        <Route path="/demo/agent" element={<AgentDemo />} />
       </Routes>
     </Router>
   );
