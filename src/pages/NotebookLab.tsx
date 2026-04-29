@@ -1,77 +1,360 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { ArrowRight, BarChart3, Download, FileText, FlaskConical, Plus, Save, Share2, Target } from 'lucide-react';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
-import { Save, Paperclip, FileText, Share2, Plus, FlaskConical, BarChart3, Target, ArrowRight } from 'lucide-react';
 import { AIInsightPanel } from '../components/ui/AIInsightPanel';
-import { useScientificEngine, DEFAULT_CONFIG } from '../scientific/useScientificEngine';
+import { ExperimentModal } from '../components/workspace/ExperimentModal';
+import {
+  ProcessingRun,
+  demoProjects,
+  generateNotebookSections,
+  getAgentPath,
+  getDataset,
+  getLocalExperiments,
+  getNotebookPath,
+  getProcessingRun,
+  getProcessingRuns,
+  getProject,
+  getProjectInsight,
+  getWorkspaceRoute,
+  loadAgentRunResult,
+} from '../data/demoProjects';
+import { DemoExportFormat, exportDemoArtifact } from '../utils/demoExport';
 
 export default function NotebookLab() {
-  const engine = useScientificEngine(DEFAULT_CONFIG);
-  const nb = engine.notebook;
+  const [searchParams] = useSearchParams();
+  const project = getProject(searchParams.get('project'));
+  const [feedback, setFeedback] = useState('');
+  const [experimentModalOpen, setExperimentModalOpen] = useState(false);
+  const [localExperiments, setLocalExperiments] = useState(() => getLocalExperiments());
+  const [observations, setObservations] = useState<string[]>([]);
+  const [attachedRun, setAttachedRun] = useState<string | null>(null);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const [observationOpen, setObservationOpen] = useState(false);
+  const [observationDraft, setObservationDraft] = useState('');
+  const [attachRunOpen, setAttachRunOpen] = useState(false);
+  const runId = searchParams.get('run');
+  const runResult = useMemo(() => loadAgentRunResult(project.id), [project.id]);
+  const workspaceRun = useMemo(() => getProcessingRun(runId), [runId]);
+  const workspaceDataset = useMemo(
+    () => (workspaceRun ? getDataset(workspaceRun.datasetId) : null),
+    [workspaceRun],
+  );
+  const availableRuns = useMemo(
+    () => getProcessingRuns().filter((run) => run.projectId === project.id),
+    [project.id, feedback],
+  );
+  const attachedRunRecord = useMemo(() => getProcessingRun(attachedRun), [attachedRun]);
+  const notebook = useMemo(() => {
+    const base = generateNotebookSections(project, runResult);
+    if (!workspaceRun) return base;
+
+    const confidence = workspaceRun.matchResult?.confidence ?? project.confidence;
+    const confidenceLabel = confidence >= 90 ? 'High confidence' : confidence >= 80 ? 'Moderate confidence' : 'Evidence-linked confidence';
+
+    return {
+      ...base,
+      summary: `${workspaceRun.technique} workspace run generated from ${workspaceDataset?.fileName ?? 'selected dataset'} with ${workspaceRun.detectedFeatures.length} detected features and traceable processing parameters.`,
+      decision: workspaceRun.matchResult?.phase ?? `${workspaceRun.technique} evidence saved for ${project.name}`,
+      confidence,
+      confidenceLabel,
+      evidence: workspaceRun.evidence.map((item) => item.claim),
+      warnings: workspaceRun.matchResult?.missingPeaks.length
+        ? [`Missing or weak references: ${workspaceRun.matchResult.missingPeaks.join(', ')}.`]
+        : [],
+      recommendations: project.recommendations,
+      processingPipeline: [
+        `Dataset: ${workspaceDataset?.fileName ?? workspaceRun.datasetId}.`,
+        `Technique: ${workspaceRun.technique}.`,
+        ...Object.entries(workspaceRun.parameters).map(([key, value]) => `${key}: ${String(value)}`),
+        `Detected features: ${workspaceRun.detectedFeatures.length}.`,
+        'Saved evidence and generated notebook section.',
+      ],
+      peakDetection: `${workspaceRun.detectedFeatures.length} ${workspaceRun.technique === 'XRD' ? 'peaks' : 'features'} detected in the workspace run.`,
+      phaseInterpretation: workspaceRun.matchResult
+        ? `${workspaceRun.matchResult.phase}. ${workspaceRun.matchResult.confidence}% confidence. ${workspaceRun.matchResult.caveat}`
+        : base.phaseInterpretation,
+    };
+  }, [project, runResult, workspaceDataset, workspaceRun]);
+
+  const showFeedback = (message: string) => {
+    setFeedback(message);
+    window.setTimeout(() => setFeedback(''), 1800);
+  };
+
+  const copyShareLink = async () => {
+    const url = `${window.location.origin}/notebook?project=${project.id}${workspaceRun ? `&run=${workspaceRun.id}` : ''}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      showFeedback('Share link copied');
+    } catch {
+      showFeedback(`Share link ready: ${url}`);
+    }
+  };
+
+  const exportNotebook = (format: DemoExportFormat) => {
+    exportDemoArtifact(format, {
+      filenameBase: `${project.id}-notebook-report`,
+      title: `${notebook.title} Report`,
+      sections: [
+        { heading: 'Summary', lines: [notebook.summary] },
+        { heading: 'Decision', lines: [notebook.decision, `${notebook.confidenceLabel} (${notebook.confidence}%)`] },
+        { heading: 'Pipeline', lines: notebook.processingPipeline },
+        { heading: 'Evidence', lines: notebook.evidence },
+        { heading: 'Observations', lines: observations.length > 0 ? observations : ['No added observations.'] },
+        {
+          heading: 'Attached run',
+          lines: attachedRunRecord
+            ? [`${attachedRunRecord.technique} run`, new Date(attachedRunRecord.timestamp).toLocaleString(), `${attachedRunRecord.detectedFeatures.length} features`]
+            : ['No attached run.'],
+        },
+      ],
+      csvRows: notebook.evidence.map((item, index) => ({
+        project: project.name,
+        row: index + 1,
+        evidence: item,
+        confidence: notebook.confidence,
+      })),
+    });
+    setExportMenuOpen(false);
+    showFeedback(`${format.toUpperCase()} export downloaded`);
+  };
+
+  const addObservation = () => {
+    const text = observationDraft.trim() || `${project.name} evidence reviewed in notebook.`;
+    const nextObservation = `Observation ${observations.length + 1}: ${text}`;
+    setObservations((current) => [nextObservation, ...current]);
+    setObservationDraft('');
+    setObservationOpen(false);
+    showFeedback('Observation added');
+  };
+
+  const attachRunToNotebook = (run: ProcessingRun) => {
+    setAttachedRun(run.id);
+    setAttachRunOpen(false);
+    showFeedback(`${run.technique} run attached`);
+  };
 
   return (
     <DashboardLayout>
       <div className="flex-1 h-full flex overflow-hidden bg-background">
-        
-        {/* Left Panel: Navigation */}
-        <div className="w-64 border-r border-border bg-surface flex flex-col shrink-0">
+        <div className="w-72 border-r border-border bg-surface flex flex-col shrink-0">
           <div className="p-4 border-b border-border flex justify-between items-center">
             <h2 className="text-sm font-semibold">Experiments</h2>
-            <Button variant="ghost" size="sm" className="px-2 h-7"><Plus size={14} /></Button>
+            <Button variant="ghost" size="sm" className="px-2 h-7" onClick={() => setExperimentModalOpen(true)}><Plus size={14} /></Button>
           </div>
           <div className="p-2 space-y-1 flex-1 overflow-y-auto">
-            <button className="w-full text-left px-3 py-2 rounded-md text-sm font-medium transition-colors bg-primary/10 text-primary border border-primary/20">
-              Exp-042: CuFe2O4 Synthesis
-            </button>
-            <button className="w-full text-left px-3 py-2 rounded-md text-sm font-medium transition-colors text-text-muted hover:bg-surface-hover hover:text-text-main border border-transparent">
-              Exp-041: NiFe2O4 Control
-            </button>
-            <button className="w-full text-left px-3 py-2 rounded-md text-sm font-medium transition-colors text-text-muted hover:bg-surface-hover hover:text-text-main border border-transparent">
-              Exp-040: Fe3O4 Calibration
-            </button>
+            {demoProjects.map((item) => (
+              <Link
+                key={item.id}
+                to={getNotebookPath(item)}
+                className={`block w-full text-left px-3 py-2 rounded-md text-sm font-medium transition-colors border ${
+                  item.id === project.id
+                    ? 'bg-primary/10 text-primary border-primary/20'
+                    : 'text-text-muted hover:bg-surface-hover hover:text-text-main border-transparent'
+                }`}
+              >
+                {item.notebook.title}
+              </Link>
+            ))}
+            {localExperiments.map((experiment) => (
+              <Link
+                key={experiment.id}
+                to={`/notebook?project=${experiment.projectId}`}
+                className={`block w-full text-left px-3 py-2 rounded-md text-sm font-medium transition-colors border ${
+                  experiment.projectId === project.id
+                    ? 'bg-primary/5 text-primary border-primary/20'
+                    : 'text-text-muted hover:bg-surface-hover hover:text-text-main border-transparent'
+                }`}
+              >
+                <span>{experiment.title}</span>
+                <span className="mt-1 block text-xs text-text-muted">{experiment.technique} - {experiment.fileName}</span>
+              </Link>
+            ))}
           </div>
         </div>
 
-        {/* Center Panel: Content */}
         <div className="flex-1 flex flex-col overflow-y-auto relative">
           <div className="sticky top-0 z-10 bg-surface/80 backdrop-blur border-b border-border p-4 flex justify-between items-center">
             <div>
               <div className="flex items-center gap-2 text-xs text-text-muted mb-1">
-                <span>Created: {nb.date}</span>
-                <span>•</span>
-                <span>Auto-generated from analysis pipeline</span>
+                <span>Created: {project.createdDate}</span>
+                <span>|</span>
+                <span>{workspaceRun ? 'Generated from workspace run' : runResult ? 'Generated from latest agent run' : 'Generated from analysis pipeline'}</span>
               </div>
-              <h1 className="text-xl font-bold">{nb.title}</h1>
+              <h1 className="text-xl font-bold">{notebook.title}</h1>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" className="gap-2"><Share2 size={14} /> Share</Button>
-              <Button variant="primary" size="sm" className="gap-2"><Save size={14} /> Save Entry</Button>
+              {feedback && (
+                <span className="hidden sm:inline-flex items-center rounded-md border border-primary/20 bg-primary/10 px-3 text-xs font-semibold text-primary">
+                  {feedback}
+                </span>
+              )}
+              <Button variant="outline" size="sm" className="gap-2" onClick={copyShareLink}><Share2 size={14} /> Share</Button>
+              <div className="relative">
+                <Button variant="outline" size="sm" className="gap-2" onClick={() => setExportMenuOpen((open) => !open)}><Download size={14} /> Export</Button>
+                {exportMenuOpen && (
+                  <div className="absolute right-0 top-10 z-20 w-44 rounded-lg border border-border bg-white p-2 shadow-xl">
+                    {(['pdf', 'docx', 'txt', 'csv', 'png'] as DemoExportFormat[]).map((format) => (
+                      <button
+                        key={format}
+                        type="button"
+                        onClick={() => exportNotebook(format)}
+                        className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs font-semibold text-text-main hover:bg-surface-hover"
+                      >
+                        Export {format.toUpperCase()}
+                        <Download size={13} />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <Button variant="outline" size="sm" className="gap-2" onClick={() => setObservationOpen(true)}><Plus size={14} /> Observation</Button>
+              <Button variant="outline" size="sm" className="gap-2" onClick={() => setAttachRunOpen(true)}><FileText size={14} /> Attach Run</Button>
+              <Button variant="primary" size="sm" className="gap-2" onClick={() => showFeedback('Notebook saved')}><Save size={14} /> Save Entry</Button>
             </div>
           </div>
 
+          {observationOpen && (
+            <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/30 p-4">
+              <div className="w-full max-w-lg rounded-xl border border-border bg-white p-5 shadow-2xl">
+                <h2 className="text-base font-bold text-text-main">Add observation</h2>
+                <p className="mt-1 text-sm text-text-muted">Add a demo notebook note tied to the current project context.</p>
+                <textarea
+                  value={observationDraft}
+                  onChange={(event) => setObservationDraft(event.target.value)}
+                  placeholder="Example: Raman A1g mode remains consistent with the XRD phase assignment."
+                  className="mt-4 h-28 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-text-main outline-none focus:border-primary"
+                />
+                <div className="mt-4 flex justify-end gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setObservationOpen(false)}>Cancel</Button>
+                  <Button size="sm" onClick={addObservation}>Add Observation</Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {attachRunOpen && (
+            <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/30 p-4">
+              <div className="w-full max-w-2xl rounded-xl border border-border bg-white p-5 shadow-2xl">
+                <h2 className="text-base font-bold text-text-main">Attach saved run</h2>
+                <p className="mt-1 text-sm text-text-muted">Select a saved workspace run to link into this notebook.</p>
+                <div className="mt-4 max-h-72 space-y-2 overflow-y-auto">
+                  {availableRuns.length === 0 && (
+                    <p className="rounded-md border border-border bg-background p-3 text-sm text-text-muted">
+                      No saved runs yet. Use Save Run in a workspace, then attach it here.
+                    </p>
+                  )}
+                  {availableRuns.slice().reverse().map((run) => {
+                    const dataset = getDataset(run.datasetId);
+                    return (
+                      <button
+                        key={run.id}
+                        type="button"
+                        onClick={() => attachRunToNotebook(run)}
+                        className="block w-full rounded-md border border-border bg-background p-3 text-left text-sm hover:border-primary/40 hover:bg-primary/5"
+                      >
+                        <span className="font-semibold text-text-main">{run.technique} run - {dataset?.fileName ?? run.datasetId}</span>
+                        <span className="mt-1 block text-xs text-text-muted">
+                          {new Date(run.timestamp).toLocaleString()} · {run.detectedFeatures.length} features · {run.matchResult?.confidence ?? project.confidence}% confidence
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="mt-4 flex justify-end">
+                  <Button variant="outline" size="sm" onClick={() => setAttachRunOpen(false)}>Back to notebook</Button>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="p-8 max-w-3xl w-full mx-auto space-y-8">
-            {/* Summary */}
             <section className="space-y-3">
               <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted border-b border-border pb-2">Summary</h3>
-              <p className="text-sm text-text-main leading-relaxed">
-                {nb.summary}
-              </p>
+              <p className="text-sm text-text-main leading-relaxed">{notebook.summary}</p>
             </section>
 
-            {/* Processing Steps */}
+            <section className="space-y-3">
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted border-b border-border pb-2">Generated Decision</h3>
+              <div className="bg-surface p-4 rounded-md border border-border flex items-center justify-between gap-4">
+                <div>
+                  <div className="text-lg font-bold">{notebook.decision}</div>
+                  <div className="text-xs text-text-muted mt-1">{notebook.confidenceLabel}</div>
+                </div>
+                <div className="text-2xl font-bold text-primary">{notebook.confidence}%</div>
+              </div>
+              {notebook.warnings.length > 0 && (
+                <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-900">
+                  {notebook.warnings.join(' ')}
+                </div>
+              )}
+            </section>
+
+            {workspaceRun && (
+              <section className="space-y-3">
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted border-b border-border pb-2">Workspace Run</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="bg-surface p-4 rounded-md border border-border">
+                    <div className="text-xs text-text-muted mb-1">Dataset</div>
+                    <div className="text-sm font-semibold text-text-main">{workspaceDataset?.fileName ?? workspaceRun.datasetId}</div>
+                    <div className="text-xs text-text-muted mt-1">{workspaceDataset?.metadata.sampleName}</div>
+                  </div>
+                  <div className="bg-surface p-4 rounded-md border border-border">
+                    <div className="text-xs text-text-muted mb-1">Technique</div>
+                    <div className="text-sm font-semibold text-text-main">{workspaceRun.technique}</div>
+                    <div className="text-xs text-text-muted mt-1">{new Date(workspaceRun.timestamp).toLocaleString()}</div>
+                  </div>
+                  <div className="bg-surface p-4 rounded-md border border-border sm:col-span-2">
+                    <div className="text-xs text-text-muted mb-2">Processing Parameters</div>
+                    <div className="flex flex-wrap gap-2">
+                      {Object.entries(workspaceRun.parameters).map(([key, value]) => (
+                        <span key={key} className="rounded-md border border-border bg-background px-2 py-1 text-xs text-text-muted">
+                          {key}: {String(value)}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {(observations.length > 0 || attachedRun) && (
+              <section className="space-y-3">
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted border-b border-border pb-2">Notebook Additions</h3>
+                {attachedRun && (
+                  <div className="rounded-md border border-primary/20 bg-primary/5 p-3 text-sm text-text-muted">
+                    <div className="font-semibold text-text-main">
+                      Linked run: {attachedRunRecord?.technique ?? 'Workspace'} analysis
+                    </div>
+                    <div className="mt-1">
+                      {attachedRunRecord
+                        ? `${new Date(attachedRunRecord.timestamp).toLocaleString()} - ${attachedRunRecord.detectedFeatures.length} features - ${attachedRunRecord.matchResult?.confidence ?? project.confidence}% confidence`
+                        : attachedRun}
+                    </div>
+                  </div>
+                )}
+                {observations.map((observation) => (
+                  <div key={observation} className="rounded-md border border-border bg-surface p-3 text-sm text-text-muted">
+                    {observation}
+                  </div>
+                ))}
+              </section>
+            )}
+
             <section className="space-y-3">
               <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted border-b border-border pb-2">
                 <span className="flex items-center gap-2"><FlaskConical size={14} /> Processing Pipeline</span>
               </h3>
               <div className="bg-surface p-4 rounded-md border border-border text-sm font-mono text-text-dim space-y-2">
-                {nb.processingSteps.map((step, i) => (
-                  <p key={i}>{i + 1}. {step}</p>
+                {notebook.processingPipeline.map((step, i) => (
+                  <p key={step}>{i + 1}. {step}</p>
                 ))}
               </div>
             </section>
 
-            {/* Peak Results */}
             <section className="space-y-3">
               <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted border-b border-border pb-2">
                 <span className="flex items-center gap-2"><BarChart3 size={14} /> Peak Detection Results</span>
@@ -79,95 +362,78 @@ export default function NotebookLab() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-surface p-4 rounded-md border border-border">
                   <div className="text-xs text-text-muted mb-1">Peaks Detected</div>
-                  <div className="text-2xl font-bold text-primary">{nb.peakCount}</div>
+                  <div className="text-2xl font-bold text-primary">{workspaceRun?.detectedFeatures.length ?? project.xrdPeaks.length}</div>
                 </div>
                 <div className="bg-surface p-4 rounded-md border border-border">
-                  <div className="text-xs text-text-muted mb-1">Peak Positions (2θ)</div>
+                  <div className="text-xs text-text-muted mb-1">Peak Positions</div>
                   <div className="text-sm font-mono text-text-main">
-                    {nb.peakPositions.map((p) => `${p.toFixed(1)}°`).join(', ')}
+                    {(workspaceRun?.detectedFeatures ?? project.xrdPeaks).map((peak) => `${peak.position.toFixed(1)} ${workspaceRun && workspaceRun.technique !== 'XRD' ? '' : 'deg'}`).join(', ')}
                   </div>
                 </div>
               </div>
+              <p className="text-sm text-text-muted">{notebook.peakDetection}</p>
             </section>
 
-            {/* Phase Identification */}
             <section className="space-y-3">
               <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted border-b border-border pb-2">
                 <span className="flex items-center gap-2"><Target size={14} /> Phase Identification</span>
               </h3>
               <div className="bg-surface p-4 rounded-md border border-border flex items-center justify-between">
                 <div>
-                  <div className="text-lg font-bold">{nb.bestPhase}</div>
-                  <div className="text-xs text-text-muted mt-1">
-                    Confidence: {nb.confidence} ({nb.confidenceScore}%)
-                  </div>
+                  <div className="text-lg font-bold">{project.phase}</div>
+                  <div className="text-xs text-text-muted mt-1">{notebook.phaseInterpretation}</div>
                 </div>
-                <div className={`text-2xl font-bold ${
-                  nb.confidenceScore >= 85 ? 'text-primary' :
-                  nb.confidenceScore >= 70 ? 'text-cyan' :
-                  nb.confidenceScore >= 50 ? 'text-yellow-400' :
-                  'text-red-400'
-                }`}>
-                  {nb.confidenceScore}%
-                </div>
+                <div className="text-2xl font-bold text-primary">{notebook.confidence}%</div>
               </div>
             </section>
 
-            {/* Characterization Data */}
             <section className="space-y-3">
-              <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted border-b border-border pb-2 flex justify-between items-center">
-                <span>Characterization Data</span>
-                <Button variant="ghost" size="sm" className="h-6 text-xs text-primary gap-1"><Paperclip size={12}/> Attach</Button>
-              </h3>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <Card className="p-3 flex items-start gap-3 hover:border-primary/50 cursor-pointer group bg-surface-hover/50">
-                  <div className="bg-primary/20 text-primary p-2 rounded">
-                    <FileText size={20} />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-medium group-hover:text-primary transition-colors">XRD_CuFe2O4_800C.raw</h4>
-                    <p className="text-xs text-text-muted">Analyzed • {nb.confidence} Confidence</p>
-                  </div>
-                </Card>
-                <Card className="p-3 flex items-start gap-3 hover:border-primary/50 cursor-pointer group bg-surface-hover/50">
-                  <div className="bg-cyan/20 text-cyan p-2 rounded">
-                    <FileText size={20} />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-medium group-hover:text-cyan transition-colors">XPS_Survey_CuFe2O4.vms</h4>
-                    <p className="text-xs text-text-muted">Pending analysis</p>
-                  </div>
-                </Card>
-              </div>
-            </section>
-
-            {/* Suggested Next Steps */}
-            <section className="space-y-3">
-              <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted border-b border-border pb-2">
-                <span className="flex items-center gap-2"><ArrowRight size={14} /> Suggested Next Steps</span>
-              </h3>
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted border-b border-border pb-2">Key Evidence</h3>
               <div className="space-y-2">
-                {nb.suggestedNextSteps.map((step, i) => (
-                  <div key={i} className="flex items-center gap-2 text-sm text-cyan p-2 bg-surface rounded-md border border-border hover:border-cyan/30 cursor-pointer transition-colors">
-                    <div className="w-5 h-5 rounded-full bg-cyan/20 flex items-center justify-center text-[10px] font-bold text-cyan shrink-0">{i + 1}</div>
-                    {step}
+                {notebook.evidence.map((item, i) => (
+                  <div key={item} className="flex items-start gap-3 rounded-md border border-border bg-surface p-3 text-sm text-text-muted">
+                    <div className="h-5 w-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-bold shrink-0">
+                      {i + 1}
+                    </div>
+                    {item}
                   </div>
                 ))}
               </div>
             </section>
+
+            <section className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <Link to={workspaceRun ? getWorkspaceRoute(project, workspaceRun.technique, workspaceRun.datasetId) : getWorkspaceRoute(project)} className="rounded-md border border-border bg-surface p-3 text-sm font-semibold text-text-main hover:border-primary/40 transition-colors">
+                Open Workspace <ArrowRight size={14} className="inline ml-1" />
+              </Link>
+              <Link to={getAgentPath(project)} className="rounded-md border border-cyan/40 bg-surface p-3 text-sm font-semibold text-cyan hover:bg-cyan/10 transition-colors">
+                Run Agent <ArrowRight size={14} className="inline ml-1" />
+              </Link>
+              <button
+                onClick={() => exportNotebook('pdf')}
+                className="rounded-md border border-border bg-surface p-3 text-left text-sm font-semibold text-text-main hover:bg-surface-hover transition-colors"
+              >
+                <FileText size={14} className="inline mr-1" /> Export summary
+              </button>
+            </section>
           </div>
         </div>
 
-        {/* Right Panel: AI Summary */}
         <div className="w-[360px] border-l border-border bg-background flex flex-col shrink-0 overflow-y-auto">
           <div className="p-6">
-             <div className="mb-4 text-xs font-semibold text-text-muted uppercase tracking-wider">Experiment Synthesis</div>
-            <AIInsightPanel result={engine.insight} />
+            <div className="mb-4 text-xs font-semibold text-text-muted uppercase tracking-wider">AI Insight</div>
+            <AIInsightPanel result={getProjectInsight(project)} />
           </div>
         </div>
-
       </div>
+      <ExperimentModal
+        open={experimentModalOpen}
+        defaultProjectId={project.id}
+        onClose={() => setExperimentModalOpen(false)}
+        onCreated={() => {
+          setLocalExperiments(getLocalExperiments());
+          showFeedback('Experiment and dataset added');
+        }}
+      />
     </DashboardLayout>
   );
 }

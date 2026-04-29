@@ -1,23 +1,39 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
-import { Card, CardContent } from '../components/ui/Card';
+import { Card } from '../components/ui/Card';
 import { Graph } from '../components/ui/Graph';
-import { Plus, Clock, FileText, Sparkles } from 'lucide-react';
+import { Plus, Clock, FileText, Layers3, Sparkles } from 'lucide-react';
 import { Button } from '../components/ui/Button';
-import { useNavigate } from 'react-router-dom';
-
-const MOCK_PROJECTS = [
-  { id: 1, name: 'CuFe2O4 Spinel', date: '2 hours ago', tags: ['XRD', 'Raman'], progress: 100 },
-  { id: 2, name: 'CuFe2O4/SBA-15', date: '5 hours ago', tags: ['XRD', 'XPS', 'FTIR'], progress: 85 },
-  { id: 3, name: 'NiFe2O4', date: '1 day ago', tags: ['XRD'], progress: 100 },
-  { id: 4, name: 'CoFe2O4', date: '2 days ago', tags: ['XRD', 'XPS'], progress: 100 },
-  { id: 5, name: 'Fe3O4 Nanoparticles', date: '1 week ago', tags: ['FTIR', 'Raman'], progress: 60 },
-];
+import { Link, useNavigate } from 'react-router-dom';
+import { ExperimentModal } from '../components/workspace/ExperimentModal';
+import {
+  DEFAULT_PROJECT_ID,
+  DemoExperiment,
+  demoProjects,
+  getAgentPath,
+  getDefaultTechnique,
+  getLocalExperiments,
+  getNotebookPath,
+  getProject,
+  getWorkspaceRoute,
+} from '../data/demoProjects';
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const [isInitializing, setIsInitializing] = useState(true);
+  const [feedback, setFeedback] = useState('');
+  const [localExperiments, setLocalExperiments] = useState<DemoExperiment[]>([]);
+  const [experimentModalOpen, setExperimentModalOpen] = useState(false);
+  const [experimentProjectId, setExperimentProjectId] = useState(DEFAULT_PROJECT_ID);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setIsInitializing(false), 1400);
+    setLocalExperiments(getLocalExperiments());
+    return () => window.clearTimeout(timer);
+  }, []);
 
   return (
+    <>
     <DashboardLayout>
       <div className="p-8 h-full overflow-y-auto">
         <div className="flex justify-between items-center mb-8">
@@ -26,43 +42,65 @@ export default function Dashboard() {
             <p className="text-text-muted mt-1 text-sm">Manage your characterization workflows and experiments.</p>
           </div>
           <div className="flex gap-3">
-            <Button variant="secondary" className="gap-2 border-primary/30 text-primary hover:bg-primary/10" onClick={() => navigate('/demo/agent')}>
+            {feedback && (
+              <span className="hidden md:inline-flex items-center rounded-md border border-primary/20 bg-primary/10 px-3 text-xs font-semibold text-primary">
+                {feedback}
+              </span>
+            )}
+            <Button variant="secondary" className="gap-2 border-primary/30 text-primary hover:bg-primary/10" onClick={() => navigate(`/demo/agent?project=${DEFAULT_PROJECT_ID}`)}>
               <Sparkles size={16} /> Run Autonomous Agent
             </Button>
-            <Button variant="primary" className="gap-2">
-              <Plus size={16} /> New Project
+            <Button
+              variant="primary"
+              className="gap-2"
+              onClick={() => {
+                setExperimentProjectId(DEFAULT_PROJECT_ID);
+                setExperimentModalOpen(true);
+              }}
+            >
+              <Plus size={16} /> New Experiment
             </Button>
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {MOCK_PROJECTS.map((project) => (
+          {demoProjects.map((project) => (
             <Card 
               key={project.id} 
-              className="cursor-pointer hover:border-primary/50 transition-colors group flex flex-col h-64"
-              onClick={() => navigate('/workspace/xrd')}
+              className="cursor-pointer hover:border-primary/50 transition-colors group flex flex-col min-h-[300px]"
+              onClick={() => navigate(project.techniques.length > 1 ? `/workspace/multi?project=${project.id}` : getWorkspaceRoute(project))}
             >
               <div className="p-4 border-b border-border bg-surface-hover/30 flex justify-between items-start">
                 <div>
                   <h3 className="font-semibold text-text-main group-hover:text-primary transition-colors">{project.name}</h3>
                   <div className="flex items-center gap-1.5 text-xs text-text-muted mt-1.5">
-                    <Clock size={12} /> {project.date}
+                    <Clock size={12} /> {project.lastUpdated}
                   </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-lg font-bold text-cyan">{project.confidence}%</div>
+                  <div className="text-[10px] text-text-muted uppercase tracking-wider">confidence</div>
                 </div>
               </div>
               <div className="flex-1 p-4 flex flex-col justify-between">
                 <div className="flex-1 pointer-events-none opacity-80 group-hover:opacity-100 transition-opacity">
-                  <Graph type={project.tags[0].toLowerCase() as any} height={100} showBackground={false} showCalculated={false} showResidual={false} />
+                  <Graph type={project.techniques[0].toLowerCase() as any} height={100} showBackground={false} showCalculated={false} showResidual={false} />
                 </div>
+                <p className="mt-3 line-clamp-2 text-xs text-text-muted leading-relaxed">{project.summary}</p>
                 <div className="mt-4 flex items-center justify-between">
                   <div className="flex gap-1.5">
-                    {project.tags.map(tag => (
-                      <span key={tag} className="px-2 py-0.5 bg-surface border border-border rounded text-[10px] font-medium text-text-dim uppercase tracking-wider">
+                    {project.techniques.map(tag => (
+                      <Link
+                        key={tag}
+                        to={getWorkspaceRoute(project, tag)}
+                        onClick={(event) => event.stopPropagation()}
+                        className="px-2 py-0.5 bg-surface border border-border rounded text-[10px] font-medium text-text-dim uppercase tracking-wider hover:border-primary/40 hover:text-primary transition-colors"
+                      >
                         {tag}
-                      </span>
+                      </Link>
                     ))}
                   </div>
-                  {project.progress < 100 ? (
+                  {project.status === 'In Progress' ? (
                     <span className="text-xs text-cyan flex items-center gap-1">
                       <div className="w-1.5 h-1.5 rounded-full bg-cyan animate-pulse" />
                       In Progress
@@ -73,11 +111,146 @@ export default function Dashboard() {
                     </span>
                   )}
                 </div>
+                <div className="mt-4 grid grid-cols-3 gap-2 border-t border-border pt-4">
+                  <Link
+                    to={getWorkspaceRoute(project)}
+                    onClick={(event) => event.stopPropagation()}
+                    className="inline-flex h-8 items-center justify-center rounded-md bg-primary/10 px-2 text-[11px] font-semibold text-primary hover:bg-primary/20 transition-colors"
+                  >
+                    Open Workspace
+                  </Link>
+                  <Link
+                    to={getNotebookPath(project)}
+                    onClick={(event) => event.stopPropagation()}
+                    className="inline-flex h-8 items-center justify-center rounded-md border border-border px-2 text-[11px] font-semibold text-text-muted hover:text-text-main hover:bg-surface-hover transition-colors"
+                  >
+                    Open Notebook
+                  </Link>
+                  <Link
+                    to={getAgentPath(project)}
+                    onClick={(event) => event.stopPropagation()}
+                    className="inline-flex h-8 items-center justify-center rounded-md border border-cyan/40 px-2 text-[11px] font-semibold text-cyan hover:bg-cyan/10 transition-colors"
+                  >
+                    Run Agent
+                  </Link>
+                  {project.techniques.length > 1 && (
+                    <Link
+                      to={`/workspace/multi?project=${project.id}`}
+                      onClick={(event) => event.stopPropagation()}
+                      className="col-span-3 inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-primary/30 bg-primary/5 px-2 text-[11px] font-semibold text-primary hover:bg-primary/10 transition-colors"
+                    >
+                      <Layers3 size={12} /> Open Multi-Tech Hub
+                    </Link>
+                  )}
+                </div>
               </div>
             </Card>
           ))}
+          {localExperiments.map((experiment) => {
+            const project = getProject(experiment.projectId);
+            const workspaceTechnique = project.techniques.includes(experiment.technique)
+              ? experiment.technique
+              : getDefaultTechnique(project);
+
+            return (
+              <Card
+                key={experiment.id}
+                className="cursor-pointer hover:border-primary/50 transition-colors group flex flex-col min-h-[300px]"
+                onClick={() => navigate(getWorkspaceRoute(project, workspaceTechnique, experiment.datasetIds[0]))}
+              >
+                <div className="p-4 border-b border-border bg-primary/5 flex justify-between items-start">
+                  <div>
+                    <h3 className="font-semibold text-text-main group-hover:text-primary transition-colors">{experiment.title}</h3>
+                    <div className="flex items-center gap-1.5 text-xs text-text-muted mt-1.5">
+                      <Clock size={12} /> {experiment.date}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-lg font-bold text-cyan">Demo</div>
+                    <div className="text-[10px] text-text-muted uppercase tracking-wider">local</div>
+                  </div>
+                </div>
+                <div className="flex-1 p-4 flex flex-col justify-between">
+                  <div className="flex-1 pointer-events-none opacity-80 group-hover:opacity-100 transition-opacity">
+                    <Graph type={workspaceTechnique.toLowerCase() as any} height={100} showBackground={false} showCalculated={false} showResidual={false} />
+                  </div>
+                  <p className="mt-3 line-clamp-2 text-xs text-text-muted leading-relaxed">{experiment.notes}</p>
+                  <div className="mt-4 flex items-center justify-between">
+                    <span className="px-2 py-0.5 bg-surface border border-border rounded text-[10px] font-medium text-text-dim uppercase tracking-wider">
+                      {experiment.technique}
+                    </span>
+                    <span className="text-xs text-primary flex items-center gap-1">
+                      <FileText size={12} /> Added dataset
+                    </span>
+                  </div>
+                  <div className="mt-4 grid grid-cols-3 gap-2 border-t border-border pt-4">
+                    <Link
+                      to={getWorkspaceRoute(project, workspaceTechnique, experiment.datasetIds[0])}
+                      onClick={(event) => event.stopPropagation()}
+                      className="inline-flex h-8 items-center justify-center rounded-md bg-primary/10 px-2 text-[11px] font-semibold text-primary hover:bg-primary/20 transition-colors"
+                    >
+                      Open Workspace
+                    </Link>
+                    <Link
+                      to={getNotebookPath(project)}
+                      onClick={(event) => event.stopPropagation()}
+                      className="inline-flex h-8 items-center justify-center rounded-md border border-border px-2 text-[11px] font-semibold text-text-muted hover:text-text-main hover:bg-surface-hover transition-colors"
+                    >
+                      Open Notebook
+                    </Link>
+                    <Link
+                      to={getAgentPath(project)}
+                      onClick={(event) => event.stopPropagation()}
+                      className="inline-flex h-8 items-center justify-center rounded-md border border-cyan/40 px-2 text-[11px] font-semibold text-cyan hover:bg-cyan/10 transition-colors"
+                    >
+                      Run Agent
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setExperimentProjectId(project.id);
+                        setExperimentModalOpen(true);
+                      }}
+                      className="col-span-3 inline-flex h-8 items-center justify-center rounded-md border border-primary/30 bg-primary/5 px-2 text-[11px] font-semibold text-primary hover:bg-primary/10 transition-colors"
+                    >
+                      Add related dataset
+                    </button>
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
         </div>
       </div>
     </DashboardLayout>
+
+    <div
+      className={`fixed inset-0 z-[100] flex items-center justify-center bg-[#070B12] transition-opacity duration-500 ${
+        isInitializing ? 'opacity-100' : 'pointer-events-none opacity-0'
+      }`}
+      aria-hidden={!isInitializing}
+    >
+      <div className="flex flex-col items-center text-center">
+        <h2 className="text-2xl font-semibold tracking-[0.18em] text-white">DIFARYX</h2>
+        <p className="mt-3 text-sm text-slate-400">Initializing workspace</p>
+        <div className="mt-6 flex items-center gap-2" aria-hidden="true">
+          <span className="h-1.5 w-1.5 rounded-full bg-blue-400/80 animate-pulse" />
+          <span className="h-1.5 w-1.5 rounded-full bg-cyan-400/80 animate-pulse [animation-delay:160ms]" />
+          <span className="h-1.5 w-1.5 rounded-full bg-indigo-400/80 animate-pulse [animation-delay:320ms]" />
+        </div>
+      </div>
+    </div>
+    <ExperimentModal
+      open={experimentModalOpen}
+      defaultProjectId={experimentProjectId}
+      onClose={() => setExperimentModalOpen(false)}
+      onCreated={() => {
+        setLocalExperiments(getLocalExperiments());
+        setFeedback('Experiment and dataset added');
+        window.setTimeout(() => setFeedback(''), 1800);
+      }}
+    />
+    </>
   );
 }

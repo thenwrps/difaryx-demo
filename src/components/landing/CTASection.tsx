@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 
 export default function CTASection() {
   return (
@@ -9,13 +10,23 @@ export default function CTASection() {
             Built for researchers who want less tool switching and more{' '}
             <span className="text-blue-600">scientific clarity.</span>
           </h2>
-          <div className="flex flex-col items-center gap-2 shrink-0">
-            <button className="inline-flex items-center gap-2 h-11 px-7 rounded-xl bg-blue-600 text-white text-[14px] font-semibold hover:bg-blue-700 transition-colors shadow-md shadow-blue-600/15">
-              JOIN CLOSED BETA
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-            </button>
-            <p className="text-[11px] text-slate-400">Be part of the future of scientific workflow.</p>
-          </div>
+          <p className="text-[13px] text-slate-500 leading-relaxed max-w-sm md:text-right">
+            Start in the workspace or run the autonomous agent demo from the hero.
+          </p>
+        </div>
+        <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-3">
+          <Link to="/login" className="border border-slate-200 rounded-lg p-4 hover:border-blue-300 hover:bg-blue-50/40 transition-colors">
+            <div className="text-sm font-bold text-slate-900">DIFARYX</div>
+            <div className="text-[12px] text-slate-500 mt-1">Open the connected scientific workspace demo.</div>
+          </Link>
+          <a href="#inanz" className="border border-slate-200 rounded-lg p-4 hover:border-cyan-300 hover:bg-cyan-50/40 transition-colors">
+            <div className="text-sm font-bold text-slate-900">INANZ</div>
+            <div className="text-[12px] text-slate-500 mt-1">Public ecosystem link placeholder until the live URL is configured.</div>
+          </a>
+          <a href="#contact" className="border border-slate-200 rounded-lg p-4 hover:border-indigo-300 hover:bg-indigo-50/40 transition-colors">
+            <div className="text-sm font-bold text-slate-900">Contact / Get Access</div>
+            <div className="text-[12px] text-slate-500 mt-1">Open demo access is available now; request team access from this section.</div>
+          </a>
         </div>
       </div>
     </section>
