@@ -84,6 +84,22 @@ export default function NotebookLab() {
     window.setTimeout(() => setFeedback(''), 1800);
   };
 
+  const exportFeedbackMessage = (format: DemoExportFormat) => {
+    if (format === 'pdf') {
+      return 'Report prepared: Agent conclusion, evidence, confidence, caveats, and provenance included.';
+    }
+    if (format === 'docx') {
+      return 'DOCX report prepared with agent summary, evidence table, and next actions.';
+    }
+    if (format === 'csv') {
+      return 'CSV evidence table prepared for export.';
+    }
+    if (format === 'txt') {
+      return 'TXT report prepared with notebook summary and provenance.';
+    }
+    return 'PNG report snapshot prepared for export.';
+  };
+
   const copyShareLink = async () => {
     const url = `${window.location.origin}/notebook?project=${project.id}${workspaceRun ? `&run=${workspaceRun.id}` : ''}`;
     try {
@@ -119,7 +135,7 @@ export default function NotebookLab() {
       })),
     });
     setExportMenuOpen(false);
-    showFeedback(`${format.toUpperCase()} export downloaded`);
+    showFeedback(exportFeedbackMessage(format));
   };
 
   const addObservation = () => {

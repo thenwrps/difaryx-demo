@@ -77,6 +77,14 @@ export default function MultiTechWorkspace() {
     window.setTimeout(() => setFeedback(''), 1800);
   };
 
+  const fusionExportMessage = (format: DemoExportFormat) => {
+    if (format === 'pdf') return 'Multi-tech evidence export prepared for Agent Report.';
+    if (format === 'docx') return 'DOCX multi-tech fusion packet prepared for Agent Report.';
+    if (format === 'csv') return 'CSV multi-tech evidence table prepared for Agent Report.';
+    if (format === 'txt') return 'TXT multi-tech fusion summary prepared for Agent Report.';
+    return 'PNG multi-tech fusion snapshot prepared for Agent Report.';
+  };
+
   const applyHubControl = (technique: Technique, control: string) => {
     setHubState((current) => {
       const previous = current[technique];
@@ -135,7 +143,7 @@ export default function MultiTechWorkspace() {
         labels: hubState[technique].labels.join('; '),
       })),
     });
-    showFeedback(`${format.toUpperCase()} export downloaded`);
+    showFeedback(fusionExportMessage(format));
   };
 
   return (

@@ -163,6 +163,7 @@ export default function AgentDemo() {
   const [showReasoningTrace, setShowReasoningTrace] = useState(false);
   const [selectedDatasetIds, setSelectedDatasetIds] = useState<string[]>([]);
   const [runHistory, setRunHistory] = useState<AgentRunHistoryItem[]>([]);
+  const [agentFeedback, setAgentFeedback] = useState('');
   const logEndRef = useRef<HTMLDivElement>(null);
 
   const isRunning = !['idle', 'complete'].includes(agentState) && !isComplete;
@@ -204,6 +205,11 @@ export default function AgentDemo() {
         type,
       },
     ]);
+  };
+
+  const showAgentFeedback = (message: string) => {
+    setAgentFeedback(message);
+    window.setTimeout(() => setAgentFeedback(''), 2200);
   };
 
   const toggleDataset = (datasetId: string) => {
@@ -330,6 +336,35 @@ export default function AgentDemo() {
         type: 'info',
       },
     ]);
+  };
+
+  const buildAgentReportContext = (currentResult: AgentRunResult) => {
+    const runId = `AG-RUN-${project.id.toUpperCase().replace(/[^A-Z0-9]+/g, '-')}`;
+    return [
+      `Run ID: ${runId}`,
+      `Project: ${project.name}`,
+      `Goal: ${goal}`,
+      `Techniques: ${selectedTechniques.join(', ') || 'None selected'}`,
+      `Evidence summary: ${currentResult.evidence.slice(0, 3).join(' / ')}`,
+      `Conclusion: ${currentResult.decision}`,
+      `Confidence: ${currentResult.confidence}% (${currentResult.confidenceLabel})`,
+      `Caveats: ${currentResult.warnings.join(' ') || 'No major caveats recorded.'}`,
+      `Next actions: ${currentResult.recommendations.join(' ')}`,
+      `Provenance: ${selectedDatasetRows.map((dataset) => `${dataset.technique}:${dataset.fileName}`).join('; ') || project.id}`,
+    ].join(' | ');
+  };
+
+  const handleAgentExportPdf = () => {
+    if (!result) return;
+    addLog(`PDF report prepared. ${buildAgentReportContext(result)}`, 'success');
+    showAgentFeedback('Report prepared: Agent conclusion, evidence, confidence, caveats, and provenance included.');
+  };
+
+  const handleAttachAgentRun = () => {
+    if (!result) return;
+    saveAgentRunResult(result);
+    addLog(`Notebook attachment prepared. ${buildAgentReportContext(result)}`, 'success');
+    showAgentFeedback('Agent run attached to Notebook Lab.');
   };
 
   if (false && isComplete && result) {
@@ -1022,6 +1057,34 @@ export default function AgentDemo() {
                       <p className="text-sm text-slate-300 leading-snug">{item}</p>
                     </div>
                   ))}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-800 bg-[#070B12] p-4">
+                <div className="flex flex-col gap-3">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <button
+                      type="button"
+                      onClick={handleAgentExportPdf}
+                      className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-cyan/40 bg-[#0A0F1A] px-3 text-xs font-semibold text-cyan transition-colors hover:bg-cyan/10"
+                    >
+                      <Download size={14} />
+                      Export PDF
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleAttachAgentRun}
+                      className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-slate-700 bg-[#0A0F1A] px-3 text-xs font-semibold text-slate-200 transition-colors hover:border-slate-500 hover:text-white"
+                    >
+                      <FileText size={14} />
+                      Attach to Notebook
+                    </button>
+                  </div>
+                  {agentFeedback && (
+                    <div className="rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-xs font-semibold leading-relaxed text-primary">
+                      {agentFeedback}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

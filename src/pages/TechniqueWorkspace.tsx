@@ -357,6 +357,14 @@ export default function TechniqueWorkspace() {
     window.setTimeout(() => setToast(''), 1800);
   };
 
+  const workspaceExportMessage = (format: DemoExportFormat) => {
+    if (format === 'pdf') return 'Workspace evidence export prepared for Agent Report.';
+    if (format === 'docx') return 'DOCX workspace evidence packet prepared for Agent Report.';
+    if (format === 'csv') return 'CSV workspace evidence table prepared for Agent Report.';
+    if (format === 'txt') return 'TXT workspace processing summary prepared for Agent Report.';
+    return 'PNG workspace chart snapshot prepared for Agent Report.';
+  };
+
   const handleImport = () => {
     setImported(true);
     appendLog(`dataset imported: ${selectedDataset?.fileName ?? 'built-in demo dataset'}`);
@@ -442,8 +450,9 @@ export default function TechniqueWorkspace() {
       ],
       csvRows: processedData.slice(0, 240).map((point) => ({ x: point.x, y: point.y, technique: activeTechnique })),
     });
-    appendLog(`${format.toUpperCase()} export downloaded`);
-    showToast(`${format.toUpperCase()} export downloaded`);
+    const message = workspaceExportMessage(format);
+    appendLog(`${message} Project: ${project.name}; technique: ${activeTechnique}; dataset: ${selectedDataset?.fileName ?? 'demo dataset'}; confidence: ${phaseConfidence.toFixed(1)}%; provenance: ${selectedDataset?.id ?? project.id}.`);
+    showToast(message);
   };
 
   const createRun = (extraLog?: string): ProcessingRun => {
@@ -757,67 +766,69 @@ export default function TechniqueWorkspace() {
         </aside>
 
         <section className="flex-1 flex flex-col min-w-0 overflow-hidden">
-          <div className="border-b border-border bg-surface/60 px-6 py-4">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="border-b border-border bg-surface/60 px-4 py-2 md:px-5">
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
                     Used by DIFARYX Agent
                   </span>
-                  <span className="rounded-full border border-cyan/30 bg-cyan/10 px-3 py-1 text-xs font-semibold text-cyan">
+                  <span className="rounded-full border border-cyan/30 bg-cyan/10 px-2 py-0.5 text-[10px] font-semibold text-cyan">
                     Agent Ready
                   </span>
                 </div>
-                <p className="mt-2 text-sm font-semibold text-text-main">Project: CuFe2O4 Spinel Formation</p>
-                <p className="mt-1 text-xs text-text-muted">{agentRoleLabel}</p>
-                <p className="mt-2 text-[11px] font-medium uppercase tracking-wider text-text-dim">
+                <p className="mt-1 text-xs font-semibold text-text-main">Project: CuFe2O4 Spinel Formation</p>
+                <p className="mt-0.5 text-[11px] text-text-muted">{agentRoleLabel}</p>
+                <p className="mt-1 text-[10px] font-medium uppercase tracking-wider text-text-dim">
                   Goal → Plan → Execute → Evidence → Decision
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => navigate('/demo/agent?project=cu-fe2o4-spinel')}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-gradient-to-r from-blue-600 to-indigo-600 px-4 text-sm font-semibold text-white shadow-lg shadow-blue-600/15 transition-all hover:-translate-y-0.5 hover:shadow-indigo-600/20"
+                className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md bg-gradient-to-r from-blue-600 to-indigo-600 px-3 text-xs font-semibold text-white shadow-md shadow-blue-600/10 transition-all hover:-translate-y-0.5 hover:shadow-indigo-600/20"
               >
-                <Sparkles size={16} /> Run in Agent Mode
+                <Sparkles size={14} /> Run in Agent Mode
               </button>
             </div>
           </div>
 
-          <div className="p-6 border-b border-border bg-surface/40">
-            <div className="flex items-start justify-between gap-4">
+          <div className="border-b border-border bg-surface/40 px-4 py-2.5 md:px-5">
+            <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">{activeTechnique} Workspace</p>
-                <h2 className="mt-1 text-2xl font-bold text-text-main">{project.name}</h2>
-                <p className="mt-2 max-w-3xl text-sm text-text-muted">
+                <div className="flex flex-wrap items-baseline gap-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">{activeTechnique} Workspace</p>
+                  <h2 className="text-xl font-bold text-text-main">{project.name}</h2>
+                </div>
+                <p className="mt-0.5 max-w-3xl text-xs text-text-muted">
                   {selectedDataset?.fileName ?? `${activeTechnique} demo dataset`} - {labels.xLabel} / {labels.yLabel}
                 </p>
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <span className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
                     {workspaceStatus}
                   </span>
                   {latestSavedRun && (
-                    <span className="rounded-full border border-border bg-background px-3 py-1 text-xs font-medium text-text-muted">
+                    <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[10px] font-medium text-text-muted">
                       latest run: {new Date(latestSavedRun.timestamp).toLocaleString()}
                     </span>
                   )}
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex shrink-0 items-center gap-2">
                 {toast && (
-                  <span className="inline-flex rounded-md border border-primary/20 bg-primary/10 px-3 py-2 text-xs font-semibold text-primary">
+                  <span className="inline-flex rounded-md border border-primary/20 bg-primary/10 px-2 py-1 text-[11px] font-semibold text-primary">
                     {toast}
                   </span>
                 )}
-                <Button variant="outline" className="gap-2" onClick={handleSaveRun}>
-                  <Save size={16} /> Save Run
+                <Button variant="outline" size="sm" className="gap-1.5" onClick={handleSaveRun}>
+                  <Save size={14} /> Save Run
                 </Button>
-                <Button className="gap-2" onClick={handleSendToNotebook}>
-                  <Send size={16} /> Send to Notebook
+                <Button size="sm" className="gap-1.5" onClick={handleSendToNotebook}>
+                  <Send size={14} /> Send to Notebook
                 </Button>
               </div>
             </div>
-            <div className="mt-4 flex gap-2 overflow-x-auto xl:hidden">
+            <div className="mt-2 flex gap-2 overflow-x-auto xl:hidden">
               {project.techniques.map((technique) => (
                 <Link
                   key={technique}
