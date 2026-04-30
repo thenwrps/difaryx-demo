@@ -16,8 +16,6 @@ import {
   Loader2,
   Microscope,
   Play,
-  RefreshCcw,
-  StepForward,
   Target,
   Terminal,
 } from 'lucide-react';
@@ -38,9 +36,13 @@ import type {
   Technique,
 } from '../data/demoProjects';
 import { generateRunId, saveRun, type AgentRun } from '../data/runModel';
+import { buildEvidencePacket } from '../agent/mcp/evidencePacket';
+import { callReasoningAPI } from '../server/api/reasoning';
+import { getProviderStatus } from '../server/llm/router';
+import type { ReasoningOutput, ToolResult } from '../agent/mcp/types';
 
 type AgentContext = Technique;
-type ModelMode = 'deterministic' | 'gemini' | 'gemma';
+type ModelMode = 'deterministic' | 'vertex-gemini' | 'gemma';
 type ExecutionMode = 'auto' | 'step';
 type ReasoningStepStatus = 'pending' | 'running' | 'complete';
 type RunStatus = 'idle' | 'running' | 'complete';
@@ -112,6 +114,11 @@ type AgentDemoState = {
     logs: ExecutionLogEntry[];
   };
   toolTrace: ToolTraceEntry[];
+  llmState: {
+    output: ReasoningOutput | null;
+    usedLlm: boolean;
+    fallbackUsed: boolean;
+  };
 };
 
 type DatasetOption = {
@@ -123,9 +130,9 @@ const DEFAULT_MISSION =
   'Investigate the selected scientific dataset and produce an evidence-linked material characterization decision.';
 
 const MODEL_MODE_LABELS: Record<ModelMode, string> = {
-  deterministic: 'Deterministic Demo',
-  gemini: 'Gemini-ready (not connected)',
-  gemma: 'Gemma-ready (not connected)',
+  deterministic: 'Deterministic',
+  'vertex-gemini': 'Vertex AI Gemini',
+  gemma: 'Gemma Open Model',
 };
 
 const CONTEXT_ORDER: AgentContext[] = ['XRD', 'XPS', 'FTIR', 'Raman'];
@@ -513,6 +520,11 @@ function makeInitialState(projectId?: string | null): AgentDemoState {
       logs: [],
     },
     toolTrace: createToolTrace(context),
+    llmState: {
+      output: null,
+      usedLlm: false,
+      fallbackUsed: false,
+    },
   };
 }
 
@@ -556,6 +568,11 @@ function resetRunState(
       logs: [],
     },
     toolTrace: createToolTrace(context),
+    llmState: {
+      output: null,
+      usedLlm: false,
+      fallbackUsed: false,
+    },
   };
 }
 
@@ -596,12 +613,118 @@ function toolStatusIcon(status: ToolStatus) {
   return <CircleDot size={12} className="text-slate-600" />;
 }
 
+const FORMULA_TOKENS = new Set([
+  'CuFe2O4',
+  'NiFe2O4',
+  'CoFe2O4',
+  'Fe3O4',
+  'Fe2O3',
+  'CuFeO2',
+  'CuO',
+]);
+
+const FORMULA_SPLIT_PATTERN = /(CuFe2O4|NiFe2O4|CoFe2O4|Fe3O4|Fe2O3|CuFeO2|CuO)/g;
+
+function renderFormula(formula: string) {
+  return formula.split(/(\d+)/).map((part, index) =>
+    /^\d+$/.test(part) ? <sub key={index}>{part}</sub> : part,
+  );
+}
+
+function renderFormulaText(text: string | number) {
+  const value = String(text);
+  return value.split(FORMULA_SPLIT_PATTERN).map((part, index) =>
+    FORMULA_TOKENS.has(part) ? (
+      <React.Fragment key={`${part}-${index}`}>{renderFormula(part)}</React.Fragment>
+    ) : (
+      part
+    ),
+  );
+}
+
+function FormulaText({
+  children,
+  className = '',
+}: {
+  children: string | number;
+  className?: string;
+}) {
+  return <span className={`agent-formula ${className}`}>{renderFormulaText(children)}</span>;
+}
+
 function asDemoPeaks(peaks: Array<{ position: number; intensity: number; label?: string }>): DemoPeak[] {
   return peaks.map((peak, index) => ({
     position: Number(peak.position.toFixed(2)),
     intensity: Number(peak.intensity.toFixed(1)),
     label: peak.label ?? `F${index + 1}`,
   }));
+}
+
+/**
+ * Call LLM reasoning if enabled, otherwise return null.
+ * This function builds an evidence packet from deterministic tools and calls the LLM API.
+ */
+async function callLlmReasoning(
+  modelMode: ModelMode,
+  context: AgentContext,
+  dataset: DemoDataset,
+  project: DemoProject,
+  xrdAnalysis: ReturnType<typeof runXrdPhaseIdentificationAgent> | null,
+  toolTrace: ToolTraceEntry[],
+): Promise<{ output: ReasoningOutput | null; fallbackUsed: boolean }> {
+  // Only call LLM if not in deterministic mode
+  if (modelMode === 'deterministic') {
+    return { output: null, fallbackUsed: false };
+  }
+
+  try {
+    // Build evidence packet from deterministic tool outputs
+    const featureCount = getFeatureCount(context, dataset, xrdAnalysis);
+    const baseConfidence = getBaseConfidence(context, project);
+    
+    // Convert tool trace to MCP ToolResult format
+    const mcpToolTrace: ToolResult[] = toolTrace.map((entry) => ({
+      id: entry.id,
+      toolCallId: entry.id,
+      name: entry.toolName as any,
+      status: entry.status === 'error' ? 'error' : entry.status,
+      output: {
+        summary: entry.outputSummary,
+        durationMs: entry.durationMs,
+      },
+      durationMs: entry.durationMs,
+      timestamp: entry.timestamp,
+    }));
+
+    const packet = buildEvidencePacket(
+      context,
+      dataset,
+      project,
+      xrdAnalysis,
+      featureCount,
+      baseConfidence,
+      mcpToolTrace,
+    );
+
+    // Call reasoning API
+    const response = await callReasoningAPI({
+      packet,
+      provider: modelMode,
+    });
+
+    if (!response.success) {
+      console.error('LLM reasoning failed:', response.error);
+      return { output: null, fallbackUsed: true };
+    }
+
+    return {
+      output: response.output ?? null,
+      fallbackUsed: response.fallbackUsed ?? false,
+    };
+  } catch (error) {
+    console.error('LLM reasoning error:', error);
+    return { output: null, fallbackUsed: true };
+  }
 }
 
 function getFeatureCount(
@@ -626,11 +749,49 @@ function createDecisionResult(
   context: AgentContext,
   option: DatasetOption,
   xrdAnalysis: ReturnType<typeof runXrdPhaseIdentificationAgent> | null,
+  llmOutput: ReasoningOutput | null = null,
 ): DecisionResult {
   const { project, dataset } = option;
   const featureCount = getFeatureCount(context, dataset, xrdAnalysis);
   const config = CONTEXT_CONFIG[context];
 
+  // If LLM output is available, use it to enhance the decision
+  if (llmOutput) {
+    const confidence = clampConfidence(llmOutput.confidence * 100);
+    
+    return {
+      runId: generateRunId(),
+      primaryResult: llmOutput.primaryResult,
+      subtitle: `${config.label} - AI-Assisted Reasoning`,
+      confidence,
+      confidenceLabel: confidenceLabel(confidence),
+      reasoningSummary: llmOutput.evidenceSummary.slice(0, 3),
+      evidence: llmOutput.evidenceSummary,
+      alternatives: llmOutput.rejectedAlternatives,
+      interpretation: llmOutput.decisionLogic,
+      caveat: llmOutput.uncertainty.join('; '),
+      recommendation: llmOutput.recommendedNextStep,
+      metrics: [
+        { label: config.featureName, value: String(featureCount), tone: 'cyan' },
+        { label: 'AI Confidence', value: `${confidence}%`, tone: 'emerald' },
+        { label: 'Provider', value: llmOutput.metadata.provider === 'vertex-gemini' ? 'Vertex AI' : llmOutput.metadata.provider === 'gemma' ? 'Gemma' : 'Deterministic', tone: 'violet' },
+      ],
+      detailRows: context === 'XRD' && xrdAnalysis
+        ? xrdAnalysis.candidates.slice(0, 5).map((candidate, index) => ({
+            Rank: index + 1,
+            Candidate: candidate.phase.name,
+            Score: `${Math.round(candidate.score * 100)}%`,
+            Evidence: `${candidate.matches.length}/${candidate.phase.peaks.length} peaks`,
+          }))
+        : [
+            { Metric: 'Features', Value: featureCount, Status: 'Analyzed' },
+            { Metric: 'Provider', Value: llmOutput.metadata.provider, Status: 'Active' },
+            { Metric: 'Duration', Value: `${llmOutput.metadata.durationMs}ms`, Status: 'Complete' },
+          ],
+    };
+  }
+
+  // Fallback to deterministic decision
   if (context === 'XRD') {
     const bestCandidate = xrdAnalysis?.candidates[0];
     const primaryResult = bestCandidate?.phase.name ?? project.phase;
@@ -902,8 +1063,10 @@ export default function AgentDemo() {
     context: AgentContext,
     option: DatasetOption,
     xrdResult: ReturnType<typeof runXrdPhaseIdentificationAgent> | null,
+    llmOutput: ReasoningOutput | null = null,
+    fallbackUsed = false,
   ) => {
-    const decision = createDecisionResult(context, option, xrdResult);
+    const decision = createDecisionResult(context, option, xrdResult, llmOutput);
     const detectedPeaks =
       context === 'XRD'
         ? asDemoPeaks(xrdResult?.detectedPeaks.length ? xrdResult.detectedPeaks : option.dataset.detectedFeatures)
@@ -939,10 +1102,15 @@ export default function AgentDemo() {
         currentStepIndex: CONTEXT_CONFIG[context].stages.length - 1,
         result: decision,
       },
+      llmState: {
+        output: llmOutput,
+        usedLlm: !!llmOutput,
+        fallbackUsed,
+      },
     }));
     appendLog({
       stamp: '[decision]',
-      message: `${CONTEXT_CONFIG[context].decisionKind} complete: ${decision.primaryResult} (${decision.confidence}%).`,
+      message: `${CONTEXT_CONFIG[context].decisionKind} complete: ${decision.primaryResult} (${decision.confidence}%).${llmOutput ? ` [AI-Assisted: ${llmOutput.metadata.provider}]` : ''}`,
       type: 'success',
     });
   };
@@ -1018,7 +1186,46 @@ export default function AgentDemo() {
 
       await wait(300);
       if (runTokenRef.current !== token) return;
-      finalizeRun(context, option, xrdResult);
+      
+      // Call LLM reasoning if enabled (after evidence fusion step)
+      let llmOutput: ReasoningOutput | null = null;
+      let fallbackUsed = false;
+      
+      if (agentState.modelMode !== 'deterministic') {
+        appendLog({
+          stamp: `[${formatStamp(config.stages.length)}]`,
+          message: `LLM Reasoning (${MODEL_MODE_LABELS[agentState.modelMode]}): Analyzing evidence packet...`,
+          type: 'tool',
+        });
+        
+        const llmResult = await callLlmReasoning(
+          agentState.modelMode,
+          context,
+          option.dataset,
+          option.project,
+          xrdResult,
+          agentState.toolTrace,
+        );
+        
+        llmOutput = llmResult.output;
+        fallbackUsed = llmResult.fallbackUsed;
+        
+        if (llmOutput) {
+          appendLog({
+            stamp: `[${formatStamp(config.stages.length)}]`,
+            message: `LLM reasoning complete: ${llmOutput.primaryResult} (confidence: ${(llmOutput.confidence * 100).toFixed(1)}%)`,
+            type: 'success',
+          });
+        } else if (fallbackUsed) {
+          appendLog({
+            stamp: `[${formatStamp(config.stages.length)}]`,
+            message: 'LLM provider unavailable, using deterministic fallback',
+            type: 'info',
+          });
+        }
+      }
+      
+      finalizeRun(context, option, xrdResult, llmOutput, fallbackUsed);
     } finally {
       if (runTokenRef.current === token) {
         runningGuardRef.current = false;
@@ -1197,22 +1404,12 @@ export default function AgentDemo() {
     showFeedback('Reproducible report generated.');
   };
 
-  const primaryButtonLabel =
-    agentState.reasoningState.executionMode === 'auto'
-      ? runComplete
-        ? 'New Execution'
-        : 'Run Agent'
-      : runComplete
-        ? 'New Step Run'
-        : agentState.reasoningState.currentStepIndex < 0
-          ? 'Start Step'
-          : 'Next Step';
-
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-[#070B12] text-slate-300 font-sans">
       <style>{`
         @keyframes agentInsightIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
         .agent-insight-in { animation: agentInsightIn 380ms ease-out both; }
+        .agent-formula sub { font-size: 0.72em; line-height: 0; position: relative; bottom: -0.25em; }
         .cockpit-scroll::-webkit-scrollbar{width:4px} .cockpit-scroll::-webkit-scrollbar-thumb{background:#1e293b;border-radius:2px}
       `}</style>
 
@@ -1236,32 +1433,120 @@ export default function AgentDemo() {
           <span className={`rounded-full border px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${agentState.reasoningState.status === 'running' ? 'border-cyan-400/40 bg-cyan-400/10 text-cyan-300' : runComplete ? 'border-emerald-400/40 bg-emerald-400/10 text-emerald-300' : 'border-slate-700 bg-[#070B12] text-slate-500'}`}>
             {agentState.reasoningState.status === 'running' ? 'Running' : runComplete ? 'Complete' : 'Ready'}
           </span>
+        </div>
+      </header>
+
+      <div className="shrink-0 px-3 pt-2.5">
+        <div className="flex min-h-[52px] flex-wrap items-center gap-2.5 rounded-[14px] border border-slate-800 bg-[#0A0F1A] px-3 py-2 min-[1180px]:flex-nowrap">
+          <label className="relative flex h-[38px] w-full min-w-0 items-center overflow-hidden rounded-[10px] border border-slate-800 bg-[#070B12] px-3 transition-colors focus-within:border-cyan-400/50 min-[760px]:w-[calc(50%_-_5px)] min-[1180px]:w-[230px] min-[1440px]:w-[260px]">
+            <select
+              value={agentState.context}
+              disabled={agentState.reasoningState.status === 'running'}
+              onChange={(event) => handleContextChange(event.target.value as AgentContext)}
+              className="absolute inset-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
+              aria-label="Context"
+            >
+              {CONTEXT_ORDER.map((context) => (
+                <option key={context} value={context}>
+                  {CONTEXT_CONFIG[context].label}
+                </option>
+              ))}
+            </select>
+            <span className="pointer-events-none flex min-w-0 items-baseline gap-1.5 whitespace-nowrap">
+              <span className="shrink-0 text-[11px] font-bold uppercase tracking-wider text-slate-500">Context:</span>
+              <span className="truncate text-[13px] font-semibold text-slate-100">{contextConfig.label}</span>
+            </span>
+          </label>
+
+          <label className="relative flex h-[38px] w-full min-w-0 flex-1 items-center overflow-hidden rounded-[10px] border border-slate-800 bg-[#070B12] px-3 transition-colors focus-within:border-cyan-400/50 min-[760px]:min-w-[260px] min-[1440px]:min-w-[320px]">
+            <select
+              value={selectedDataset.id}
+              disabled={agentState.reasoningState.status === 'running'}
+              onChange={(event) => handleDatasetChange(event.target.value)}
+              className="absolute inset-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
+              aria-label="Dataset"
+            >
+              {datasetOptions.map((option) => (
+                <option key={option.dataset.id} value={option.dataset.id}>
+                  {option.project.name} - {option.dataset.fileName}
+                </option>
+              ))}
+            </select>
+            <span className="pointer-events-none flex min-w-0 items-baseline gap-1.5 whitespace-nowrap">
+              <span className="shrink-0 text-[11px] font-bold uppercase tracking-wider text-slate-500">Dataset:</span>
+              <FormulaText className="block min-w-0 truncate text-[13px] font-semibold text-slate-100">
+                {`${selectedProject.name} - ${selectedDataset.sampleName}`}
+              </FormulaText>
+            </span>
+          </label>
+
+          <label className="relative flex h-[38px] w-full min-w-0 items-center overflow-hidden rounded-[10px] border border-slate-800 bg-[#070B12] px-3 transition-colors focus-within:border-cyan-400/50 min-[760px]:w-[180px] min-[1440px]:w-[210px]">
+            <select
+              value={agentState.modelMode}
+              disabled={agentState.reasoningState.status === 'running'}
+              onChange={(event) => {
+                const newMode = event.target.value as ModelMode;
+                setAgentState((current) => ({
+                  ...resetRunState(current, current.context, current.datasetId),
+                  modelMode: newMode,
+                }));
+              }}
+              className="absolute inset-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
+              aria-label="Reasoning mode"
+            >
+              <option value="deterministic">Deterministic</option>
+              <option value="vertex-gemini">Vertex AI Gemini</option>
+              <option value="gemma">Gemma Open Model</option>
+            </select>
+            <span className="pointer-events-none flex min-w-0 items-baseline gap-1.5 whitespace-nowrap">
+              <span className="shrink-0 text-[11px] font-bold uppercase tracking-wider text-slate-500">Mode:</span>
+              <span className="truncate text-[13px] font-semibold text-slate-100">
+                {agentState.modelMode === 'deterministic' ? 'Deterministic' : MODEL_MODE_LABELS[agentState.modelMode]}
+              </span>
+            </span>
+          </label>
+
+          <div className="flex h-[38px] w-full min-w-0 items-center gap-2 rounded-[10px] border border-slate-800 bg-[#070B12] px-2 min-[760px]:w-[210px] min-[1440px]:w-[240px]">
+            <span className="shrink-0 text-[11px] font-bold uppercase tracking-wider text-slate-500">Run:</span>
+            <div className="grid h-9 min-w-0 flex-1 grid-cols-2 rounded-[10px] bg-[#050812] p-1">
+              {(['auto', 'step'] as ExecutionMode[]).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  disabled={agentState.reasoningState.status === 'running'}
+                  onClick={() => handleExecutionModeChange(mode)}
+                  className={`rounded-md text-[11px] font-bold transition-colors disabled:opacity-60 ${agentState.reasoningState.executionMode === mode ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-slate-200'}`}
+                >
+                  {mode === 'auto' ? 'Auto Run' : 'Step-by-Step'}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <button
             type="button"
             onClick={handlePrimaryRun}
             disabled={runningGuardRef.current}
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-4 text-xs font-bold text-white shadow-lg shadow-blue-600/20 transition-all hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex h-[38px] w-full shrink-0 items-center justify-center gap-1.5 rounded-[10px] bg-gradient-to-r from-blue-600 to-indigo-600 px-3 text-[12px] font-bold text-white shadow-lg shadow-blue-600/20 transition-all hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60 min-[760px]:w-[145px] min-[1440px]:w-[160px]"
           >
             {agentState.reasoningState.status === 'running' ? (
               <Loader2 size={13} className="animate-spin" />
-            ) : agentState.reasoningState.executionMode === 'step' ? (
-              <StepForward size={13} />
             ) : (
               <Play size={13} fill="currentColor" />
             )}
-            {primaryButtonLabel}
+            New Execution
           </button>
+
           <button
             type="button"
             onClick={resetExecution}
             disabled={runningGuardRef.current}
-            className="hidden h-8 items-center gap-1.5 rounded-lg border border-slate-700 px-3 text-[11px] font-semibold text-slate-300 transition-colors hover:border-cyan-400/40 hover:text-cyan-200 disabled:opacity-50 sm:inline-flex"
+            className="inline-flex h-[38px] w-full shrink-0 items-center justify-center gap-1.5 rounded-[10px] border border-slate-700 px-3 text-[12px] font-semibold text-slate-300 transition-colors hover:border-cyan-400/40 hover:text-cyan-200 disabled:cursor-not-allowed disabled:opacity-50 min-[760px]:w-[84px] min-[1440px]:w-[92px]"
           >
-            <RefreshCcw size={12} />
             Reset
           </button>
         </div>
-      </header>
+      </div>
 
       <div className="flex min-h-0 flex-1">
         <aside className="cockpit-scroll w-[282px] shrink-0 overflow-y-auto border-r border-slate-800/50 bg-[#080E19] p-3 space-y-3">
@@ -1305,6 +1590,12 @@ export default function AgentDemo() {
                 <span className="truncate text-right font-semibold text-slate-200">{selectedDataset.fileName}</span>
               </div>
               <div className="flex justify-between gap-2">
+                <span className="text-slate-500">Material</span>
+                <FormulaText className="block min-w-0 truncate text-right font-semibold text-slate-200">
+                  {selectedDataset.metadata.materialSystem}
+                </FormulaText>
+              </div>
+              <div className="flex justify-between gap-2">
                 <span className="text-slate-500">Model mode</span>
                 <span className="font-semibold text-cyan-200">{MODEL_MODE_LABELS[agentState.modelMode]}</span>
               </div>
@@ -1337,7 +1628,9 @@ export default function AgentDemo() {
                     )}
                     <div>
                       <p className="font-semibold">{stage.label}</p>
-                      {status !== 'pending' && <p className="text-[10px] text-slate-500">{stage.outputSummary}</p>}
+                      {status !== 'pending' && (
+                        <FormulaText className="block text-[10px] text-slate-500">{stage.outputSummary}</FormulaText>
+                      )}
                     </div>
                   </div>
                 );
@@ -1381,63 +1674,14 @@ export default function AgentDemo() {
                 </span>
               </div>
               <p className="mt-1 truncate text-[10px] text-slate-500">{selectedDataset.fileName}</p>
-              <p className="mt-1 text-[10px] leading-4 text-slate-400">{selectedDataset.metadata.materialSystem}</p>
+              <FormulaText className="mt-1 block text-[10px] leading-4 text-slate-400">
+                {selectedDataset.metadata.materialSystem}
+              </FormulaText>
             </div>
           </div>
         </aside>
 
-        <main className="cockpit-scroll flex min-w-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
-          <div className="grid gap-3 xl:grid-cols-[1fr_1fr_1fr]">
-            <label className="rounded-lg border border-slate-800 bg-[#0A0F1A] p-3">
-              <span className="mb-1 block text-[9px] font-bold uppercase tracking-wider text-slate-500">Context</span>
-              <select
-                value={agentState.context}
-                disabled={agentState.reasoningState.status === 'running'}
-                onChange={(event) => handleContextChange(event.target.value as AgentContext)}
-                className="h-9 w-full rounded-md border border-slate-800 bg-[#070B12] px-2 text-xs font-semibold text-white outline-none transition-colors focus:border-cyan-400/50 disabled:opacity-60"
-              >
-                {CONTEXT_ORDER.map((context) => (
-                  <option key={context} value={context}>
-                    {CONTEXT_CONFIG[context].label}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="rounded-lg border border-slate-800 bg-[#0A0F1A] p-3">
-              <span className="mb-1 block text-[9px] font-bold uppercase tracking-wider text-slate-500">Dataset</span>
-              <select
-                value={selectedDataset.id}
-                disabled={agentState.reasoningState.status === 'running'}
-                onChange={(event) => handleDatasetChange(event.target.value)}
-                className="h-9 w-full rounded-md border border-slate-800 bg-[#070B12] px-2 text-xs font-semibold text-white outline-none transition-colors focus:border-cyan-400/50 disabled:opacity-60"
-              >
-                {datasetOptions.map((option) => (
-                  <option key={option.dataset.id} value={option.dataset.id}>
-                    {option.project.name} - {option.dataset.fileName}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <div className="rounded-lg border border-slate-800 bg-[#0A0F1A] p-3">
-              <span className="mb-1 block text-[9px] font-bold uppercase tracking-wider text-slate-500">Execution</span>
-              <div className="grid h-9 grid-cols-2 rounded-md border border-slate-800 bg-[#070B12] p-1">
-                {(['auto', 'step'] as ExecutionMode[]).map((mode) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    disabled={agentState.reasoningState.status === 'running'}
-                    onClick={() => handleExecutionModeChange(mode)}
-                    className={`rounded text-[11px] font-bold transition-colors disabled:opacity-60 ${agentState.reasoningState.executionMode === mode ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-slate-200'}`}
-                  >
-                    {mode === 'auto' ? 'Auto Run' : 'Step-by-Step'}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
+        <main className="cockpit-scroll flex min-w-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
           <div className="rounded-lg border border-slate-800 bg-[#0A0F1A] px-4 py-3">
             <div className="flex items-center gap-0">
               {stages.map((stage, index) => {
@@ -1471,7 +1715,9 @@ export default function AgentDemo() {
                   <Microscope size={14} className={contextConfig.iconTone} />
                   <h2 className="text-sm font-bold text-white">{contextConfig.label}</h2>
                 </div>
-                <p className="mt-1 text-[11px] text-slate-500">{selectedDataset.sampleName} - {selectedProject.material}</p>
+                <FormulaText className="mt-1 block text-[11px] text-slate-500">
+                  {`${selectedDataset.sampleName} - ${selectedProject.material}`}
+                </FormulaText>
               </div>
               <div className="flex items-center gap-2">
                 <span className="rounded-full border border-slate-700 bg-[#070B12] px-2.5 py-1 text-[10px] font-semibold text-slate-300">
@@ -1505,7 +1751,7 @@ export default function AgentDemo() {
                 <div key={metric.label} className="rounded-lg border border-slate-800 bg-[#070B12] px-3 py-2">
                   <p className="text-[9px] font-bold uppercase tracking-wider text-slate-600">{metric.label}</p>
                   <p className={`mt-1 text-sm font-bold ${metric.tone === 'emerald' ? 'text-emerald-300' : metric.tone === 'violet' ? 'text-violet-300' : metric.tone === 'amber' ? 'text-amber-300' : 'text-cyan-300'}`}>
-                    {metric.value}
+                    <FormulaText>{metric.value}</FormulaText>
                   </p>
                 </div>
               ))}
@@ -1526,7 +1772,7 @@ export default function AgentDemo() {
                     {agentState.reasoningState.logs.map((entry, index) => (
                       <div key={`${entry.stamp}-${index}`} className="flex gap-2">
                         <span className="shrink-0 text-slate-600">{entry.stamp}</span>
-                        <span className={logClass(entry.type)}>{entry.message}</span>
+                        <FormulaText className={logClass(entry.type)}>{entry.message}</FormulaText>
                       </div>
                     ))}
                   </div>
@@ -1553,13 +1799,15 @@ export default function AgentDemo() {
                         </span>
                         <div className="min-w-0">
                           <p className="text-[10px] font-bold text-slate-100">{stage.label}</p>
-                          {status === 'running' && <p className="text-[9px] text-cyan-200">{stage.detail}</p>}
+                          {status === 'running' && (
+                            <FormulaText className="block text-[9px] text-cyan-200">{stage.detail}</FormulaText>
+                          )}
                         </div>
                       </div>
                       {status === 'complete' && (
                         <div className="mt-1.5 space-y-1 pl-7">
                           <p className="font-mono text-[9px] text-slate-400">{stage.toolName}()</p>
-                          <p className="text-[10px] text-cyan-300/80">{stage.outputSummary}</p>
+                          <FormulaText className="block text-[10px] text-cyan-300/80">{stage.outputSummary}</FormulaText>
                         </div>
                       )}
                     </div>
@@ -1590,7 +1838,9 @@ export default function AgentDemo() {
                   {(currentResult?.detailRows ?? [{ Item: contextConfig.featureName, Status: 'Run agent to populate evidence table' }]).map((row, index) => (
                     <tr key={index} className="border-t border-slate-800 text-slate-300">
                       {Object.values(row).map((value, valueIndex) => (
-                        <td key={`${index}-${valueIndex}`} className="px-3 py-2">{value}</td>
+                        <td key={`${index}-${valueIndex}`} className="px-3 py-2">
+                          <FormulaText>{value}</FormulaText>
+                        </td>
                       ))}
                     </tr>
                   ))}
@@ -1604,12 +1854,23 @@ export default function AgentDemo() {
           <div className={`rounded-lg border p-4 transition-all duration-500 ${runComplete ? 'border-emerald-400/30 bg-emerald-400/5' : 'border-slate-800 bg-[#0A0F1A]'}`}>
             <div className="flex items-center justify-between gap-2">
               <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Primary Result</p>
-              <span className={`rounded-full border px-2 py-0.5 text-[8px] font-bold uppercase ${runComplete ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300' : 'border-slate-700 bg-[#070B12] text-slate-500'}`}>
-                {runComplete ? currentResult?.confidenceLabel : 'Pending'}
-              </span>
+              <div className="flex items-center gap-1.5">
+                {agentState.llmState.usedLlm && runComplete && (
+                  <span className="rounded-full border border-violet-400/30 bg-violet-400/10 px-2 py-0.5 text-[8px] font-bold uppercase text-violet-300">
+                    AI-Assisted
+                  </span>
+                )}
+                <span className={`rounded-full border px-2 py-0.5 text-[8px] font-bold uppercase ${runComplete ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300' : 'border-slate-700 bg-[#070B12] text-slate-500'}`}>
+                  {runComplete ? currentResult?.confidenceLabel : 'Pending'}
+                </span>
+              </div>
             </div>
             <p className={`mt-3 text-xl font-black leading-tight ${runComplete ? 'text-emerald-300' : 'text-slate-700'}`}>
-              {runComplete ? currentResult?.primaryResult : 'Decision Pending'}
+              {runComplete && currentResult ? (
+                <FormulaText>{currentResult.primaryResult}</FormulaText>
+              ) : (
+                'Decision Pending'
+              )}
             </p>
             <p className="mt-1 text-[11px] text-slate-500">{runComplete ? currentResult?.subtitle : 'Run the agent to execute tools and produce a decision.'}</p>
             <div className="mt-4">
@@ -1627,7 +1888,9 @@ export default function AgentDemo() {
             <div className="agent-insight-in space-y-3">
               <div className="rounded-lg border border-cyan-400/20 bg-cyan-400/5 p-3">
                 <p className="text-[9px] font-bold uppercase tracking-wider text-cyan-200">Agent Decision</p>
-                <p className="mt-1 text-[11px] leading-5 text-slate-300">{currentResult.interpretation}</p>
+                <FormulaText className="mt-1 block text-[11px] leading-5 text-slate-300">
+                  {currentResult.interpretation}
+                </FormulaText>
               </div>
 
               <div className="rounded-lg border border-slate-800 bg-[#0A0F1A] p-3">
@@ -1636,7 +1899,7 @@ export default function AgentDemo() {
                   {currentResult.reasoningSummary.map((item) => (
                     <div key={item} className="flex items-start gap-2 rounded-md border border-slate-800 bg-[#070B12] px-2 py-1.5 text-[11px] text-slate-300">
                       <CheckCircle2 size={12} className="mt-0.5 shrink-0 text-emerald-300" />
-                      <span>{item}</span>
+                      <FormulaText>{item}</FormulaText>
                     </div>
                   ))}
                 </div>
@@ -1647,7 +1910,7 @@ export default function AgentDemo() {
                 <div className="space-y-1">
                   {currentResult.evidence.map((item) => (
                     <div key={item} className="rounded-md border border-slate-800 bg-[#070B12] px-2 py-1.5 text-[11px] leading-5 text-slate-300">
-                      {item}
+                      <FormulaText>{item}</FormulaText>
                     </div>
                   ))}
                 </div>
@@ -1659,7 +1922,7 @@ export default function AgentDemo() {
                   {currentResult.alternatives.map((item) => (
                     <div key={item} className="flex items-start gap-2 text-[11px] leading-5 text-slate-400">
                       <AlertTriangle size={12} className="mt-0.5 shrink-0 text-amber-300" />
-                      <span>{item}</span>
+                      <FormulaText>{item}</FormulaText>
                     </div>
                   ))}
                 </div>
@@ -1670,12 +1933,14 @@ export default function AgentDemo() {
                   <AlertTriangle size={12} className="text-orange-300" />
                   <p className="text-[9px] font-bold uppercase text-orange-300">Caveat</p>
                 </div>
-                <p className="text-[11px] leading-5 text-slate-300">{currentResult.caveat}</p>
+                <FormulaText className="block text-[11px] leading-5 text-slate-300">{currentResult.caveat}</FormulaText>
               </div>
 
               <div className="rounded-lg border border-indigo-400/20 bg-indigo-500/10 p-3">
                 <p className="text-[9px] font-bold uppercase text-indigo-200">Recommended Next</p>
-                <p className="mt-1 text-[11px] leading-5 text-slate-200">{currentResult.recommendation}</p>
+                <FormulaText className="mt-1 block text-[11px] leading-5 text-slate-200">
+                  {currentResult.recommendation}
+                </FormulaText>
               </div>
 
               <div className="grid grid-cols-2 gap-2">
@@ -1725,7 +1990,9 @@ export default function AgentDemo() {
                       </div>
                       <span className="shrink-0 text-[9px] text-slate-600">{entry.timestamp}</span>
                     </div>
-                    <p className="mt-1 text-[9px] text-slate-500">{entry.displayName} - {entry.outputSummary}</p>
+                    <FormulaText className="mt-1 block text-[9px] text-slate-500">
+                      {`${entry.displayName} - ${entry.outputSummary}`}
+                    </FormulaText>
                   </div>
                   {entry.canInsertLlmReasoningAfter && (
                     <div className="rounded-md border border-dashed border-slate-700 bg-[#050812] px-2 py-1.5 text-[9px] leading-4 text-slate-500">
@@ -1745,6 +2012,12 @@ export default function AgentDemo() {
             <div className="space-y-1 text-[10px]">
               <div className="flex justify-between gap-2"><span className="text-slate-500">Context</span><span className="text-right font-semibold text-white">{contextConfig.label}</span></div>
               <div className="flex justify-between gap-2"><span className="text-slate-500">Dataset</span><span className="truncate text-right font-semibold text-slate-300">{selectedDataset.id}</span></div>
+              <div className="flex justify-between gap-2">
+                <span className="text-slate-500">Material</span>
+                <FormulaText className="block min-w-0 truncate text-right font-semibold text-slate-300">
+                  {selectedProject.material}
+                </FormulaText>
+              </div>
               <div className="flex justify-between gap-2"><span className="text-slate-500">Execution</span><span className="font-semibold text-slate-300">{agentState.reasoningState.executionMode === 'auto' ? 'Auto Run' : 'Step-by-Step'}</span></div>
               <div className="flex justify-between gap-2"><span className="text-slate-500">Status</span><span className="font-semibold text-slate-300">{agentState.reasoningState.status}</span></div>
             </div>
