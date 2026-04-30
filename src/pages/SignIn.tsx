@@ -8,12 +8,18 @@ import { isDemoMode } from '../config/demoMode';
 export default function SignIn() {
   const navigate = useNavigate();
   const [emailMode, setEmailMode] = useState(false);
+  const [createMode, setCreateMode] = useState(false);
+  const [name, setName] = useState('');
+  const [organization, setOrganization] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [emailError, setEmailError] = useState('');
 
-  const enterDemo = () => {
-    if (isDemoMode) localStorage.setItem('demoAuth', 'true');
+  const enterDemo = (profile = { name: 'Demo Researcher', email: 'demo@difaryx.local', organization: 'DIFARYX Demo Lab' }) => {
+    if (isDemoMode) {
+      localStorage.setItem('demoAuth', 'true');
+      localStorage.setItem('demoProfile', JSON.stringify(profile));
+    }
     navigate('/dashboard');
   };
 
@@ -23,7 +29,24 @@ export default function SignIn() {
       setEmailError('Enter an email and password to continue in demo mode.');
       return;
     }
-    enterDemo();
+    enterDemo({
+      name: email.split('@')[0] || 'Demo Researcher',
+      email: email.trim(),
+      organization: 'DIFARYX Demo Lab',
+    });
+  };
+
+  const handleCreateSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!name.trim() || !email.trim() || !password.trim()) {
+      setEmailError('Enter a name, email, and password to create a demo account.');
+      return;
+    }
+    enterDemo({
+      name: name.trim(),
+      email: email.trim(),
+      organization: organization.trim() || 'DIFARYX Demo Lab',
+    });
   };
 
   return (
@@ -46,12 +69,12 @@ export default function SignIn() {
 
             <Card className="border-slate-200 bg-white shadow-2xl shadow-slate-200/70">
               <CardContent className="p-6">
-                {!emailMode ? (
+                {!emailMode && !createMode ? (
                   <div className="space-y-3">
                     <Button
                       variant="outline"
                       className="h-12 w-full justify-center gap-3 border-slate-200 bg-white text-base font-semibold text-slate-800 hover:border-blue-300 hover:bg-blue-50/60"
-                      onClick={enterDemo}
+                      onClick={() => enterDemo()}
                     >
                       <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
                         <path d="M12.0003 4.75C13.7703 4.75 15.3553 5.36002 16.6053 6.54998L20.0303 3.125C17.9502 1.19 15.2353 0 12.0003 0C7.31028 0 3.25527 2.69 1.28027 6.60998L5.27028 9.70498C6.21525 6.86002 8.87028 4.75 12.0003 4.75Z" fill="#EA4335" />
@@ -67,6 +90,7 @@ export default function SignIn() {
                       className="h-12 w-full justify-between border-slate-200 bg-white px-4 text-base font-semibold text-slate-800 hover:border-blue-300 hover:bg-blue-50/60"
                       onClick={() => {
                         setEmailMode(true);
+                        setCreateMode(false);
                         setEmailError('');
                       }}
                     >
@@ -78,8 +102,24 @@ export default function SignIn() {
                     </Button>
 
                     <Button
+                      variant="outline"
+                      className="h-12 w-full justify-between border-slate-200 bg-white px-4 text-base font-semibold text-slate-800 hover:border-blue-300 hover:bg-blue-50/60"
+                      onClick={() => {
+                        setCreateMode(true);
+                        setEmailMode(false);
+                        setEmailError('');
+                      }}
+                    >
+                      <span className="flex items-center gap-3">
+                        <UserRound size={18} />
+                        Create demo account
+                      </span>
+                      <ArrowRight size={18} className="text-slate-400" />
+                    </Button>
+
+                    <Button
                       className="h-12 w-full justify-between bg-gradient-to-r from-blue-600 to-indigo-600 px-4 text-base font-bold text-white shadow-lg shadow-blue-600/20 hover:shadow-xl hover:shadow-indigo-600/25"
-                      onClick={enterDemo}
+                      onClick={() => enterDemo()}
                     >
                       <span className="flex items-center gap-3">
                         <UserRound size={18} />
@@ -89,6 +129,69 @@ export default function SignIn() {
                     </Button>
                   </div>
                 ) : (
+                  createMode ? (
+                  <form className="space-y-4" onSubmit={handleCreateSubmit}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCreateMode(false);
+                        setEmailError('');
+                      }}
+                      className="inline-flex items-center gap-2 text-xs font-semibold text-slate-500 hover:text-blue-600"
+                    >
+                      <ArrowLeft size={14} />
+                      Back to login options
+                    </button>
+                    <label className="block text-sm font-semibold text-slate-700">
+                      Name
+                      <input
+                        type="text"
+                        value={name}
+                        onChange={(event) => setName(event.target.value)}
+                        placeholder="Demo Researcher"
+                        className="mt-2 h-11 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                      />
+                    </label>
+                    <label className="block text-sm font-semibold text-slate-700">
+                      Email
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(event) => setEmail(event.target.value)}
+                        placeholder="researcher@example.com"
+                        className="mt-2 h-11 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                      />
+                    </label>
+                    <label className="block text-sm font-semibold text-slate-700">
+                      Password
+                      <input
+                        type="password"
+                        value={password}
+                        onChange={(event) => setPassword(event.target.value)}
+                        placeholder="Create demo password"
+                        className="mt-2 h-11 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                      />
+                    </label>
+                    <label className="block text-sm font-semibold text-slate-700">
+                      Organization
+                      <input
+                        type="text"
+                        value={organization}
+                        onChange={(event) => setOrganization(event.target.value)}
+                        placeholder="Optional"
+                        className="mt-2 h-11 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                      />
+                    </label>
+                    {emailError && <p className="text-xs font-medium text-amber-600">{emailError}</p>}
+                    <Button
+                      type="submit"
+                      className="h-12 w-full justify-between bg-gradient-to-r from-blue-600 to-indigo-600 px-4 text-base font-bold text-white shadow-lg shadow-blue-600/20 hover:shadow-xl hover:shadow-indigo-600/25"
+                    >
+                      Create account and enter
+                      <ArrowRight size={18} />
+                    </Button>
+                  </form>
+                  ) : (
                   <form className="space-y-4" onSubmit={handleEmailSubmit}>
                     <button
                       type="button"
@@ -130,6 +233,7 @@ export default function SignIn() {
                       <ArrowRight size={18} />
                     </Button>
                   </form>
+                  )
                 )}
 
                 <p className="pt-2 text-center text-xs text-slate-500">Demo mode uses bundled scientific datasets.</p>

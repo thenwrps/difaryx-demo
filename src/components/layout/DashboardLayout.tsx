@@ -1,12 +1,24 @@
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { Bot, LayoutDashboard, FolderKanban, BookOpen, History, Settings, Search, User } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Bot, LayoutDashboard, FolderKanban, BookOpen, History, Settings, Search, User, PanelLeftClose, PanelLeftOpen, ChevronDown, LogOut } from 'lucide-react';
 import { cn } from '../ui/Button';
 import { DEFAULT_PROJECT_ID } from '../../data/demoProjects';
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
+  const navigate = useNavigate();
   const [isTopbarCompact, setIsTopbarCompact] = React.useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(true);
+  const [isProfileOpen, setIsProfileOpen] = React.useState(false);
+  const [profile] = React.useState(() => {
+    try {
+      const savedProfile = localStorage.getItem('demoProfile');
+      if (savedProfile) return JSON.parse(savedProfile) as { name?: string; email?: string; organization?: string };
+    } catch {
+      // Ignore malformed demo profile data.
+    }
+    return { name: 'Demo Researcher', email: 'demo@difaryx.local', organization: 'DIFARYX Demo Lab' };
+  });
   const lastScrollY = React.useRef(0);
 
   React.useEffect(() => {
@@ -42,36 +54,80 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     { label: 'Settings', icon: Settings, path: '/settings' },
   ];
 
+  const handleSignOut = () => {
+    localStorage.removeItem('demoAuth');
+    setIsProfileOpen(false);
+    navigate('/login');
+  };
+
   return (
     <div className="flex h-screen bg-background overflow-hidden text-text-main">
       {/* Sidebar */}
-      <aside className="w-16 md:w-64 border-r border-border bg-surface flex flex-col">
-        <div className="h-16 flex items-center justify-center md:justify-start px-2 md:px-6 border-b border-border shrink-0">
-          <Link to="/" className="md:bg-white md:px-3 md:py-1.5 rounded flex items-center">
+      <aside
+        className={cn(
+          "border-r border-border bg-surface flex flex-col transition-[width] duration-200 shrink-0",
+          isSidebarCollapsed ? "w-16 md:w-[72px]" : "w-64"
+        )}
+      >
+        <div
+          className={cn(
+            "h-14 flex items-center border-b border-border shrink-0 px-2",
+            isSidebarCollapsed ? "justify-center" : "justify-between"
+          )}
+        >
+          <Link to="/" className={cn("rounded flex items-center", !isSidebarCollapsed && "bg-white px-3 py-1.5")}>
             <img 
               src="/logo/difaryx.png" 
               alt="DIFARYX" 
-              className="h-7 md:h-8 object-contain hover:opacity-90 cursor-pointer transition-none"
+              className={cn(
+                "object-contain hover:opacity-90 cursor-pointer transition-none",
+                isSidebarCollapsed ? "h-7 w-9 object-cover object-left" : "h-8"
+              )}
             />
           </Link>
+          {!isSidebarCollapsed && (
+            <button
+              type="button"
+              onClick={() => setIsSidebarCollapsed(true)}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-text-muted hover:bg-surface-hover hover:text-text-main"
+              aria-label="Collapse sidebar"
+            >
+              <PanelLeftClose size={17} />
+            </button>
+          )}
         </div>
-        <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
+        <nav className={cn("flex-1 overflow-y-auto py-4 space-y-2", isSidebarCollapsed ? "px-2" : "px-3")}>
           {navItems.map((item, i) => (
             <Link
               key={i}
               to={item.path}
+              title={isSidebarCollapsed ? item.label : undefined}
               className={cn(
-                "flex items-center justify-center md:justify-start gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors",
+                "flex items-center rounded-md text-sm font-medium transition-colors",
+                isSidebarCollapsed ? "h-11 justify-center px-0" : "justify-start gap-3 px-3 py-2.5",
                 location.pathname === item.path.split('?')[0]
                   ? "bg-primary/10 text-primary" 
                   : "text-text-muted hover:bg-surface-hover hover:text-text-main"
               )}
             >
-              <item.icon size={18} />
-              <span className="hidden md:inline">{item.label}</span>
+              <item.icon size={isSidebarCollapsed ? 20 : 18} />
+              <span className={cn(isSidebarCollapsed ? "sr-only" : "inline")}>{item.label}</span>
             </Link>
           ))}
         </nav>
+        {isSidebarCollapsed && (
+          <div className="border-t border-border p-2">
+            <button
+              type="button"
+              onClick={() => setIsSidebarCollapsed(false)}
+              className="flex h-10 w-full items-center justify-center rounded-md text-text-muted hover:bg-surface-hover hover:text-text-main"
+              aria-label="Expand sidebar"
+              title="Expand sidebar"
+            >
+              <PanelLeftOpen size={18} />
+            </button>
+          </div>
+        )}
       </aside>
 
       {/* Main Content */}
@@ -88,10 +144,51 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
               />
             </div>
           </div>
-          <div className="flex items-center gap-3 ml-3">
-            <div className="h-7 w-7 rounded-full bg-primary/20 flex items-center justify-center text-primary border border-primary/30">
-              <User size={15} />
-            </div>
+          <div className="relative flex items-center gap-3 ml-3">
+            <button
+              type="button"
+              onClick={() => setIsProfileOpen((open) => !open)}
+              className="flex h-8 items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-1.5 pr-2 text-primary transition-colors hover:bg-primary/15"
+              aria-label="Open profile menu"
+              aria-expanded={isProfileOpen}
+            >
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/20">
+                <User size={14} />
+              </span>
+              <ChevronDown size={13} />
+            </button>
+            {isProfileOpen && (
+              <div className="absolute right-0 top-10 z-50 w-64 rounded-lg border border-border bg-surface p-2 shadow-xl shadow-slate-900/10">
+                <div className="rounded-md border border-border bg-background px-3 py-2">
+                  <p className="text-sm font-bold text-text-main">{profile.name ?? 'Demo Researcher'}</p>
+                  <p className="mt-0.5 truncate text-xs text-text-muted">{profile.email ?? 'demo@difaryx.local'}</p>
+                  <p className="mt-1 text-[11px] font-semibold text-primary">{profile.organization ?? 'DIFARYX Demo Lab'}</p>
+                </div>
+                <div className="mt-2 space-y-1">
+                  <Link
+                    to="/settings"
+                    onClick={() => setIsProfileOpen(false)}
+                    className="flex h-9 items-center gap-2 rounded-md px-3 text-sm font-medium text-text-main hover:bg-surface-hover"
+                  >
+                    <Settings size={15} /> Profile settings
+                  </Link>
+                  <Link
+                    to="/login"
+                    onClick={() => setIsProfileOpen(false)}
+                    className="flex h-9 items-center gap-2 rounded-md px-3 text-sm font-medium text-text-main hover:bg-surface-hover"
+                  >
+                    <User size={15} /> Switch account
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={handleSignOut}
+                    className="flex h-9 w-full items-center gap-2 rounded-md px-3 text-left text-sm font-medium text-red-600 hover:bg-red-50"
+                  >
+                    <LogOut size={15} /> Sign out
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </header>
 

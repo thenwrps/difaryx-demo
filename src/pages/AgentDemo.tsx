@@ -164,6 +164,7 @@ export default function AgentDemo() {
   const [selectedDatasetIds, setSelectedDatasetIds] = useState<string[]>([]);
   const [runHistory, setRunHistory] = useState<AgentRunHistoryItem[]>([]);
   const [agentFeedback, setAgentFeedback] = useState('');
+  const [isLogExpanded, setIsLogExpanded] = useState(false);
   const logEndRef = useRef<HTMLDivElement>(null);
 
   const isRunning = !['idle', 'complete'].includes(agentState) && !isComplete;
@@ -177,6 +178,47 @@ export default function AgentDemo() {
   const stagedEvidence = getTechniqueEvidence(project, selectedTechniques).slice(0, evidenceCountForState(agentState));
   const activeGraphIndex = activeGraphIndexForState(agentState, selectedDatasetRows.length);
   const statusLabel = isComplete ? 'Complete' : agentState === 'input' || agentState === 'context' ? 'Planning' : isRunning ? 'Running' : 'Idle';
+  const agentInsight = {
+    'Quick Insight': {
+      content: 'Fast phase-readout focused on primary evidence and immediate caveats.',
+      focus: 'XRD peaks and strongest selected signal.',
+      confidence: 'Readable as a fast confidence estimate.',
+      next: 'Confirm primary phase, then inspect caveats.',
+    },
+    'Deep Analysis': {
+      content: 'Multi-tech reasoning across XRD, Raman, FTIR, and XPS with confidence and caveat tracking.',
+      focus: 'Cross-technique evidence consistency.',
+      confidence: 'Weighted by selected datasets and missing evidence.',
+      next: 'Review fused evidence before report export.',
+    },
+    'Autonomous Workflow': {
+      content: 'End-to-end agent plan including dataset validation, tool execution, evidence fusion, and report preparation.',
+      focus: 'Full workflow readiness and provenance.',
+      confidence: 'Interpreted with run trace and report caveats.',
+      next: 'Send the completed run to Notebook Lab.',
+    },
+  }[agentMode] ?? {
+    content: 'Multi-tech reasoning across selected evidence with confidence and caveat tracking.',
+    focus: 'Selected evidence packets.',
+    confidence: 'Weighted by selected datasets.',
+    next: 'Run the agent and review results.',
+  };
+
+  const agentReasoningMessage = (() => {
+    if (!isRunning) return isComplete ? 'Run complete; decision remains available.' : 'Idle; graph and datasets are ready.';
+    if (agentState === 'input') return 'Planning workflow...';
+    if (agentState === 'context') return 'Validating dataset context...';
+    if (agentState === 'execution') {
+      if (timelineIndex <= 3) return 'Running XRD phase screening...';
+      if (timelineIndex === 4) return 'Checking Raman lattice evidence...';
+      if (timelineIndex === 5) return 'Checking FTIR bonding evidence...';
+      return 'Reviewing XPS surface evidence...';
+    }
+    if (agentState === 'fusion') return 'Fusing multi-tech evidence...';
+    if (agentState === 'reasoning') return 'Interpreting confidence and caveats...';
+    if (agentState === 'decision') return 'Generating decision...';
+    return 'Agent is reasoning...';
+  })();
 
   useEffect(() => {
     const nextDatasets = getProjectDatasets(project.id);
@@ -619,25 +661,25 @@ export default function AgentDemo() {
 
   return (
     <div className="min-h-screen bg-[#070B12] text-slate-300 font-sans flex flex-col h-screen overflow-hidden">
-      <header className="h-16 border-b border-slate-800 bg-[#0A0F1A] flex items-center justify-between px-6 shrink-0">
-        <div className="flex items-center gap-4">
+      <header className="h-12 border-b border-slate-800 bg-[#0A0F1A] flex items-center justify-between px-4 shrink-0">
+        <div className="flex items-center gap-3">
           <Link
             to={selectedDatasetRows[0] ? getWorkspaceRoute(project, selectedDatasetRows[0].technique, selectedDatasetRows[0].id) : getWorkspaceRoute(project)}
             className="text-slate-400 hover:text-white transition-colors"
             aria-label="Back to workspace"
           >
-            <ChevronLeft size={20} />
+            <ChevronLeft size={18} />
           </Link>
           <Link to="/dashboard" className="flex items-center gap-2 hover:opacity-90 transition-opacity">
-            <div className="w-6 h-6 rounded bg-primary/20 flex items-center justify-center border border-primary/30">
-              <Brain size={14} className="text-primary" />
+            <div className="w-5 h-5 rounded bg-primary/20 flex items-center justify-center border border-primary/30">
+              <Brain size={12} className="text-primary" />
             </div>
-            <span className="font-semibold text-white tracking-wide">DIFARYX Agent</span>
+            <span className="text-sm font-semibold text-white tracking-wide">DIFARYX Agent</span>
           </Link>
-          <span className="hidden lg:inline text-xs text-slate-500 border-l border-slate-800 pl-4">{project.name}</span>
+          <span className="hidden lg:inline text-[11px] text-slate-500 border-l border-slate-800 pl-3">{project.name}</span>
         </div>
 
-        <div className="hidden md:flex items-center gap-2">
+        <div className="hidden md:flex items-center gap-1.5">
           {PIPELINE_STEPS.map((step, idx) => {
             const activeIndex = PIPELINE_STEPS.findIndex((item) => item.id === agentState);
             const isActive = agentState === step.id;
@@ -648,41 +690,41 @@ export default function AgentDemo() {
 
             return (
               <React.Fragment key={step.id}>
-                <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-medium transition-colors ${color}`}>
-                  {isPast ? <CheckCircle2 size={12} /> : isActive && isRunning ? <Loader2 size={12} className="animate-spin" /> : <CircleDot size={12} />}
+                <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-medium transition-colors ${color}`}>
+                  {isPast ? <CheckCircle2 size={10} /> : isActive && isRunning ? <Loader2 size={10} className="animate-spin" /> : <CircleDot size={10} />}
                   {step.label}
                 </div>
                 {idx < PIPELINE_STEPS.length - 1 && (
-                  <ArrowRight size={14} className={isPast ? 'text-primary/50' : 'text-slate-700'} />
+                  <ArrowRight size={12} className={isPast ? 'text-primary/50' : 'text-slate-700'} />
                 )}
               </React.Fragment>
             );
           })}
         </div>
 
-        <div className={`flex items-center gap-2 text-xs font-medium ${isRunning ? 'text-emerald-400' : 'text-slate-500'}`}>
-          <div className={`w-2 h-2 rounded-full ${isRunning ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'}`} />
+        <div className={`flex items-center gap-1.5 text-[11px] font-medium ${isRunning ? 'text-emerald-400' : 'text-slate-500'}`}>
+          <div className={`w-1.5 h-1.5 rounded-full ${isRunning ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'}`} />
           {isRunning ? 'Agent Active' : 'Agent Idle'}
         </div>
       </header>
 
-      <section className="shrink-0 border-b border-slate-800 bg-[#0A0F1A] px-6 py-4">
-        <div className="grid gap-4 xl:grid-cols-[220px_1fr_300px_auto] xl:items-end">
-          <div className="rounded-lg border border-slate-800 bg-[#070B12] p-3">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Project</p>
-            <p className="mt-1 text-sm font-semibold text-white">CuFe2O4 Spinel Formation</p>
+      <section className="shrink-0 border-b border-slate-800 bg-[#0A0F1A] px-4 py-1.5">
+        <div className="grid gap-2 lg:grid-cols-[160px_minmax(0,1fr)_270px_135px] lg:items-end">
+          <div className="rounded-md border border-slate-800 bg-[#070B12] px-2.5 py-1.5">
+            <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-500">Project</p>
+            <p className="mt-0.5 text-xs font-semibold text-white">CuFe2O4 Spinel Formation</p>
           </div>
           <label className="block">
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Goal</span>
+            <span className="text-[9px] font-semibold uppercase tracking-wider text-slate-500">Goal</span>
             <textarea
               value={goal}
               onChange={(event) => setGoal(event.target.value)}
               disabled={isRunning}
-              className="mt-1 h-16 w-full resize-none rounded-lg border border-slate-800 bg-[#070B12] px-3 py-2 text-sm text-slate-200 outline-none transition-colors focus:border-primary disabled:opacity-70"
+              className="mt-1 h-8 w-full resize-none overflow-hidden rounded-md border border-slate-800 bg-[#070B12] px-2.5 py-1.5 text-xs leading-tight text-slate-200 outline-none transition-colors focus:border-primary disabled:opacity-70"
             />
           </label>
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Mode selector</p>
+            <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-500">Mode selector</p>
             <div className="mt-1 grid grid-cols-3 gap-1">
               {['Quick Insight', 'Deep Analysis', 'Autonomous Workflow'].map((mode) => (
                 <button
@@ -690,7 +732,7 @@ export default function AgentDemo() {
                   type="button"
                   onClick={() => setAgentMode(mode)}
                   disabled={isRunning}
-                  className={`min-h-10 rounded-md border px-2 text-center text-[10px] font-semibold transition-colors ${
+                  className={`h-8 rounded-md border px-2 text-center text-[10px] font-semibold leading-tight transition-colors ${
                     agentMode === mode
                       ? 'border-cyan/50 bg-cyan/10 text-cyan'
                       : 'border-slate-800 bg-[#070B12] text-slate-400 hover:border-slate-600 hover:text-slate-200'
@@ -701,9 +743,9 @@ export default function AgentDemo() {
               ))}
             </div>
           </div>
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1">
             <span
-              className={`inline-flex h-8 items-center justify-center rounded-full border px-3 text-xs font-semibold ${
+              className={`inline-flex h-6 items-center justify-center rounded-full border px-2 text-[10px] font-semibold ${
                 statusLabel === 'Complete'
                   ? 'border-emerald-400/40 bg-emerald-400/10 text-emerald-300'
                   : statusLabel === 'Running' || statusLabel === 'Planning'
@@ -717,9 +759,9 @@ export default function AgentDemo() {
               type="button"
               onClick={runAgent}
               disabled={isRunning || !goal.trim()}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-4 text-sm font-bold text-white shadow-lg shadow-blue-600/20 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-indigo-600/25 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md bg-gradient-to-r from-blue-600 to-indigo-600 px-3 text-xs font-bold text-white shadow-md shadow-blue-600/15 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-indigo-600/20 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {isRunning ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} fill="currentColor" />}
+              {isRunning ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} fill="currentColor" />}
               Run Agent
             </button>
           </div>
@@ -727,19 +769,19 @@ export default function AgentDemo() {
       </section>
 
       <div className="flex-1 flex overflow-hidden">
-        <div className="w-80 border-r border-slate-800 bg-[#0A0F1A]/50 p-5 flex flex-col gap-6 shrink-0 overflow-y-auto">
-          <div className="rounded-lg border border-slate-800 bg-[#070B12] p-3">
+        <div className="w-[240px] border-r border-slate-800 bg-[#0A0F1A]/50 p-3 flex flex-col gap-3 shrink-0 overflow-y-auto">
+          <div className="rounded-lg border border-slate-800 bg-[#070B12] p-2.5">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Project context</p>
             <h1 className="mt-1 text-sm font-semibold text-white">{project.name}</h1>
             <p className="mt-1 text-xs text-slate-500">{project.summary}</p>
           </div>
 
           <div>
-            <h2 className="text-sm font-semibold text-white flex items-center gap-2 mb-3">
-              <Activity size={16} className="text-primary" /> Define Goal
+            <h2 className="text-xs font-semibold text-white flex items-center gap-2 mb-2">
+              <Activity size={14} className="text-primary" /> Define Goal
             </h2>
             <textarea
-              className="w-full bg-[#070B12] border border-slate-700 rounded-lg p-3 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-primary resize-none h-32"
+              className="w-full bg-[#070B12] border border-slate-700 rounded-lg p-2 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-primary resize-none h-24"
               placeholder="What do you want the agent to analyze?"
               value={goal}
               onChange={(event) => setGoal(event.target.value)}
@@ -748,18 +790,18 @@ export default function AgentDemo() {
             <button
               onClick={runAgent}
               disabled={isRunning || !goal.trim()}
-              className="mt-3 w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary-hover text-white py-2.5 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="mt-2 h-8 w-full flex items-center justify-center gap-1.5 bg-primary hover:bg-primary-hover text-white rounded-md text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isRunning ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} fill="currentColor" />}
+              {isRunning ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} fill="currentColor" />}
               {isRunning ? 'Agent Running...' : 'Execute Agent'}
             </button>
           </div>
 
           <div>
-            <h2 className="text-sm font-semibold text-white flex items-center gap-2 mb-3">
-              <Database size={16} className="text-primary" /> Available Datasets
+            <h2 className="text-xs font-semibold text-white flex items-center gap-2 mb-2">
+              <Database size={14} className="text-primary" /> Available Datasets
             </h2>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               {availableDatasets.map((dataset) => {
                 const checked = selectedDatasetIds.includes(dataset.id);
                 const savedEvidenceCount = getSavedEvidence(project.id, dataset.technique).length;
@@ -767,7 +809,7 @@ export default function AgentDemo() {
                 return (
                   <div
                     key={dataset.id}
-                    className={`rounded border p-2.5 transition-colors ${
+                    className={`rounded border p-2 transition-colors ${
                       checked ? 'bg-primary/10 border-primary/30' : 'bg-[#070B12] border-slate-800 opacity-75'
                     }`}
                   >
@@ -791,7 +833,7 @@ export default function AgentDemo() {
                           </span>
                         </span>
                       </label>
-                      <div className="ml-2 flex shrink-0 items-center gap-2">
+                      <div className="ml-2 flex shrink-0 flex-col items-end gap-1">
                         <span className="text-[10px] bg-slate-800 px-1.5 py-0.5 rounded text-slate-400">{dataset.technique}</span>
                         <Link
                           to={getWorkspaceRoute(project, dataset.technique, dataset.id)}
@@ -801,7 +843,7 @@ export default function AgentDemo() {
                         </Link>
                       </div>
                     </div>
-                    <div className="mt-2 h-16 rounded border border-slate-800 bg-[#050812] p-1">
+                    <div className="mt-1.5 h-12 rounded border border-slate-800 bg-[#050812] p-1">
                       <Graph
                         type={dataset.technique.toLowerCase() as 'xrd' | 'xps' | 'ftir' | 'raman'}
                         height="100%"
@@ -814,24 +856,38 @@ export default function AgentDemo() {
                 );
               })}
             </div>
-            <p className="mt-3 text-xs text-slate-500">
+            <p className="mt-2 text-[11px] leading-snug text-slate-500">
               Project datasets start selected. Toggle evidence to see confidence and warnings change.
             </p>
           </div>
         </div>
 
         <div className="flex-1 flex flex-col min-w-0">
-          <div className="flex-1 p-6 flex flex-col min-h-0 relative">
-            <h2 className="text-sm font-semibold text-white flex items-center gap-2 mb-4">
-              <Microscope size={16} className="text-primary" /> Execution View: Evidence Pattern
-            </h2>
-            <div className="flex-1 bg-[#0A0F1A] border border-slate-800 rounded-xl p-4 relative min-h-0 overflow-y-auto">
+          <div className="flex-1 p-4 flex flex-col min-h-0 relative">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+                <Microscope size={16} className="text-primary" /> Execution View: Evidence Pattern
+              </h2>
+              <div
+                className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-semibold ${
+                  isRunning
+                    ? 'border-cyan/40 bg-cyan/10 text-cyan'
+                    : isComplete
+                      ? 'border-emerald-400/40 bg-emerald-400/10 text-emerald-300'
+                      : 'border-slate-800 bg-[#0A0F1A] text-slate-500'
+                }`}
+              >
+                <span className={`h-1.5 w-1.5 rounded-full ${isRunning ? 'animate-pulse bg-cyan' : isComplete ? 'bg-emerald-400' : 'bg-slate-600'}`} />
+                <span>{isRunning ? `Agent is reasoning: ${agentReasoningMessage}` : agentReasoningMessage}</span>
+              </div>
+            </div>
+            <div className="flex-1 bg-[#0A0F1A] border border-slate-800 rounded-xl p-3 relative min-h-0 overflow-y-auto">
               {selectedDatasetRows.length === 0 ? (
                 <div className="flex h-full min-h-[260px] items-center justify-center text-center text-sm text-slate-500">
                   Select at least one dataset to render technique evidence graphs.
                 </div>
               ) : (
-                <div className={`grid gap-4 ${selectedDatasetRows.length === 1 ? 'grid-cols-1' : 'grid-cols-1 2xl:grid-cols-2'}`}>
+                <div className={`grid gap-3 ${selectedDatasetRows.length === 1 ? 'grid-cols-1' : 'grid-cols-1 xl:grid-cols-2'}`}>
                   {selectedDatasetRows.map((dataset, index) => {
                     const isActiveGraph = isRunning && index === activeGraphIndex;
                     const savedRunCount = getProcessingRuns(dataset.id).length;
@@ -860,7 +916,7 @@ export default function AgentDemo() {
                             )}
                           </div>
                         </div>
-                        <div className="h-56 rounded-md border border-slate-800 bg-[#050812] p-2">
+                        <div className="h-60 rounded-md border border-slate-800 bg-[#050812] p-2">
                           <Graph
                             type={dataset.technique.toLowerCase() as 'xrd' | 'xps' | 'ftir' | 'raman'}
                             height="100%"
@@ -881,34 +937,23 @@ export default function AgentDemo() {
                   })}
                 </div>
               )}
-
-              {isRunning && (
-                <div className="pointer-events-none absolute right-6 top-6 rounded-lg border border-cyan/30 bg-[#070B12]/90 px-3 py-2 shadow-lg shadow-cyan/10">
-                  <div className="flex items-center gap-2">
-                    <Loader2 size={14} className="text-cyan animate-spin" />
-                    <div>
-                      <h3 className="text-xs font-semibold text-white">Agent is analyzing</h3>
-                      <p className="text-[11px] text-cyan animate-pulse">
-                      {agentState === 'execution'
-                        ? 'Extracting selected evidence...'
-                        : agentState === 'fusion'
-                          ? 'Fusing evidence across modules...'
-                          : agentState === 'reasoning'
-                            ? 'Evaluating confidence and caveats...'
-                            : 'Preparing run state...'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
 
-          <div className="h-64 border-t border-slate-800 bg-[#0A0F1A]/80 p-4 flex flex-col shrink-0">
-            <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2 mb-3">
-              <Terminal size={14} /> Execution Log
-            </h2>
-            <div className="flex-1 overflow-y-auto font-mono text-[11px] space-y-1.5 pr-2 custom-scrollbar">
+          <div className={`${isLogExpanded ? 'h-52' : 'h-24'} border-t border-slate-800 bg-[#0A0F1A]/80 p-2.5 flex flex-col shrink-0 transition-[height] duration-200`}>
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                <Terminal size={13} /> Execution Log
+              </h2>
+              <button
+                type="button"
+                onClick={() => setIsLogExpanded((expanded) => !expanded)}
+                className="rounded border border-slate-800 px-2 py-0.5 text-[10px] font-semibold text-slate-400 hover:border-slate-600 hover:text-slate-200"
+              >
+                {isLogExpanded ? 'Collapse' : 'Expand'}
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto font-mono text-[10px] space-y-1 pr-2 custom-scrollbar">
               {logs.length === 0 && <span className="text-slate-600">Waiting for agent execution...</span>}
               {logs.map((log, i) => (
                 <div key={`${log.time}-${i}`} className="flex gap-3">
@@ -931,27 +976,64 @@ export default function AgentDemo() {
           </div>
         </div>
 
-        <div className="w-[340px] border-l border-slate-800 bg-[#0A0F1A]/50 p-5 flex flex-col gap-6 shrink-0 overflow-y-auto">
+        <div className="w-[300px] border-l border-slate-800 bg-[#0A0F1A]/50 p-3 flex flex-col gap-3 shrink-0 overflow-y-auto">
           <h2 className="text-sm font-semibold text-white flex items-center gap-2">
             <FileText size={16} className="text-primary" /> Final Decision
           </h2>
 
-          <div className="rounded-xl border border-slate-800 bg-[#070B12] p-4">
-            <div className="mb-3 flex items-center justify-between gap-2">
+          <div className="rounded-xl border border-slate-800 bg-[#070B12] p-3">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Agent Insight</h3>
+            <p className="mt-2 text-xs leading-relaxed text-slate-300">{agentInsight.content}</p>
+            <div
+              className={`mt-3 flex items-center gap-2 rounded-md border px-2 py-1.5 text-[11px] ${
+                isRunning
+                  ? 'border-cyan/30 bg-cyan/10 text-cyan'
+                  : isComplete
+                    ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300'
+                    : 'border-slate-800 bg-[#0A0F1A] text-slate-500'
+              }`}
+            >
+              <span className={`h-1.5 w-1.5 rounded-full ${isRunning ? 'animate-pulse bg-cyan' : isComplete ? 'bg-emerald-400' : 'bg-slate-600'}`} />
+              <span>{agentReasoningMessage}</span>
+            </div>
+            <div className="mt-3 space-y-2 text-[11px] leading-snug">
+              <div className="rounded-md border border-slate-800 bg-[#0A0F1A] p-2">
+                <span className="font-semibold text-cyan">Evidence focus:</span> <span className="text-slate-400">{agentInsight.focus}</span>
+              </div>
+              <div className="rounded-md border border-slate-800 bg-[#0A0F1A] p-2">
+                <span className="font-semibold text-cyan">Confidence:</span> <span className="text-slate-400">{agentInsight.confidence}</span>
+              </div>
+              <div className="rounded-md border border-slate-800 bg-[#0A0F1A] p-2">
+                <span className="font-semibold text-cyan">Next action:</span> <span className="text-slate-400">{agentInsight.next}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-800 bg-[#070B12] p-3">
+            <div className="mb-2 flex items-center justify-between gap-2">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Agent Timeline</h3>
-              <span className="rounded-full border border-slate-700 px-2 py-0.5 text-[10px] font-semibold text-slate-400">
-                Goal → Plan → Execute → Evidence → Decision
+              <span className="rounded-full border border-slate-700 px-2 py-0.5 text-[9px] font-semibold text-slate-400">
+                {'Goal -> Plan -> Execute -> Evidence -> Decision'}
               </span>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               {EXECUTION_STEPS.map((step, index) => {
                 const running = isRunning && index === timelineIndex;
                 const complete = isComplete || index < timelineIndex;
                 const status = running ? 'running' : complete ? 'complete' : 'pending';
 
                 return (
-                  <div key={step.label} className="rounded-lg border border-slate-800 bg-[#0A0F1A] p-3">
-                    <div className="flex items-start gap-3">
+                  <div
+                    key={step.label}
+                    className={`rounded-lg border p-2 transition-colors ${
+                      status === 'complete'
+                        ? 'border-emerald-400/30 bg-emerald-400/5'
+                        : status === 'running'
+                          ? 'border-cyan/50 bg-cyan/10 shadow-sm shadow-cyan/10'
+                          : 'border-slate-800 bg-[#0A0F1A]'
+                    }`}
+                  >
+                    <div className="flex items-start gap-2">
                       <span
                         className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[10px] font-bold ${
                           status === 'complete'
@@ -961,7 +1043,7 @@ export default function AgentDemo() {
                               : 'border-slate-700 bg-slate-900 text-slate-500'
                         }`}
                       >
-                        {status === 'complete' ? '✓' : index + 1}
+                        {status === 'complete' ? 'done' : index + 1}
                       </span>
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
@@ -978,7 +1060,7 @@ export default function AgentDemo() {
                             {status}
                           </span>
                         </div>
-                        <p className="mt-1 text-[11px] leading-snug text-slate-500">{step.summary}</p>
+                        <p className="mt-1 text-[10px] leading-snug text-slate-500">{step.summary}</p>
                       </div>
                     </div>
                   </div>
@@ -987,16 +1069,16 @@ export default function AgentDemo() {
             </div>
           </div>
 
-          <div className="rounded-xl border border-slate-800 bg-[#070B12] p-4">
-            <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">Evidence Summary</h3>
-            <div className="space-y-2">
+          <div className="rounded-xl border border-slate-800 bg-[#070B12] p-3">
+            <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-500">Evidence Summary</h3>
+            <div className="space-y-1.5">
               {EVIDENCE_SUMMARY.map((item) => (
-                <div key={item.technique} className="rounded-lg border border-slate-800 bg-[#0A0F1A] p-3">
+                <div key={item.technique} className="rounded-lg border border-slate-800 bg-[#0A0F1A] p-2">
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-xs font-semibold text-cyan">{item.technique}</span>
                     <span className="text-[10px] font-semibold text-emerald-300">{item.contribution}</span>
                   </div>
-                  <p className="mt-1 text-sm font-semibold text-white">{item.feature}</p>
+                  <p className="mt-1 text-xs font-semibold text-white">{item.feature}</p>
                   <p className="mt-1 text-[11px] leading-snug text-slate-500">{item.caveat}</p>
                 </div>
               ))}

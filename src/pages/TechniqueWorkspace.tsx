@@ -19,7 +19,6 @@ import {
   Upload,
 } from 'lucide-react';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
-import { AIInsightPanel } from '../components/ui/AIInsightPanel';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Graph } from '../components/ui/Graph';
@@ -331,9 +330,6 @@ export default function TechniqueWorkspace() {
       ? ['Send this run to Notebook.', 'Run Agent with the saved evidence.']
       : ['Import data, detect features, then save evidence.'],
   };
-  const agentRoleLabel = activeTechnique === 'XRD'
-    ? 'Role: Phase screening (crystallographic validation)'
-    : `Role: ${activeTechnique} evidence preparation`;
   const evidenceOutputRows = activeTechnique === 'XRD'
     ? [
         ['Detected peaks', '9 diffraction peaks'],
@@ -766,46 +762,27 @@ export default function TechniqueWorkspace() {
         </aside>
 
         <section className="flex-1 flex flex-col min-w-0 overflow-hidden">
-          <div className="border-b border-border bg-surface/60 px-4 py-2 md:px-5">
-            <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
-                    Used by DIFARYX Agent
+          <div className="border-b border-border bg-surface/60 px-3 py-2 md:px-4">
+            <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
+              <div className="min-w-0">
+                <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">
+                    {activeTechnique} Workspace
                   </span>
-                  <span className="rounded-full border border-cyan/30 bg-cyan/10 px-2 py-0.5 text-[10px] font-semibold text-cyan">
-                    Agent Ready
+                  <h2 className="text-base font-bold leading-tight text-text-main">{project.name}</h2>
+                </div>
+                <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
+                  <span className="max-w-[420px] truncate text-[11px] text-text-muted">
+                    {selectedDataset?.fileName ?? `${activeTechnique} demo dataset`} - {labels.xLabel} / {labels.yLabel}
                   </span>
-                </div>
-                <p className="mt-1 text-xs font-semibold text-text-main">Project: CuFe2O4 Spinel Formation</p>
-                <p className="mt-0.5 text-[11px] text-text-muted">{agentRoleLabel}</p>
-                <p className="mt-1 text-[10px] font-medium uppercase tracking-wider text-text-dim">
-                  Goal → Plan → Execute → Evidence → Decision
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => navigate('/demo/agent?project=cu-fe2o4-spinel')}
-                className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md bg-gradient-to-r from-blue-600 to-indigo-600 px-3 text-xs font-semibold text-white shadow-md shadow-blue-600/10 transition-all hover:-translate-y-0.5 hover:shadow-indigo-600/20"
-              >
-                <Sparkles size={14} /> Run in Agent Mode
-              </button>
-            </div>
-          </div>
-
-          <div className="border-b border-border bg-surface/40 px-4 py-2.5 md:px-5">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="flex flex-wrap items-baseline gap-2">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">{activeTechnique} Workspace</p>
-                  <h2 className="text-xl font-bold text-text-main">{project.name}</h2>
-                </div>
-                <p className="mt-0.5 max-w-3xl text-xs text-text-muted">
-                  {selectedDataset?.fileName ?? `${activeTechnique} demo dataset`} - {labels.xLabel} / {labels.yLabel}
-                </p>
-                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                   <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
                     {workspaceStatus}
+                  </span>
+                  <span className="rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                    Used by DIFARYX Agent
+                  </span>
+                  <span className="rounded-full border border-cyan/25 bg-cyan/10 px-2 py-0.5 text-[10px] font-semibold text-cyan">
+                    Agent Ready
                   </span>
                   {latestSavedRun && (
                     <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[10px] font-medium text-text-muted">
@@ -814,9 +791,9 @@ export default function TechniqueWorkspace() {
                   )}
                 </div>
               </div>
-              <div className="flex shrink-0 items-center gap-2">
+              <div className="flex shrink-0 flex-wrap items-center justify-start gap-1.5 lg:justify-end">
                 {toast && (
-                  <span className="inline-flex rounded-md border border-primary/20 bg-primary/10 px-2 py-1 text-[11px] font-semibold text-primary">
+                  <span className="inline-flex h-8 items-center rounded-md border border-primary/20 bg-primary/10 px-2 text-[11px] font-semibold text-primary">
                     {toast}
                   </span>
                 )}
@@ -826,9 +803,16 @@ export default function TechniqueWorkspace() {
                 <Button size="sm" className="gap-1.5" onClick={handleSendToNotebook}>
                   <Send size={14} /> Send to Notebook
                 </Button>
+                <button
+                  type="button"
+                  onClick={() => navigate('/demo/agent?project=cu-fe2o4-spinel')}
+                  className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md bg-gradient-to-r from-blue-600 to-indigo-600 px-3 text-xs font-semibold text-white shadow-md shadow-blue-600/10 transition-all hover:-translate-y-0.5 hover:shadow-indigo-600/20"
+                >
+                  <Sparkles size={14} /> Run in Agent Mode
+                </button>
               </div>
             </div>
-            <div className="mt-2 flex gap-2 overflow-x-auto xl:hidden">
+            <div className="mt-2 flex gap-1.5 overflow-x-auto xl:hidden">
               {project.techniques.map((technique) => (
                 <Link
                   key={technique}
@@ -851,11 +835,11 @@ export default function TechniqueWorkspace() {
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
             <div className="grid grid-cols-1 2xl:grid-cols-[1fr_360px] gap-6">
-              <div className="space-y-6">
-                <Card className="p-5 min-h-[430px]">
-                  <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+              <div className="space-y-4">
+                <Card className="p-4 min-h-[430px]">
+                  <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
                     <div>
                       <h3 className="text-sm font-semibold text-text-main">{TECHNIQUE_COPY[activeTechnique].noun}</h3>
                       <p className="text-xs text-text-muted mt-1">
@@ -1121,11 +1105,19 @@ export default function TechniqueWorkspace() {
 
               <aside className="space-y-6">
                 <Card className="p-5">
-                  <div className="flex items-center gap-2">
-                    <Sparkles size={16} className="text-primary" />
-                    <h3 className="text-sm font-semibold">Evidence Output Panel</h3>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <Sparkles size={16} className="text-primary" />
+                      <h3 className="text-sm font-semibold">Evidence & Insight</h3>
+                    </div>
+                    <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                      {phaseConfidence.toFixed(1)}%
+                    </span>
                   </div>
-                  <p className="mt-2 text-xs text-text-muted">What this workspace contributes to the DIFARYX agent.</p>
+                  <p className="mt-2 text-xs text-text-muted">
+                    Agent-ready contribution from this {activeTechnique} workspace after graph review, controls, and feature detection.
+                  </p>
+
                   <div className="mt-4 space-y-2">
                     {evidenceOutputRows.map(([label, value]) => (
                       <div key={label} className="flex items-start justify-between gap-4 rounded-md border border-border bg-background px-3 py-2 text-sm">
@@ -1134,47 +1126,69 @@ export default function TechniqueWorkspace() {
                       </div>
                     ))}
                   </div>
-                </Card>
 
-                <AIInsightPanel result={insight} />
-
-                <Card className="p-5">
-                  <div className="flex items-center gap-2">
-                    <Layers3 size={16} className="text-primary" />
-                    <h3 className="text-sm font-semibold">{activeTechnique === 'XRD' ? 'Phase match' : 'Evidence assignment'}</h3>
-                  </div>
-                  {matched ? (
-                    <div className="mt-4 space-y-4">
-                      <div className="rounded-md border border-primary/20 bg-primary/5 p-4">
-                        <div className="text-xs font-semibold uppercase tracking-wider text-primary">Best match</div>
-                        <p className="mt-1 text-sm font-semibold text-text-main">{project.phase}</p>
-                        <p className="mt-1 text-2xl font-bold text-cyan">{phaseConfidence.toFixed(1)}%</p>
-                      </div>
-                      <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                        <div className="rounded-md border border-border bg-background p-2">
-                          <div className="font-bold text-text-main">{detectedFeatures.length}</div>
-                          <div className="text-text-muted">matched</div>
-                        </div>
-                        <div className="rounded-md border border-border bg-background p-2">
-                          <div className="font-bold text-text-main">{project.confidence < 90 ? 1 : 0}</div>
-                          <div className="text-text-muted">missing</div>
-                        </div>
-                        <div className="rounded-md border border-border bg-background p-2">
-                          <div className="font-bold text-text-main">{activeTechnique === 'XRD' ? 1 : 0}</div>
-                          <div className="text-text-muted">unexplained</div>
-                        </div>
-                      </div>
-                      <p className="text-sm text-text-muted">
-                        {activeTechnique === 'XRD'
-                          ? 'Caveat: compact frontend reference matching is used for this demo.'
-                          : 'Caveat: saved evidence supports the project decision but does not replace full fitting.'}
-                      </p>
+                  <div className="mt-4 rounded-md border border-border bg-background p-3">
+                    <div className="mb-2 flex items-center gap-2">
+                      <Layers3 size={14} className="text-primary" />
+                      <span className="text-xs font-semibold uppercase tracking-wider text-text-muted">
+                        {activeTechnique === 'XRD' ? 'Phase / match interpretation' : 'Evidence assignment'}
+                      </span>
                     </div>
-                  ) : (
-                    <p className="mt-4 text-sm text-text-muted">
-                      Run {TECHNIQUE_COPY[activeTechnique].assignLabel.toLowerCase()} to populate confidence, matched features, limitations, and evidence.
+                    {matched ? (
+                      <div className="space-y-3">
+                        <div>
+                          <p className="text-sm font-semibold text-text-main">{project.phase}</p>
+                          <p className="mt-1 text-xs text-text-muted">{insight.interpretation}</p>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                          <div className="rounded-md border border-border bg-surface p-2">
+                            <div className="font-bold text-text-main">{detectedFeatures.length}</div>
+                            <div className="text-text-muted">matched</div>
+                          </div>
+                          <div className="rounded-md border border-border bg-surface p-2">
+                            <div className="font-bold text-text-main">{project.confidence < 90 ? 1 : 0}</div>
+                            <div className="text-text-muted">missing</div>
+                          </div>
+                          <div className="rounded-md border border-border bg-surface p-2">
+                            <div className="font-bold text-text-main">{activeTechnique === 'XRD' ? 1 : 0}</div>
+                            <div className="text-text-muted">unexplained</div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-text-muted">
+                        Run {TECHNIQUE_COPY[activeTechnique].assignLabel.toLowerCase()} to populate confidence, matched features, limitations, and evidence.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="mt-4 space-y-2">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-text-muted">Key evidence</p>
+                    {insight.keyEvidence.slice(0, 3).map((item) => (
+                      <div key={item} className="rounded-md border border-border bg-background px-3 py-2 text-xs text-text-main">
+                        {item}
+                      </div>
+                    ))}
+                  </div>
+
+                  {matched ? (
+                    <p className="mt-4 rounded-md border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-700">
+                      Caveat: {activeTechnique === 'XRD'
+                        ? 'compact frontend reference matching is used for this demo.'
+                        : 'saved evidence supports the project decision but does not replace full fitting.'}
                     </p>
+                  ) : (
+                    insight.warnings.map((warning) => (
+                      <p key={warning} className="mt-4 rounded-md border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-700">
+                        Caveat: {warning}
+                      </p>
+                    ))
                   )}
+
+                  <div className="mt-4 rounded-md border border-primary/20 bg-primary/5 px-3 py-2">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-primary">Next recommended action</p>
+                    <p className="mt-1 text-sm text-text-main">{insight.recommendedNextStep[0]}</p>
+                  </div>
                 </Card>
 
                 <Card className="p-5">

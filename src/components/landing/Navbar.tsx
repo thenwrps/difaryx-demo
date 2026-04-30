@@ -28,14 +28,27 @@ export default function Navbar() {
             <img src="/logo/difaryx.png" alt="DIFARYX" className={`object-contain transition-[height] duration-200 ${isCompact ? 'h-5' : 'h-6'}`} />
           </Link>
           <nav className="hidden lg:flex items-center gap-5">
-            {['PRODUCT','TECHNIQUES','NOTEBOOK LAB','ROADMAP','COMPANY','INVESTOR BRIEFING'].map(item => (
-              <a key={item} href={`#${item.toLowerCase().replace(/\s+/g,'-')}`}
+            {[
+              ['PRODUCT', '#product'],
+              ['TECHNIQUES', '#techniques'],
+              ['NOTEBOOK LAB', '/notebook?project=cu-fe2o4-spinel'],
+              ['ROADMAP', '#roadmap'],
+              ['COMPANY', '#company'],
+              ['INVESTOR BRIEFING', '#roadmap'],
+            ].map(([item, href]) => (
+              <a key={item} href={href}
                 className="text-[12px] font-semibold tracking-[0.04em] text-slate-500 hover:text-slate-900 transition-colors">
                 {item}
               </a>
             ))}
           </nav>
         </div>
+        <Link
+          to="/login"
+          className="inline-flex h-9 items-center justify-center rounded-md border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 shadow-sm transition-colors hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
+        >
+          Sign in
+        </Link>
       </div>
     </header>
   );

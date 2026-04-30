@@ -167,7 +167,7 @@ export default function NotebookLab() {
   return (
     <DashboardLayout>
       <div className="flex-1 h-full flex overflow-hidden bg-background">
-        <div className="w-72 border-r border-border bg-surface flex flex-col shrink-0">
+        <div className="w-60 border-r border-border bg-surface flex flex-col shrink-0">
           <div className="p-4 border-b border-border flex justify-between items-center">
             <h2 className="text-sm font-semibold">Experiments</h2>
             <Button variant="ghost" size="sm" className="px-2 h-7" onClick={() => setExperimentModalOpen(true)}><Plus size={14} /></Button>
@@ -177,7 +177,7 @@ export default function NotebookLab() {
               <Link
                 key={item.id}
                 to={getNotebookPath(item)}
-                className={`block w-full text-left px-3 py-2 rounded-md text-sm font-medium transition-colors border ${
+                className={`block w-full text-left px-3 py-2 rounded-md text-xs font-medium leading-snug transition-colors border ${
                   item.id === project.id
                     ? 'bg-primary/10 text-primary border-primary/20'
                     : 'text-text-muted hover:bg-surface-hover hover:text-text-main border-transparent'
@@ -190,7 +190,7 @@ export default function NotebookLab() {
               <Link
                 key={experiment.id}
                 to={`/notebook?project=${experiment.projectId}`}
-                className={`block w-full text-left px-3 py-2 rounded-md text-sm font-medium transition-colors border ${
+                className={`block w-full text-left px-3 py-2 rounded-md text-xs font-medium leading-snug transition-colors border ${
                   experiment.projectId === project.id
                     ? 'bg-primary/5 text-primary border-primary/20'
                     : 'text-text-muted hover:bg-surface-hover hover:text-text-main border-transparent'
@@ -203,17 +203,17 @@ export default function NotebookLab() {
           </div>
         </div>
 
-        <div className="flex-1 flex flex-col overflow-y-auto relative">
-          <div className="sticky top-0 z-10 bg-surface/80 backdrop-blur border-b border-border p-4 flex justify-between items-center">
+        <div className="flex-1 min-w-0 flex flex-col overflow-y-auto relative">
+          <div className="sticky top-0 z-10 bg-surface/80 backdrop-blur border-b border-border p-3 flex flex-wrap justify-between items-center gap-3">
             <div>
-              <div className="flex items-center gap-2 text-xs text-text-muted mb-1">
+              <div className="flex items-center gap-2 text-[11px] text-text-muted mb-1">
                 <span>Created: {project.createdDate}</span>
                 <span>|</span>
                 <span>{workspaceRun ? 'Generated from workspace run' : runResult ? 'Generated from latest agent run' : 'Generated from analysis pipeline'}</span>
               </div>
-              <h1 className="text-xl font-bold">{notebook.title}</h1>
+              <h1 className="text-lg font-bold">{notebook.title}</h1>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {feedback && (
                 <span className="hidden sm:inline-flex items-center rounded-md border border-primary/20 bg-primary/10 px-3 text-xs font-semibold text-primary">
                   {feedback}
@@ -285,7 +285,7 @@ export default function NotebookLab() {
                       >
                         <span className="font-semibold text-text-main">{run.technique} run - {dataset?.fileName ?? run.datasetId}</span>
                         <span className="mt-1 block text-xs text-text-muted">
-                          {new Date(run.timestamp).toLocaleString()} · {run.detectedFeatures.length} features · {run.matchResult?.confidence ?? project.confidence}% confidence
+                          {new Date(run.timestamp).toLocaleString()} / {run.detectedFeatures.length} features / {run.matchResult?.confidence ?? project.confidence}% confidence
                         </span>
                       </button>
                     );
@@ -298,7 +298,28 @@ export default function NotebookLab() {
             </div>
           )}
 
-          <div className="p-8 max-w-3xl w-full mx-auto space-y-8">
+          <div className="p-6 max-w-5xl w-full mx-auto space-y-8">
+            <section className="grid grid-cols-1 gap-4 xl:grid-cols-2 2xl:hidden">
+              <Card className="p-4">
+                <div className="text-xs font-semibold uppercase tracking-wider text-text-muted">Judge View Summary</div>
+                <div className="mt-3 grid gap-3 text-sm sm:grid-cols-3 xl:grid-cols-1">
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-wider text-primary">Problem</div>
+                    <p className="mt-1 text-text-muted">Fragmented characterization workflows</p>
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-wider text-primary">Agent action</div>
+                    <p className="mt-1 text-text-muted">Planned, executed, and fused multi-tech evidence</p>
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-wider text-primary">Output</div>
+                    <p className="mt-1 text-text-muted">Traceable scientific decision with caveats and next experiment</p>
+                  </div>
+                </div>
+              </Card>
+              <AIInsightPanel result={getProjectInsight(project)} />
+            </section>
+
             <section className="space-y-4">
               <div className="rounded-xl border border-primary/20 bg-surface p-5">
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
@@ -418,7 +439,7 @@ export default function NotebookLab() {
                   ))}
                 </div>
                 <div className="mt-4 rounded-md border border-primary/20 bg-primary/5 p-3 text-center text-xs font-semibold uppercase tracking-wider text-primary">
-                  Goal → Plan → Execute → Evidence → Reason → Decision → Report
+                  {'Goal -> Plan -> Execute -> Evidence -> Reason -> Decision -> Report'}
                 </div>
               </div>
             </section>
@@ -602,7 +623,7 @@ export default function NotebookLab() {
           </div>
         </div>
 
-        <div className="w-[360px] border-l border-border bg-background flex flex-col shrink-0 overflow-y-auto">
+        <div className="hidden w-[340px] border-l border-border bg-background 2xl:flex flex-col shrink-0 overflow-y-auto">
           <div className="p-6">
             <Card className="mb-6 p-5">
               <div className="text-xs font-semibold uppercase tracking-wider text-text-muted">Judge View Summary</div>

@@ -10,7 +10,7 @@ const steps = [
 
 export default function WorkflowSection() {
   return (
-    <section className="py-14 border-t border-slate-100 bg-white">
+    <section id="workflow" className="py-14 border-t border-slate-100 bg-white">
       <div className="max-w-[1280px] mx-auto px-8">
         <p className="text-[11px] font-bold tracking-[0.15em] text-slate-400 uppercase mb-8">Agentic Scientific Workflow</p>
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">

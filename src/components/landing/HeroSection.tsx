@@ -230,7 +230,7 @@ export default function HeroSection() {
             <div className="flex flex-col items-start gap-3">
               <div className="flex flex-wrap gap-3">
                 <Link
-                  to="/dashboard"
+                  to="/login"
                   className="inline-flex h-11 items-center justify-center rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-6 text-[14px] font-bold text-white shadow-lg shadow-blue-600/20 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-indigo-600/25"
                 >
                   Enter DIFARYX
