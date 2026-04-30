@@ -20,14 +20,7 @@ function App() {
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<SignIn />} />
           <Route path="/signin" element={<SignIn />} />
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            }
-          />
+          <Route path="/dashboard" element={<Dashboard />} />
           <Route
             path="/workspace/multi"
             element={
