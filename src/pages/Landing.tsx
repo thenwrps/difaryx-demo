@@ -2,10 +2,13 @@ import React from 'react';
 import Navbar from '../components/landing/Navbar';
 import HeroSection from '../components/landing/HeroSection';
 import ProblemSection from '../components/landing/ProblemSection';
+import EvidenceSection from '../components/landing/EvidenceSection';
 import SolutionSection from '../components/landing/SolutionSection';
-import TechniquesSection from '../components/landing/TechniquesSection';
 import WorkflowSection from '../components/landing/WorkflowSection';
-import RoadmapSection from '../components/landing/RoadmapSection';
+import AgentDemoSection from '../components/landing/AgentDemoSection';
+import ResearcherControlSection from '../components/landing/ResearcherControlSection';
+import MultiTechniqueSection from '../components/landing/MultiTechniqueSection';
+import SystemCloudSection from '../components/landing/SystemCloudSection';
 import CTASection from '../components/landing/CTASection';
 import FooterSection from '../components/landing/FooterSection';
 
@@ -15,10 +18,13 @@ export default function Landing() {
       <Navbar />
       <HeroSection />
       <ProblemSection />
+      <EvidenceSection />
       <SolutionSection />
-      <TechniquesSection />
       <WorkflowSection />
-      <RoadmapSection />
+      <AgentDemoSection />
+      <ResearcherControlSection />
+      <MultiTechniqueSection />
+      <SystemCloudSection />
       <CTASection />
       <FooterSection />
     </div>

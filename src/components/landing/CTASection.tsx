@@ -3,30 +3,20 @@ import { Link } from 'react-router-dom';
 
 export default function CTASection() {
   return (
-    <section id="contact" className="py-16 border-t border-slate-100 bg-white">
-      <div className="max-w-[1280px] mx-auto px-8">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-          <h2 className="text-[28px] lg:text-[32px] font-bold leading-[1.2] text-slate-900 max-w-lg">
-            Built for researchers who need traceable agent decisions from{' '}
-            <span className="text-blue-600">multi-tech evidence.</span>
+    <section id="contact" className="border-t border-slate-100 bg-white py-24">
+      <div className="mx-auto max-w-[1200px] px-6">
+        <div className="rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-12 text-center shadow-[0_20px_60px_rgba(15,23,42,0.08)] lg:p-16">
+          <h2 className="mb-6 text-[32px] font-bold leading-[1.2] text-slate-900 lg:text-[48px]">
+            Most tools analyze data.
+            <br />
+            <span className="text-blue-600">DIFARYX fixes the workflow</span> — and makes scientific decisions reproducible.
           </h2>
-          <p className="text-[13px] text-slate-500 leading-relaxed max-w-sm md:text-right">
-            Start in the workspace or run the CuFe2O4 agent demo across XRD, Raman, FTIR, and XPS.
-          </p>
-        </div>
-        <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-3">
-          <Link to="/dashboard" className="border border-slate-200 rounded-lg p-4 hover:border-blue-300 hover:bg-blue-50/40 transition-colors">
-            <div className="text-sm font-bold text-slate-900">DIFARYX</div>
-            <div className="text-[12px] text-slate-500 mt-1">Open the connected scientific agent workspace demo.</div>
+          <Link
+            to="/dashboard"
+            className="inline-flex h-14 items-center justify-center rounded-xl bg-blue-600 px-8 text-[16px] font-bold text-white shadow-lg shadow-blue-600/20 transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-xl hover:shadow-blue-600/25"
+          >
+            Explore DIFARYX
           </Link>
-          <a href="#company" className="border border-slate-200 rounded-lg p-4 hover:border-cyan-300 hover:bg-cyan-50/40 transition-colors">
-            <div className="text-sm font-bold text-slate-900">INANZ</div>
-            <div className="text-[12px] text-slate-500 mt-1">Public ecosystem link placeholder until the live URL is configured.</div>
-          </a>
-          <a href="#contact" className="border border-slate-200 rounded-lg p-4 hover:border-indigo-300 hover:bg-indigo-50/40 transition-colors">
-            <div className="text-sm font-bold text-slate-900">Contact / Get Access</div>
-            <div className="text-[12px] text-slate-500 mt-1">Open demo access is available now; request team access from this section.</div>
-          </a>
         </div>
       </div>
     </section>

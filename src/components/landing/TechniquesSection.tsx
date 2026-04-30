@@ -102,13 +102,21 @@ export default function TechniquesSection() {
   return (
     <section id="techniques" className="border-t border-slate-100 bg-white py-16">
       <div className="mx-auto max-w-[1280px] px-8">
-        <p className="mb-6 text-[11px] font-bold uppercase tracking-[0.15em] text-slate-400">Techniques We Support</p>
+        <div className="mb-8">
+          <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.15em] text-slate-400">Product</p>
+          <h2 className="text-[28px] lg:text-[32px] font-bold leading-[1.2] text-slate-900 mb-3">
+            Multi-Technique Scientific Reasoning
+          </h2>
+          <p className="text-[14px] text-slate-600 max-w-2xl">
+            DIFARYX supports XRD, XPS, FTIR, Raman, and other characterization techniques. The agent demo demonstrates one execution of the system using XRD phase identification for catalyst materials.
+          </p>
+        </div>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
           {techniqueCards.map((card) => (
             <SpectrumCard key={card.title} {...card} />
           ))}
           <div className="flex flex-col rounded-xl border border-slate-200 bg-slate-50 p-4 md:col-span-2">
-            <p className="mb-3 text-[10px] font-bold uppercase tracking-wide text-orange-500">Coming Soon</p>
+            <p className="mb-3 text-[10px] font-bold uppercase tracking-wide text-orange-500">Extensible Architecture</p>
             <div className="grid flex-1 grid-cols-1 gap-2 sm:grid-cols-2">
               {comingSoon.map((item) => (
                 <div key={item} className="flex items-center justify-between border-b border-slate-200 pb-2 text-[13px] font-semibold text-slate-700 last:border-0">
@@ -119,7 +127,7 @@ export default function TechniquesSection() {
                 </div>
               ))}
             </div>
-            <p className="mt-2 text-[10px] text-slate-400">Additional scientific modalities can join the same demo pipeline.</p>
+            <p className="mt-2 text-[10px] text-slate-400">Additional modalities integrate into the same reasoning infrastructure.</p>
           </div>
         </div>
       </div>

@@ -1,36 +1,31 @@
 import React from 'react';
-import { BarChart3, BookOpen, FolderKanban, Link2, FileOutput } from 'lucide-react';
+import { Layers, FileInput, Sliders, GitCompare, Brain } from 'lucide-react';
 
 const solutions = [
-  { title: 'Agent Plan', desc: 'Turn a research goal into an executable analysis plan.', Icon: FolderKanban },
-  { title: 'Tool Execution', desc: 'Run XRD, XPS, FTIR, Raman, and related characterization steps.', Icon: BarChart3 },
-  { title: 'Evidence Layer', desc: 'Link spectra, features, methods, confidence, caveats, and provenance.', Icon: Link2 },
-  { title: 'Notebook Memory', desc: 'Save agent runs, observations, and scientific context in one place.', Icon: BookOpen },
-  { title: 'Report Output', desc: 'Prepare traceable decisions for review, export, and presentation.', Icon: FileOutput },
+  { title: 'Unified workspace', desc: 'One platform for XRD, XPS, FTIR, Raman, and microscopy data.', Icon: Layers },
+  { title: 'Universal file reader', desc: 'Load proprietary formats without manual export or conversion.', Icon: FileInput },
+  { title: 'Controlled preprocessing', desc: 'Automated baseline, normalization, and peak detection with full parameter control.', Icon: Sliders },
+  { title: 'Cross-technique comparison', desc: 'Compare evidence across techniques in a single view.', Icon: GitCompare },
+  { title: 'Reasoning layer', desc: 'AI-assisted interpretation as a supporting layer, not a black box.', Icon: Brain },
 ];
 
 export default function SolutionSection() {
   return (
-    <section className="py-16 border-t border-slate-100 bg-white">
-      <div className="max-w-[1280px] mx-auto px-8">
-        <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-10 items-start">
-          <div>
-            <p className="text-[11px] font-bold tracking-[0.15em] text-slate-400 uppercase mb-4">Our Solution</p>
-            <h2 className="text-[28px] lg:text-[32px] font-bold leading-[1.2] text-slate-900">
-              DIFARYX turns a research goal into an executable analysis plan.
-            </h2>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-            {solutions.map(({ title, desc, Icon }) => (
-              <div key={title} className="border border-slate-200 rounded-xl p-4 bg-white text-center flex flex-col items-center">
-                <div className="w-10 h-10 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center mb-3">
-                  <Icon size={18} className="text-blue-600" />
-                </div>
-                <h3 className="text-[13px] font-bold text-slate-900 mb-1">{title}</h3>
-                <p className="text-[11px] text-slate-500 leading-relaxed">{desc}</p>
+    <section className="border-t border-slate-100 bg-white py-24">
+      <div className="mx-auto max-w-[1200px] px-6">
+        <h2 className="mb-12 text-center text-[32px] font-bold leading-[1.2] text-slate-900 lg:text-[40px]">
+          A unified system for scientific workflows
+        </h2>
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-5">
+          {solutions.map(({ title, desc, Icon }) => (
+            <div key={title} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-blue-100 bg-blue-50">
+                <Icon size={20} className="text-blue-600" />
               </div>
-            ))}
-          </div>
+              <h3 className="mb-2 text-[15px] font-bold text-slate-900">{title}</h3>
+              <p className="text-[13px] leading-relaxed text-slate-600">{desc}</p>
+            </div>
+          ))}
         </div>
       </div>
     </section>

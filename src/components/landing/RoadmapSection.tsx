@@ -5,29 +5,29 @@ const phases = [
     label: 'PHASE 1',
     status: 'Current',
     active: true,
-    title: 'Core Platform',
-    items: ['XRD, XPS, FTIR, Raman', 'Notebook Lab', 'Project Workflow', 'Report Export'],
+    title: 'Core Infrastructure',
+    items: ['Multi-tech reasoning (XRD, XPS, FTIR, Raman)', 'Evidence packet architecture', 'Autonomous execution pipeline', 'Reproducible decision framework'],
   },
   {
     label: 'PHASE 2',
-    status: 'Next',
+    status: 'Active',
     active: false,
-    title: 'Expand & Integrate',
-    items: ['More techniques (SEM/TEM, XRF)', 'Advanced analysis modules', 'Template & automation', 'API & integrations'],
+    title: 'Cloud Integration',
+    items: ['Modular deployment (Cloud Run, containers)', 'Provider routing (Vertex AI, Gemma)', 'API-first architecture', 'Extensible tool registry'],
   },
   {
     label: 'PHASE 3',
-    status: 'Future',
+    status: 'Next',
     active: false,
-    title: 'Collaborate & Scale',
-    items: ['Multi-user collaboration', 'Cloud sync & sharing', 'Lab & instrument integration', 'Organization & permissions'],
+    title: 'Scale & Collaborate',
+    items: ['Multi-user workflows', 'Lab system integration', 'Instrument connectivity', 'Organization deployment'],
   },
   {
     label: 'PHASE 4',
     status: 'Vision',
     active: false,
-    title: 'Intelligent Science Platform',
-    items: ['AI-assisted analysis', 'Knowledge graph', 'Predictive insights', 'Autonomous workflows'],
+    title: 'Reasoning Platform',
+    items: ['Cross-domain reasoning', 'Knowledge graph integration', 'Predictive insights', 'Autonomous research loops'],
   },
 ];
 
@@ -35,7 +35,13 @@ export default function RoadmapSection() {
   return (
     <section id="roadmap" className="py-16 border-t border-slate-100 bg-white">
       <div className="max-w-[1280px] mx-auto px-8">
-        <p className="text-[11px] font-bold tracking-[0.15em] text-slate-400 uppercase mb-8">Roadmap</p>
+        <div className="mb-8">
+          <p className="text-[11px] font-bold tracking-[0.15em] text-slate-400 uppercase mb-3">Cloud & Deployment</p>
+          <h2 className="text-[24px] font-bold text-slate-900 mb-2">Built for Integration, Modularity, and Extensibility</h2>
+          <p className="text-[13px] text-slate-600 max-w-2xl">
+            DIFARYX deploys as infrastructure. Integrate with existing tools, connect to lab systems, and extend with custom reasoning modules. Cloud-native architecture supports containerized deployment, API access, and provider routing.
+          </p>
+        </div>
         <div className="hidden md:flex items-center gap-0 mb-6 px-1">
           {phases.map((phase, i) => (
             <React.Fragment key={phase.label}>
