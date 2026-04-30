@@ -10,6 +10,13 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [isTopbarCompact, setIsTopbarCompact] = React.useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(true);
   const [isProfileOpen, setIsProfileOpen] = React.useState(false);
+  const [isDemoAuthenticated, setIsDemoAuthenticated] = React.useState(() => {
+    try {
+      return localStorage.getItem('demoAuth') === 'true';
+    } catch {
+      return false;
+    }
+  });
   const [profile] = React.useState(() => {
     try {
       const savedProfile = localStorage.getItem('demoProfile');
@@ -56,6 +63,8 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
 
   const handleSignOut = () => {
     localStorage.removeItem('demoAuth');
+    localStorage.removeItem('demoProfile');
+    setIsDemoAuthenticated(false);
     setIsProfileOpen(false);
     navigate('/login');
   };
@@ -145,49 +154,68 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             </div>
           </div>
           <div className="relative flex items-center gap-3 ml-3">
-            <button
-              type="button"
-              onClick={() => setIsProfileOpen((open) => !open)}
-              className="flex h-8 items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-1.5 pr-2 text-primary transition-colors hover:bg-primary/15"
-              aria-label="Open profile menu"
-              aria-expanded={isProfileOpen}
-            >
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/20">
-                <User size={14} />
-              </span>
-              <ChevronDown size={13} />
-            </button>
-            {isProfileOpen && (
-              <div className="absolute right-0 top-10 z-50 w-64 rounded-lg border border-border bg-surface p-2 shadow-xl shadow-slate-900/10">
-                <div className="rounded-md border border-border bg-background px-3 py-2">
-                  <p className="text-sm font-bold text-text-main">{profile.name ?? 'Demo Researcher'}</p>
-                  <p className="mt-0.5 truncate text-xs text-text-muted">{profile.email ?? 'demo@difaryx.local'}</p>
-                  <p className="mt-1 text-[11px] font-semibold text-primary">{profile.organization ?? 'DIFARYX Demo Lab'}</p>
-                </div>
-                <div className="mt-2 space-y-1">
-                  <Link
-                    to="/settings"
-                    onClick={() => setIsProfileOpen(false)}
-                    className="flex h-9 items-center gap-2 rounded-md px-3 text-sm font-medium text-text-main hover:bg-surface-hover"
-                  >
-                    <Settings size={15} /> Profile settings
-                  </Link>
-                  <Link
-                    to="/login"
-                    onClick={() => setIsProfileOpen(false)}
-                    className="flex h-9 items-center gap-2 rounded-md px-3 text-sm font-medium text-text-main hover:bg-surface-hover"
-                  >
-                    <User size={15} /> Switch account
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={handleSignOut}
-                    className="flex h-9 w-full items-center gap-2 rounded-md px-3 text-left text-sm font-medium text-red-600 hover:bg-red-50"
-                  >
-                    <LogOut size={15} /> Sign out
-                  </button>
-                </div>
+            {!isDemoAuthenticated ? (
+              <div className="flex items-center gap-2">
+                <Link
+                  to="/login"
+                  className="inline-flex h-8 items-center justify-center rounded-md border border-border bg-background px-3 text-xs font-bold text-text-main transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+                >
+                  Sign In
+                </Link>
+                <Link
+                  to="/login"
+                  className="inline-flex h-8 items-center justify-center rounded-md bg-primary px-3 text-xs font-bold text-white shadow-sm shadow-primary/20 transition-colors hover:bg-primary/90"
+                >
+                  Continue Demo
+                </Link>
               </div>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setIsProfileOpen((open) => !open)}
+                  className="flex h-8 items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-1.5 pr-2 text-primary transition-colors hover:bg-primary/15"
+                  aria-label="Open profile menu"
+                  aria-expanded={isProfileOpen}
+                >
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/20">
+                    <User size={14} />
+                  </span>
+                  <ChevronDown size={13} />
+                </button>
+                {isProfileOpen && (
+                  <div className="absolute right-0 top-10 z-50 w-64 rounded-lg border border-border bg-surface p-2 shadow-xl shadow-slate-900/10">
+                    <div className="rounded-md border border-border bg-background px-3 py-2">
+                      <p className="text-sm font-bold text-text-main">{profile.name ?? 'Demo Researcher'}</p>
+                      <p className="mt-0.5 truncate text-xs text-text-muted">{profile.email ?? 'demo@difaryx.local'}</p>
+                      <p className="mt-1 text-[11px] font-semibold text-primary">{profile.organization ?? 'DIFARYX Demo Lab'}</p>
+                    </div>
+                    <div className="mt-2 space-y-1">
+                      <Link
+                        to="/settings"
+                        onClick={() => setIsProfileOpen(false)}
+                        className="flex h-9 items-center gap-2 rounded-md px-3 text-sm font-medium text-text-main hover:bg-surface-hover"
+                      >
+                        <Settings size={15} /> Profile settings
+                      </Link>
+                      <Link
+                        to="/login"
+                        onClick={() => setIsProfileOpen(false)}
+                        className="flex h-9 items-center gap-2 rounded-md px-3 text-sm font-medium text-text-main hover:bg-surface-hover"
+                      >
+                        <User size={15} /> Switch account
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={handleSignOut}
+                        className="flex h-9 w-full items-center gap-2 rounded-md px-3 text-left text-sm font-medium text-red-600 hover:bg-red-50"
+                      >
+                        <LogOut size={15} /> Sign out
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </header>

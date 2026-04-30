@@ -22,10 +22,13 @@ import {
   loadAgentRunResult,
 } from '../data/demoProjects';
 import { DemoExportFormat, exportDemoArtifact } from '../utils/demoExport';
+import { getRun, type AgentRun } from '../data/runModel';
 
 export default function NotebookLab() {
   const [searchParams] = useSearchParams();
   const project = getProject(searchParams.get('project'));
+  const runId = searchParams.get('run');
+  const agentRun = runId ? getRun(runId) : null;
   const [feedback, setFeedback] = useState('');
   const [experimentModalOpen, setExperimentModalOpen] = useState(false);
   const [localExperiments, setLocalExperiments] = useState(() => getLocalExperiments());
@@ -35,7 +38,6 @@ export default function NotebookLab() {
   const [observationOpen, setObservationOpen] = useState(false);
   const [observationDraft, setObservationDraft] = useState('');
   const [attachRunOpen, setAttachRunOpen] = useState(false);
-  const runId = searchParams.get('run');
   const runResult = useMemo(() => loadAgentRunResult(project.id), [project.id]);
   const workspaceRun = useMemo(() => getProcessingRun(runId), [runId]);
   const workspaceDataset = useMemo(
@@ -48,6 +50,28 @@ export default function NotebookLab() {
   );
   const attachedRunRecord = useMemo(() => getProcessingRun(attachedRun), [attachedRun]);
   const notebook = useMemo(() => {
+    // If we have an agent run, use that data
+    if (agentRun) {
+      return {
+        title: `Agent Run: ${project.name}`,
+        summary: agentRun.outputs.interpretation,
+        decision: agentRun.outputs.phase,
+        confidence: agentRun.outputs.confidence,
+        confidenceLabel: agentRun.outputs.confidenceLabel,
+        evidence: agentRun.outputs.evidence,
+        warnings: agentRun.outputs.caveats,
+        recommendations: agentRun.outputs.recommendations,
+        processingPipeline: [
+          `Mission: ${agentRun.mission}`,
+          `Selected datasets: ${agentRun.outputs.selectedDatasets.join(', ')}`,
+          `Detected ${agentRun.outputs.detectedPeaks?.length ?? 0} peaks`,
+          'Generated autonomous decision with evidence chain',
+        ],
+        peakDetection: `${agentRun.outputs.detectedPeaks?.length ?? 0} peaks detected by agent`,
+        phaseInterpretation: `${agentRun.outputs.phase} at ${agentRun.outputs.confidence}% confidence`,
+      };
+    }
+    
     const base = generateNotebookSections(project, runResult);
     if (!workspaceRun) return base;
 
@@ -138,6 +162,11 @@ export default function NotebookLab() {
     showFeedback(exportFeedbackMessage(format));
   };
 
+  const printReport = () => {
+    window.print();
+    showFeedback('Print dialog opened');
+  };
+
   const addObservation = () => {
     const text = observationDraft.trim() || `${project.name} evidence reviewed in notebook.`;
     const nextObservation = `Observation ${observations.length + 1}: ${text}`;
@@ -220,6 +249,7 @@ export default function NotebookLab() {
                 </span>
               )}
               <Button variant="outline" size="sm" className="gap-2" onClick={copyShareLink}><Share2 size={14} /> Share</Button>
+              <Button variant="outline" size="sm" className="gap-2" onClick={printReport}><FileText size={14} /> Print Report</Button>
               <div className="relative">
                 <Button variant="outline" size="sm" className="gap-2" onClick={() => setExportMenuOpen((open) => !open)}><Download size={14} /> Export</Button>
                 {exportMenuOpen && (

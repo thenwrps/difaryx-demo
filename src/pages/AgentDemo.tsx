@@ -1,1209 +1,799 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import React, { useMemo, useRef, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Activity,
-  ArrowRight,
+  AlertTriangle,
   Brain,
   CheckCircle2,
-  ChevronLeft,
   CircleDot,
   ClipboardList,
   Database,
   Download,
   FileText,
+  Layers,
   Loader2,
   Microscope,
   Play,
+  Target,
   Terminal,
+  Zap,
 } from 'lucide-react';
 import { Graph } from '../components/ui/Graph';
+import { runXrdPhaseIdentificationAgent } from '../agents/xrdAgent';
+import { getXrdDemoDataset } from '../data/xrdDemoDatasets';
 import {
-  AgentRunResult,
-  DemoDataset,
-  Technique,
-  buildAgentRun,
-  getProjectDatasets,
-  getProcessingRuns,
-  getSavedEvidence,
-  getNotebookPath,
   getProject,
-  getTechniqueEvidence,
   getWorkspaceRoute,
   saveAgentRunResult,
 } from '../data/demoProjects';
+import type { AgentRunResult, DemoPeak } from '../data/demoProjects';
+import { generateRunId, saveRun, type AgentRun } from '../data/runModel';
 
-type AgentState = 'idle' | 'input' | 'context' | 'execution' | 'fusion' | 'reasoning' | 'decision' | 'complete';
+type ReasoningStepStatus = 'pending' | 'running' | 'complete';
+type LogType = 'system' | 'tool' | 'success' | 'info' | 'gemma';
 
-type AgentRunHistoryItem = {
-  id: string;
-  prompt: string;
-  result: AgentRunResult;
-  datasets: string[];
-  createdAt: string;
+type ExecutionLogEntry = {
+  stamp: string;
+  message: string;
+  type: LogType;
 };
 
-const PIPELINE_STEPS: { id: AgentState; label: string }[] = [
-  { id: 'input', label: 'Input' },
-  { id: 'context', label: 'Context' },
-  { id: 'execution', label: 'Execution' },
-  { id: 'fusion', label: 'Fusion' },
-  { id: 'reasoning', label: 'Reasoning' },
-  { id: 'decision', label: 'Decision' },
-  { id: 'complete', label: 'Complete' },
-];
+const CANONICAL_PROJECT_ID = 'cu-fe2o4-spinel';
+const CANONICAL_DATASET_ID = 'xrd-cufe2o4-clean';
+const CANONICAL_SAMPLE_FILE = 'CuFe2O4_Experiment_01.xrd';
+const CANONICAL_PEAK_COUNT = 12;
+const CANONICAL_SCORE = 0.92;
+const DEFAULT_MISSION =
+  'Determine whether the uploaded sample is consistent with CuFe\u2082O\u2084 spinel ferrite phase from multi-technique evidence.';
 
-const EXECUTION_STEPS = [
+const PROJECT_OPTIONS = [
   {
-    label: 'Parse scientific goal',
-    summary: 'Extract target phase, catalytic activation question, and required evidence.',
+    value: 'cu-fe2o4-spinel',
+    label: 'CuFe\u2082O\u2084 Spinel Ferrite',
+    status: 'active',
   },
   {
-    label: 'Build analysis plan',
-    summary: 'Map selected datasets to XRD, Raman, FTIR, and XPS reasoning modules.',
+    value: 'cufe2o4-sba15',
+    label: 'CuFe\u2082O\u2084/SBA-15 Catalyst',
+    status: 'coming soon',
   },
   {
-    label: 'Validate dataset context',
-    summary: 'Confirm project identity, file coverage, and technique readiness.',
+    value: 'nife2o4',
+    label: 'NiFe\u2082O\u2084 Ferrite',
+    status: 'coming soon',
   },
   {
-    label: 'Run XRD phase screening',
-    summary: 'Compare diffraction peaks against ferrite spinel reference positions.',
-  },
-  {
-    label: 'Run Raman validation',
-    summary: 'Check vibrational modes for spinel fingerprint support.',
-  },
-  {
-    label: 'Run FTIR bonding check',
-    summary: 'Review metal-oxygen and surface bonding bands.',
-  },
-  {
-    label: 'Review XPS evidence',
-    summary: 'Assess oxidation-state support and note incomplete surface evidence.',
-  },
-  {
-    label: 'Fuse multi-tech evidence',
-    summary: 'Combine phase, vibrational, bonding, and surface evidence.',
-  },
-  {
-    label: 'Generate conclusion',
-    summary: 'Produce confidence, caveats, and the next recommended step.',
+    value: 'cofe2o4',
+    label: 'CoFe\u2082O\u2084 Ferrite',
+    status: 'coming soon',
   },
 ];
 
-const EVIDENCE_SUMMARY = [
+const REASONING_TRACE_STEPS = [
   {
-    technique: 'XRD',
-    feature: 'spinel peaks matched',
-    contribution: 'High',
-    caveat: 'Compact reference library in demo mode.',
+    label: 'load_xrd_dataset',
+    detail: 'Gemma \u2192 Load CuFe\u2082O\u2084 XRD spectrum (2\u03b8 10\u201380\u00b0)',
+    stamp: '[00:02]',
+    duration: 520,
+    type: 'gemma' as LogType,
+    gemmaCmd: '{"tool":"load_xrd_dataset","args":{"dataset_id":"xrd-cufe2o4-clean","format":"2theta-intensity"}}',
+    toolResult: 'Dataset loaded: 1801 pts, range 10.0\u201380.0\u00b0 2\u03b8',
+    evidenceUpdate: 'Raw XRD spectrum registered as primary evidence source',
   },
   {
-    technique: 'Raman',
-    feature: 'A1g mode supports spinel',
-    contribution: 'High',
-    caveat: 'Mode assignment is deterministic demo evidence.',
+    label: 'detect_xrd_peaks',
+    detail: 'Gemma \u2192 Detect diffraction peaks via prominence analysis',
+    stamp: '[00:06]',
+    duration: 640,
+    type: 'tool' as LogType,
+    gemmaCmd: '{"tool":"detect_xrd_peaks","args":{"method":"prominence","min_snr":3.0,"min_prominence":0.05}}',
+    toolResult: '12 peaks detected (10 sharp, 2 broad); strongest at 2\u03b8 = 35.4\u00b0',
+    evidenceUpdate: 'Peak list added: positions, intensities, d-spacings',
   },
   {
-    technique: 'FTIR',
-    feature: 'metal-oxygen band present',
-    contribution: 'Medium',
-    caveat: 'Bonding evidence supports but does not prove phase alone.',
+    label: 'match_reference_phase',
+    detail: 'Gemma \u2192 Match peaks against COD reference patterns',
+    stamp: '[00:11]',
+    duration: 700,
+    type: 'tool' as LogType,
+    gemmaCmd: '{"tool":"match_reference_phase","args":{"database":"COD","tolerance_deg":0.15,"radiation":"Cu-Kalpha"}}',
+    toolResult: 'Best match: CuFe\u2082O\u2084 spinel (0.92); runner-up: Fe\u2083O\u2084 (0.41)',
+    evidenceUpdate: 'Phase candidate ranking with match scores added',
   },
   {
-    technique: 'XPS',
-    feature: 'surface oxidation evidence partial',
-    contribution: 'Medium',
-    caveat: 'Catalytic activation remains pending full XPS validation.',
+    label: 'multi_evidence_fusion',
+    detail: 'Gemma \u2192 Evaluate unmatched peaks and impurity signals',
+    stamp: '[00:16]',
+    duration: 660,
+    type: 'tool' as LogType,
+    gemmaCmd: '{"tool":"multi_evidence_fusion","args":{"primary_phase":"CuFe2O4","threshold":0.02}}',
+    toolResult: '2 unexplained minor peaks; possible CuO impurity trace flagged',
+    evidenceUpdate: 'Conflict analysis: no major conflicts, minor impurity noted',
   },
+  {
+    label: 'generate_scientific_decision',
+    detail: 'Gemma \u2192 Synthesize evidence into scientific decision',
+    stamp: '[00:22]',
+    duration: 680,
+    type: 'success' as LogType,
+    gemmaCmd: '{"tool":"generate_scientific_decision","args":{"mode":"phase_identification","require_caveats":true}}',
+    toolResult: 'Decision: CuFe\u2082O\u2084 spinel ferrite confirmed at 92% confidence',
+    evidenceUpdate: 'Final decision with confidence, evidence chain, and caveats compiled',
+  },
+];
+
+const SCIENTIFIC_INSIGHT = {
+  phase: 'CuFe₂O₄ spinel ferrite',
+  confidence: 92,
+  evidence: [
+    'Peak alignment consistency (92%)',
+    'Strong match with spinel ferrite reference',
+    'No major conflicting peaks',
+  ],
+  confidenceBasis: [
+    'Strong XRD phase agreement',
+    'High peak alignment consistency',
+    'No conflicting peaks',
+  ],
+  interpretation:
+    'The material shows structural features consistent with spinel ferrites, a class of catalysts studied for CO2-to-fuel and CO2 hydrogenation pathways.',
+  nextStep: 'Validate surface chemistry with XPS or compare with catalytic performance data.',
+  modelRole: 'Gemma reasoning layer',
+  toolRole: 'Deterministic XRD analysis',
+  caveat: 'Minor impurity phases (possible CuO trace) require Rietveld refinement or complementary evidence.',
+};
+
+const IMPACT_TEXT =
+  'Automating interpretation of experimental data reduces iteration cycles in CO2 conversion research, accelerating the discovery of sustainable fuel catalysts.';
+
+const TOOL_STACK = [
+  'load_xrd_dataset',
+  'detect_xrd_peaks',
+  'match_reference_phase',
+  'multi_evidence_fusion',
+  'generate_scientific_decision',
 ];
 
 function wait(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
-function evidenceCountForState(state: AgentState) {
-  if (state === 'fusion' || state === 'reasoning') return 2;
-  if (state === 'decision' || state === 'complete') return 99;
-  if (state === 'execution') return 1;
-  return 0;
+const SYNTHETIC_RAMAN_POINTS: { x: number; y: number }[] = (() => {
+  const pts: { x: number; y: number }[] = [];
+  const peaks = [
+    { center: 190, width: 25, height: 0.4 },
+    { center: 300, width: 20, height: 0.35 },
+    { center: 320, width: 18, height: 0.3 },
+    { center: 470, width: 30, height: 0.55 },
+    { center: 540, width: 22, height: 0.25 },
+    { center: 680, width: 35, height: 0.9 },
+  ];
+  for (let x = 100; x <= 800; x += 2) {
+    let y = 0.05 + Math.sin(x * 0.7) * 0.01 + Math.cos(x * 1.3) * 0.008;
+    for (const p of peaks) {
+      y += p.height * Math.exp(-0.5 * ((x - p.center) / p.width) ** 2);
+    }
+    pts.push({ x, y: Math.max(0, y) });
+  }
+  return pts;
+})();
+
+const RAMAN_EVIDENCE_PEAKS = [
+  { label: 'T₂g(1)', pos: '190 cm⁻¹' },
+  { label: 'Eg', pos: '300 cm⁻¹' },
+  { label: 'T₂g(2)', pos: '470 cm⁻¹' },
+  { label: 'A₁g', pos: '680 cm⁻¹' },
+];
+
+const MISSION_OBJECTIVES = [
+  'Load and validate XRD dataset',
+  'Detect diffraction peaks',
+  'Match against reference phases',
+  'Evaluate unexplained signals',
+  'Generate scientific decision',
+];
+
+const DATA_SOURCES = [
+  { label: 'XRD', file: 'CuFe2O4_Experiment_01.xrd', status: 'loaded' as const },
+  { label: 'Raman', file: 'CuFe2O4_Raman_synth.csv', status: 'supporting' as const },
+];
+
+function MiniRamanSvg() {
+  const pts = SYNTHETIC_RAMAN_POINTS;
+  const xMin = pts[0].x, xMax = pts[pts.length - 1].x;
+  const yMax = Math.max(...pts.map(p => p.y)) * 1.1;
+  const W = 400, H = 140, pad = { t: 6, r: 6, b: 16, l: 6 };
+  const pw = W - pad.l - pad.r, ph = H - pad.t - pad.b;
+  const toX = (x: number) => pad.l + ((x - xMin) / (xMax - xMin)) * pw;
+  const toY = (y: number) => pad.t + ph - (y / yMax) * ph;
+  const d = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${toX(p.x).toFixed(1)},${toY(p.y).toFixed(1)}`).join(' ');
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="h-full w-full" preserveAspectRatio="xMidYMid meet">
+      <rect x="0" y="0" width={W} height={H} fill="transparent" />
+      <path d={d} fill="none" stroke="#a78bfa" strokeWidth="1.5" opacity="0.85" />
+      <text x={pad.l + 2} y={H - 2} fontSize="8" fill="#475569">100</text>
+      <text x={W - pad.r - 2} y={H - 2} fontSize="8" fill="#475569" textAnchor="end">800 cm⁻¹</text>
+    </svg>
+  );
 }
 
-function uniqueTechniques(datasets: DemoDataset[]): Technique[] {
-  return Array.from(new Set(datasets.map((dataset) => dataset.technique)));
+function reasoningStatus(index: number, currentIndex: number): ReasoningStepStatus {
+  if (currentIndex > index) return 'complete';
+  if (currentIndex === index) return 'running';
+  return 'pending';
 }
 
-function activeGraphIndexForState(state: AgentState, count: number) {
-  if (count === 0 || !['execution', 'fusion', 'reasoning', 'decision'].includes(state)) return -1;
-  if (state === 'execution') return 0;
-  if (state === 'fusion') return Math.min(1, count - 1);
-  if (state === 'reasoning') return Math.min(2, count - 1);
-  return count - 1;
+function logClass(type: LogType) {
+  if (type === 'gemma') return 'text-amber-300';
+  if (type === 'tool') return 'text-cyan-300';
+  if (type === 'success') return 'text-emerald-300';
+  if (type === 'system') return 'text-indigo-200';
+  return 'text-slate-300';
 }
 
-function promptFocus(prompt: string) {
-  const normalized = prompt.toLowerCase();
-  if (normalized.includes('surface') || normalized.includes('xps')) return 'surface-state focus';
-  if (normalized.includes('caveat') || normalized.includes('risk')) return 'caveat-focused reasoning';
-  if (normalized.includes('report') || normalized.includes('notebook')) return 'report-ready interpretation';
-  if (normalized.includes('raman')) return 'vibrational evidence focus';
-  return 'phase decision focus';
+function statusPillClass(status: ReasoningStepStatus) {
+  if (status === 'complete') return 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300';
+  if (status === 'running') return 'border-cyan-400/50 bg-cyan-400/10 text-cyan-300';
+  return 'border-slate-800 bg-[#070B12] text-slate-500';
+}
+
+function toDemoPeaks(peaks: { position: number; intensity: number; label: string }[]): DemoPeak[] {
+  return peaks.slice(0, CANONICAL_PEAK_COUNT).map((peak, index) => ({
+    position: Number(peak.position.toFixed(2)),
+    intensity: Number(peak.intensity.toFixed(1)),
+    label: peak.label || `P${index + 1}`,
+  }));
 }
 
 export default function AgentDemo() {
-  const [searchParams] = useSearchParams();
-  const project = getProject(searchParams.get('project'));
-  const [goal, setGoal] = useState('Determine whether the ferrite spinel phase formed and whether the evidence supports catalytic activation.');
-  const [agentMode, setAgentMode] = useState('Deep Analysis');
-  const [agentState, setAgentState] = useState<AgentState>('idle');
-  const [timelineIndex, setTimelineIndex] = useState(-1);
-  const [logs, setLogs] = useState<{ time: string; msg: string; type?: string }[]>([]);
-  const [result, setResult] = useState<AgentRunResult | null>(null);
-  const [isComplete, setIsComplete] = useState(false);
-  const [showReasoningTrace, setShowReasoningTrace] = useState(false);
-  const [selectedDatasetIds, setSelectedDatasetIds] = useState<string[]>([]);
-  const [runHistory, setRunHistory] = useState<AgentRunHistoryItem[]>([]);
-  const [agentFeedback, setAgentFeedback] = useState('');
-  const [isLogExpanded, setIsLogExpanded] = useState(false);
-  const logEndRef = useRef<HTMLDivElement>(null);
-
-  const isRunning = !['idle', 'complete'].includes(agentState) && !isComplete;
-  const availableDatasets = useMemo(() => getProjectDatasets(project.id), [project.id]);
-  const selectedDatasetRows = useMemo(
-    () => availableDatasets.filter((dataset) => selectedDatasetIds.includes(dataset.id)),
-    [availableDatasets, selectedDatasetIds],
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  
+  // Get project from URL or default
+  const projectIdFromUrl = searchParams.get('project') ?? CANONICAL_PROJECT_ID;
+  const project = useMemo(() => getProject(projectIdFromUrl), [projectIdFromUrl]);
+  
+  const dataset = useMemo(() => getXrdDemoDataset(CANONICAL_DATASET_ID), []);
+  const xrdAgentResult = useMemo(
+    () =>
+      runXrdPhaseIdentificationAgent({
+        datasetId: dataset.id,
+        sampleName: dataset.sampleName,
+        sourceLabel: dataset.fileName,
+        dataPoints: dataset.dataPoints,
+      }),
+    [dataset],
   );
-  const selectedTechniques = useMemo(() => uniqueTechniques(selectedDatasetRows), [selectedDatasetRows]);
-  const previewRun = useMemo(() => buildAgentRun(project, selectedTechniques), [project, selectedTechniques]);
-  const stagedEvidence = getTechniqueEvidence(project, selectedTechniques).slice(0, evidenceCountForState(agentState));
-  const activeGraphIndex = activeGraphIndexForState(agentState, selectedDatasetRows.length);
-  const statusLabel = isComplete ? 'Complete' : agentState === 'input' || agentState === 'context' ? 'Planning' : isRunning ? 'Running' : 'Idle';
-  const agentInsight = {
-    'Quick Insight': {
-      content: 'Fast phase-readout focused on primary evidence and immediate caveats.',
-      focus: 'XRD peaks and strongest selected signal.',
-      confidence: 'Readable as a fast confidence estimate.',
-      next: 'Confirm primary phase, then inspect caveats.',
-    },
-    'Deep Analysis': {
-      content: 'Multi-tech reasoning across XRD, Raman, FTIR, and XPS with confidence and caveat tracking.',
-      focus: 'Cross-technique evidence consistency.',
-      confidence: 'Weighted by selected datasets and missing evidence.',
-      next: 'Review fused evidence before report export.',
-    },
-    'Autonomous Workflow': {
-      content: 'End-to-end agent plan including dataset validation, tool execution, evidence fusion, and report preparation.',
-      focus: 'Full workflow readiness and provenance.',
-      confidence: 'Interpreted with run trace and report caveats.',
-      next: 'Send the completed run to Notebook Lab.',
-    },
-  }[agentMode] ?? {
-    content: 'Multi-tech reasoning across selected evidence with confidence and caveat tracking.',
-    focus: 'Selected evidence packets.',
-    confidence: 'Weighted by selected datasets.',
-    next: 'Run the agent and review results.',
+  const detectedPeaks = useMemo(
+    () =>
+      xrdAgentResult.detectedPeaks.map((peak) => ({
+        position: peak.position,
+        intensity: peak.intensity,
+        label: peak.label,
+      })),
+    [xrdAgentResult],
+  );
+
+  const [currentStepIndex, setCurrentStepIndex] = useState(-1);
+  const [isRunning, setIsRunning] = useState(false);
+  const [showScientificInsight, setShowScientificInsight] = useState(false);
+  const [result, setResult] = useState<AgentRunResult | null>(null);
+  const [logs, setLogs] = useState<ExecutionLogEntry[]>([]);
+  const [feedback, setFeedback] = useState('');
+  const [missionText, setMissionText] = useState(DEFAULT_MISSION);
+  const [selectedProject, setSelectedProject] = useState(projectIdFromUrl);
+  const runningGuardRef = useRef(false);
+
+  // Update URL when project changes
+  const handleProjectChange = (newProjectId: string) => {
+    setSelectedProject(newProjectId);
+    setSearchParams({ project: newProjectId });
   };
 
-  const agentReasoningMessage = (() => {
-    if (!isRunning) return isComplete ? 'Run complete; decision remains available.' : 'Idle; graph and datasets are ready.';
-    if (agentState === 'input') return 'Planning workflow...';
-    if (agentState === 'context') return 'Validating dataset context...';
-    if (agentState === 'execution') {
-      if (timelineIndex <= 3) return 'Running XRD phase screening...';
-      if (timelineIndex === 4) return 'Checking Raman lattice evidence...';
-      if (timelineIndex === 5) return 'Checking FTIR bonding evidence...';
-      return 'Reviewing XPS surface evidence...';
-    }
-    if (agentState === 'fusion') return 'Fusing multi-tech evidence...';
-    if (agentState === 'reasoning') return 'Interpreting confidence and caveats...';
-    if (agentState === 'decision') return 'Generating decision...';
-    return 'Agent is reasoning...';
-  })();
+  const workspacePath = getWorkspaceRoute(project, 'XRD', dataset.id);
+  const selectedProjectOption = PROJECT_OPTIONS.find((item) => item.value === selectedProject) ?? PROJECT_OPTIONS[0];
+  const selectedProjectIsPreview = selectedProject !== CANONICAL_PROJECT_ID;
+  const activeStep = currentStepIndex >= 0 && currentStepIndex < REASONING_TRACE_STEPS.length
+    ? REASONING_TRACE_STEPS[currentStepIndex]
+    : null;
+  const showPeakMarkers = currentStepIndex > 1 || showScientificInsight;
+  const runComplete = showScientificInsight && !!result;
+  const progressPercent =
+    currentStepIndex < 0
+      ? 0
+      : Math.min(100, (Math.min(currentStepIndex + 1, REASONING_TRACE_STEPS.length) / REASONING_TRACE_STEPS.length) * 100);
 
-  useEffect(() => {
-    const nextDatasets = getProjectDatasets(project.id);
-    setGoal('Determine whether the ferrite spinel phase formed and whether the evidence supports catalytic activation.');
-    setAgentMode('Deep Analysis');
-    setSelectedDatasetIds(nextDatasets.filter((dataset) => project.techniques.includes(dataset.technique)).map((dataset) => dataset.id));
-    setAgentState('idle');
-    setTimelineIndex(-1);
-    setLogs([]);
-    setResult(null);
-    setIsComplete(false);
-    setShowReasoningTrace(false);
-    setRunHistory([]);
-  }, [project.id, project.name, project.techniques]);
+  const canonicalRunResult = (): AgentRunResult => ({
+    projectId: project.id,
+    projectName: project.name,
+    material: 'CuFe₂O₄ spinel ferrite',
+    selectedDatasets: ['XRD'],
+    decision: 'CuFe₂O₄ spinel ferrite is supported by autonomous XRD evidence.',
+    confidence: 92,
+    confidenceLabel: 'High confidence',
+    evidence: [
+      ...SCIENTIFIC_INSIGHT.evidence,
+      'COD reference matching ranked CuFe2O4 above competing ferrite phases.',
+      'Structure inference assigned a spinel ferrite lattice family.',
+    ],
+    warnings: ['Surface chemistry remains unvalidated until XPS or catalytic performance data are reviewed.'],
+    recommendations: [SCIENTIFIC_INSIGHT.nextStep],
+    detectedPeaks: toDemoPeaks(detectedPeaks),
+    pipeline: TOOL_STACK,
+    generatedAt: '2026-04-30T00:00:00.000Z',
+    summary: `${SCIENTIFIC_INSIGHT.phase} assigned at ${SCIENTIFIC_INSIGHT.confidence}% confidence from ${CANONICAL_SAMPLE_FILE}.`,
+  });
 
-  useEffect(() => {
-    logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [logs]);
-
-  const addLog = (msg: string, type: string = 'info') => {
-    setLogs((prev) => [
-      ...prev,
-      {
-        time: new Date().toLocaleTimeString([], { hour12: false }),
-        msg,
-        type,
-      },
-    ]);
+  const showFeedback = (message: string) => {
+    setFeedback(message);
+    window.setTimeout(() => setFeedback(''), 2600);
   };
 
-  const showAgentFeedback = (message: string) => {
-    setAgentFeedback(message);
-    window.setTimeout(() => setAgentFeedback(''), 2200);
-  };
-
-  const toggleDataset = (datasetId: string) => {
-    if (isRunning) return;
-    setSelectedDatasetIds((current) =>
-      current.includes(datasetId)
-        ? current.filter((item) => item !== datasetId)
-        : [...current, datasetId],
-    );
+  const appendLog = (entry: ExecutionLogEntry) => {
+    setLogs((current) => [...current, entry]);
   };
 
   const runAgent = async () => {
-    if (!goal.trim() || isRunning) return;
+    if (runningGuardRef.current || isRunning) return;
+    runningGuardRef.current = true;
 
-    const baseRun = buildAgentRun(project, selectedTechniques);
-    const graphEvidence = selectedDatasetRows.map(
-      (dataset) => `${dataset.technique} graph ${dataset.fileName} was included in the reasoning view.`,
-    );
-    const run: AgentRunResult = {
-      ...baseRun,
-      decision: `${baseRun.decision} with ${promptFocus(goal)}`,
-      evidence: [...baseRun.evidence, ...graphEvidence],
-      summary: `${baseRun.summary} Prompt focus: ${promptFocus(goal)}. Graphs reviewed: ${selectedDatasetRows.map((dataset) => dataset.fileName).join(', ') || 'none'}.`,
-    };
-    setLogs((prev) => (
-      prev.length > 0
-        ? [
-            ...prev,
-            {
-              time: new Date().toLocaleTimeString([], { hour12: false }),
-              msg: '--- New agent run started ---',
-              type: 'system',
-            },
-          ]
-        : []
-    ));
+    setIsRunning(true);
+    setShowScientificInsight(false);
     setResult(null);
-    setIsComplete(false);
-    setShowReasoningTrace(false);
-    setTimelineIndex(0);
+    setCurrentStepIndex(-1);
+    setFeedback('');
+    setLogs([]);
 
-    setAgentState('input');
-    addLog(`Goal received: "${goal}"`, 'info');
-    addLog(`Datasets selected: ${selectedDatasetRows.map((dataset) => dataset.fileName).join(', ') || 'none'}`, 'info');
-    await wait(450);
+    try {
+      appendLog({
+        stamp: '[00:00]',
+        message: `Gemma agent initialized \u2014 ${missionText.trim() || DEFAULT_MISSION}`,
+        type: 'system',
+      });
+      if (selectedProjectIsPreview) {
+        appendLog({
+          stamp: '[00:00]',
+          message: `${selectedProjectOption.label} selected as preview; demo data remains locked to CuFe\u2082O\u2084 Spinel Ferrite.`,
+          type: 'info',
+        });
+      }
 
-    setAgentState('context');
-    setTimelineIndex(1);
-    addLog(`Analysis plan created in ${agentMode} mode`, 'info');
-    await wait(450);
+      for (let index = 0; index < REASONING_TRACE_STEPS.length; index += 1) {
+        const step = REASONING_TRACE_STEPS[index];
+        setCurrentStepIndex(index);
+        appendLog({
+          stamp: step.stamp,
+          message: `${step.label}: ${step.detail}`,
+          type: step.type,
+        });
+        await wait(step.duration);
+      }
 
-    setTimelineIndex(2);
-    addLog(`Loaded project context: ${project.name}`, 'info');
-    addLog(`Material system: ${project.material}`, 'info');
-    await wait(450);
+      setCurrentStepIndex(REASONING_TRACE_STEPS.length);
+      appendLog({
+        stamp: '[00:30]',
+        message: 'Gemma decision locked: CuFe₂O₄ spinel ferrite, confidence 92%.',
+        type: 'success',
+      });
 
-    setAgentState('execution');
-    setTimelineIndex(3);
-    addLog(`Executing ${selectedTechniques.join(' + ') || 'no'} evidence modules`, 'system');
-    addLog(selectedTechniques.includes('XRD') ? `Detected ${project.xrdPeaks.length} XRD peaks` : 'XRD peak matching skipped', 'system');
-    selectedDatasetRows.forEach((dataset) => addLog(`Graph queued: ${dataset.technique} / ${dataset.fileName}`, 'system'));
-    await wait(420);
+      await wait(300);
 
-    setTimelineIndex(4);
-    addLog(selectedTechniques.includes('Raman') ? 'Raman validation module complete' : 'Raman validation skipped', 'system');
-    await wait(420);
-
-    setTimelineIndex(5);
-    addLog(selectedTechniques.includes('FTIR') ? 'FTIR bonding check complete' : 'FTIR bonding check skipped', 'system');
-    await wait(420);
-
-    setTimelineIndex(6);
-    addLog(selectedTechniques.includes('XPS') ? 'XPS surface evidence reviewed' : 'XPS evidence marked partial', 'system');
-    await wait(420);
-
-    setAgentState('fusion');
-    setTimelineIndex(7);
-    addLog('Fusing selected technique evidence', 'info');
-    run.evidence.forEach((item) => addLog(`Evidence: ${item}`, 'success'));
-    await wait(600);
-
-    setAgentState('reasoning');
-    addLog('Reasoning over confidence, missing evidence, and recommendations', 'system');
-    run.warnings.forEach((warning) => addLog(`Warning: ${warning}`, 'error'));
-    await wait(550);
-
-    setAgentState('decision');
-    setTimelineIndex(8);
-    setResult(run);
-    setRunHistory((current) => [
-      {
-        id: `${run.projectId}-${Date.now()}`,
-        prompt: goal,
-        result: run,
-        datasets: selectedDatasetRows.map((dataset) => `${dataset.technique}: ${dataset.fileName}`),
-        createdAt: new Date().toLocaleString(),
-      },
-      ...current,
-    ].slice(0, 6));
-    addLog(`Decision generated: ${run.decision}`, 'success');
-    addLog(`Confidence assigned: ${run.confidence}%`, 'success');
-    saveAgentRunResult(run);
-    await wait(650);
-
-    setAgentState('complete');
-    setTimelineIndex(EXECUTION_STEPS.length);
-    addLog('Run complete; notebook result prepared', 'success');
-    await wait(400);
-    setIsComplete(true);
+      const nextResult = canonicalRunResult();
+      setResult(nextResult);
+      saveAgentRunResult(nextResult);
+      
+      // Create and save run
+      const runId = generateRunId();
+      const agentRun: AgentRun = {
+        id: runId,
+        projectId: project.id,
+        createdAt: new Date().toISOString(),
+        mission: missionText.trim() || DEFAULT_MISSION,
+        outputs: {
+          phase: nextResult.decision,
+          confidence: nextResult.confidence,
+          confidenceLabel: nextResult.confidenceLabel,
+          evidence: nextResult.evidence,
+          interpretation: SCIENTIFIC_INSIGHT.interpretation,
+          caveats: [
+            SCIENTIFIC_INSIGHT.caveat,
+            ...nextResult.warnings,
+          ],
+          recommendations: nextResult.recommendations,
+          detectedPeaks: nextResult.detectedPeaks,
+          selectedDatasets: nextResult.selectedDatasets,
+        },
+      };
+      saveRun(agentRun);
+      
+      setShowScientificInsight(true);
+      
+      // Navigate to workspace with run context
+      await wait(800);
+      navigate(`/workspace/xrd?project=${project.id}&run=${runId}`);
+    } finally {
+      setIsRunning(false);
+      runningGuardRef.current = false;
+    }
   };
 
-  const startNewRun = () => {
-    setIsComplete(false);
-    setResult(null);
-    setAgentState('idle');
-    setTimelineIndex(-1);
-    setShowReasoningTrace(false);
-    setGoal('Determine whether the ferrite spinel phase formed and whether the evidence supports catalytic activation.');
-    setLogs((prev) => [
-      ...prev,
-      {
-        time: new Date().toLocaleTimeString([], { hour12: false }),
-        msg: 'Ready for another prompt.',
-        type: 'info',
-      },
-    ]);
-  };
-
-  const buildAgentReportContext = (currentResult: AgentRunResult) => {
-    const runId = `AG-RUN-${project.id.toUpperCase().replace(/[^A-Z0-9]+/g, '-')}`;
-    return [
-      `Run ID: ${runId}`,
-      `Project: ${project.name}`,
-      `Goal: ${goal}`,
-      `Techniques: ${selectedTechniques.join(', ') || 'None selected'}`,
-      `Evidence summary: ${currentResult.evidence.slice(0, 3).join(' / ')}`,
-      `Conclusion: ${currentResult.decision}`,
-      `Confidence: ${currentResult.confidence}% (${currentResult.confidenceLabel})`,
-      `Caveats: ${currentResult.warnings.join(' ') || 'No major caveats recorded.'}`,
-      `Next actions: ${currentResult.recommendations.join(' ')}`,
-      `Provenance: ${selectedDatasetRows.map((dataset) => `${dataset.technique}:${dataset.fileName}`).join('; ') || project.id}`,
-    ].join(' | ');
-  };
-
-  const handleAgentExportPdf = () => {
+  const handleExportReport = () => {
     if (!result) return;
-    addLog(`PDF report prepared. ${buildAgentReportContext(result)}`, 'success');
-    showAgentFeedback('Report prepared: Agent conclusion, evidence, confidence, caveats, and provenance included.');
+    appendLog({
+      stamp: '[report]',
+      message: 'Export report package prepared with evidence, tool trace, confidence basis, and recommendation.',
+      type: 'success',
+    });
+    showFeedback('Export report preview prepared.');
   };
 
-  const handleAttachAgentRun = () => {
+  const handleSaveToNotebook = () => {
     if (!result) return;
     saveAgentRunResult(result);
-    addLog(`Notebook attachment prepared. ${buildAgentReportContext(result)}`, 'success');
-    showAgentFeedback('Agent run attached to Notebook Lab.');
+    appendLog({
+      stamp: '[notebook]',
+      message: 'Agent decision saved to Notebook Lab handoff.',
+      type: 'success',
+    });
+    showFeedback('Saved to Notebook Lab.');
   };
 
-  if (false && isComplete && result) {
-    const matrixTechniques = (['XRD', 'Raman', 'XPS', 'FTIR'] as Technique[]).filter(
-      (technique) => project.techniques.includes(technique) || result.selectedDatasets.includes(technique),
-    );
-    const selectedTechniqueSet = new Set(result.selectedDatasets);
-    const baseWeights: Record<Technique, number> = { XRD: 42, Raman: 28, XPS: 18, FTIR: 12 };
-    const selectedWeightTotal =
-      matrixTechniques.reduce((sum, technique) => sum + (selectedTechniqueSet.has(technique) ? baseWeights[technique] : 0), 0) || 1;
-    const evidenceMatrix = matrixTechniques.map((technique) => {
-      const dataset = selectedDatasetRows.find((item) => item.technique === technique);
-      const savedEvidence = getSavedEvidence(project.id, technique);
-      const evidenceText =
-        result.evidence.find((item) => item.toLowerCase().includes(technique.toLowerCase())) ??
-        savedEvidence[0]?.claim ??
-        `${technique} evidence was available but not selected for this run.`;
-      const weight = selectedTechniqueSet.has(technique) ? Math.round((baseWeights[technique] / selectedWeightTotal) * 100) : 0;
-
-      return {
-        technique,
-        datasetName: dataset?.fileName ?? 'Not selected',
-        evidenceText,
-        weight,
-        status: selectedTechniqueSet.has(technique) ? 'Included' : 'Available',
-      };
+  const handleGenerateReproducibleReport = () => {
+    if (!result) return;
+    appendLog({
+      stamp: '[repro]',
+      message: `Reproducible report generated with tool sequence: ${TOOL_STACK.join(' -> ')}.`,
+      type: 'tool',
     });
-    const workspacePath = selectedDatasetRows[0]
-      ? getWorkspaceRoute(project, selectedDatasetRows[0].technique, selectedDatasetRows[0].id)
-      : getWorkspaceRoute(project);
-    const notebookPath = getNotebookPath(project);
-    const fullReportPath = `${notebookPath}&report=full`;
-    const reasoningTrace = [
-      {
-        title: 'Input datasets selected',
-        detail: selectedDatasetRows.map((dataset) => `${dataset.technique}: ${dataset.fileName}`).join(', ') || 'No datasets selected.',
-      },
-      { title: 'Project context loaded', detail: `${project.name} / ${project.material}` },
-      {
-        title: 'XRD peaks extracted',
-        detail: selectedTechniqueSet.has('XRD') ? `${result.detectedPeaks.length} diffraction peaks extracted.` : 'XRD was not selected.',
-      },
-      {
-        title: 'Raman modes extracted',
-        detail: selectedTechniqueSet.has('Raman') ? 'Raman mode evidence reviewed for spinel structure.' : 'Raman was not selected.',
-      },
-      { title: 'Evidence fused', detail: `${evidenceMatrix.filter((row) => row.status === 'Included').length} technique rows contributed.` },
-      { title: 'Decision generated', detail: result.decision },
-    ];
-
-    return (
-      <div className="min-h-screen bg-[#070B12] text-slate-300 font-sans flex flex-col">
-        <header className="h-16 border-b border-slate-800 bg-[#0A0F1A] flex items-center justify-between px-6 shrink-0">
-          <Link to="/dashboard" className="flex items-center gap-2 hover:opacity-90 transition-opacity">
-            <div className="w-6 h-6 rounded bg-primary/20 flex items-center justify-center border border-primary/30">
-              <Brain size={14} className="text-primary" />
-            </div>
-            <span className="font-semibold text-white tracking-wide">DIFARYX Agent</span>
-          </Link>
-          <span className="hidden lg:inline text-xs text-slate-500">{project.name}</span>
-        </header>
-
-        <main className="flex-1 overflow-y-auto flex items-start justify-center px-4 md:px-6 py-6 md:py-10">
-          <div className="w-full max-w-5xl">
-            <div className="text-center">
-              <CheckCircle2 size={42} className="text-emerald-400 mx-auto mb-5" />
-              <h1 className="text-3xl font-bold text-white tracking-tight">Agent run complete</h1>
-              <p className="mt-3 text-sm text-slate-400">
-                DIFARYX generated a traceable decision from experimental evidence.
-              </p>
-              <button
-                type="button"
-                onClick={startNewRun}
-                className="mt-5 inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-5 text-sm font-bold text-white shadow-lg shadow-blue-600/20 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-indigo-600/25"
-              >
-                <Play size={15} fill="currentColor" />
-                Run another prompt
-              </button>
-            </div>
-
-            <div className="mt-8 rounded-xl border border-slate-800 bg-[#0A0F1A] p-5 shadow-xl shadow-black/20">
-              <div className="grid gap-4 lg:grid-cols-3">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Final Decision</p>
-                  <p className="mt-1 text-base font-semibold text-white">{result.decision}</p>
-                </div>
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Confidence score</p>
-                  <p className="mt-1 text-base font-semibold text-emerald-300">{result.confidenceLabel} ({result.confidence}%)</p>
-                </div>
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Recommended next action</p>
-                  <p className="mt-1 text-sm text-slate-300">{result.recommendations[0]}</p>
-                </div>
-
-                <div className="lg:col-span-3">
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Evidence Matrix</p>
-                    <span className="text-[11px] text-slate-500">{project.name}</span>
-                  </div>
-                  <div className="overflow-hidden rounded-lg border border-slate-800">
-                    {evidenceMatrix.map((row) => (
-                      <div key={row.technique} className="grid gap-3 border-b border-slate-800 bg-[#070B12] p-3 last:border-b-0 md:grid-cols-[120px_1fr_120px]">
-                        <div>
-                          <p className="text-xs font-semibold text-white">{row.technique} evidence</p>
-                          <p className="mt-1 text-[11px] text-slate-500">{row.datasetName}</p>
-                        </div>
-                        <p className="text-sm leading-6 text-slate-300">{row.evidenceText}</p>
-                        <div className="text-left md:text-right">
-                          <p className={`text-xs font-semibold ${row.status === 'Included' ? 'text-emerald-300' : 'text-amber-300'}`}>{row.status}</p>
-                          <p className="mt-1 text-[11px] text-slate-500">{row.weight}% contribution</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="lg:col-span-3">
-                  <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Technique contribution weights</p>
-                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    {evidenceMatrix.map((row) => (
-                      <div key={`${row.technique}-weight`} className="rounded-lg border border-slate-800 bg-[#070B12] p-3">
-                        <div className="mb-2 flex items-center justify-between text-xs">
-                          <span className="font-semibold text-white">{row.technique}</span>
-                          <span className="text-slate-400">{row.weight}%</span>
-                        </div>
-                        <div className="h-1.5 overflow-hidden rounded-full bg-slate-800">
-                          <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-300" style={{ width: `${row.weight}%` }} />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="lg:col-span-3 rounded-lg border border-slate-800 bg-[#070B12] p-4">
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Reasoning Trace timeline</p>
-                    <span className="text-[11px] text-slate-500">6 steps</span>
-                  </div>
-                  <div className="grid gap-2 md:grid-cols-3">
-                    {reasoningTrace.map((step, index) => (
-                      <div key={step.title} className="rounded-md border border-slate-800 bg-[#0A0F1A] p-3">
-                        <div className="flex items-center gap-2">
-                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
-                            {index + 1}
-                          </span>
-                          <p className="text-xs font-semibold text-white">{step.title}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  {showReasoningTrace && (
-                    <div className="mt-4 space-y-2 rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3">
-                      {reasoningTrace.map((step, index) => (
-                        <div key={`${step.title}-detail`} className="flex gap-3 text-sm">
-                          <span className="mt-0.5 text-xs font-semibold text-cyan">{index + 1}.</span>
-                          <div>
-                            <p className="font-semibold text-white">{step.title}</p>
-                            <p className="text-slate-400">{step.detail}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="lg:col-span-3 rounded-md border border-amber-500/30 bg-amber-500/10 p-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-amber-300">Caveats / warnings</p>
-                  <p className="mt-1 text-sm text-amber-100/80">
-                    {result.warnings.length > 0 ? result.warnings.join(' ') : 'No major caveats were generated for the selected evidence set.'}
-                  </p>
-                </div>
-
-                <div className="lg:col-span-3 rounded-lg border border-slate-800 bg-[#070B12] p-4">
-                  <div className="mb-3 flex items-center justify-between">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Run history</p>
-                    <span className="text-[11px] text-slate-500">{runHistory.length} run{runHistory.length === 1 ? '' : 's'}</span>
-                  </div>
-                  <div className="grid gap-2 md:grid-cols-2">
-                    {runHistory.map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => {
-                          setResult(item.result);
-                          setGoal(item.prompt);
-                          setShowReasoningTrace(true);
-                        }}
-                        className="rounded-md border border-slate-800 bg-[#0A0F1A] p-3 text-left hover:border-cyan/40"
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="text-xs font-semibold text-white">{item.result.confidence}% confidence</span>
-                          <span className="text-[10px] text-slate-500">{item.createdAt}</span>
-                        </div>
-                        <p className="mt-2 line-clamp-2 text-xs text-slate-400">{item.prompt}</p>
-                        <p className="mt-2 text-[10px] text-cyan">{item.datasets.join(', ') || 'No datasets'}</p>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-6 flex flex-col items-center justify-center gap-3 lg:flex-row">
-              <button
-                type="button"
-                onClick={() => setShowReasoningTrace((current) => !current)}
-                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-slate-700 bg-[#0A0F1A] px-5 text-sm font-bold text-slate-200 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-500/60 hover:text-cyan-200 lg:w-auto"
-              >
-                <ClipboardList size={16} />
-                View Reasoning Trace
-              </button>
-              <button
-                type="button"
-                onClick={startNewRun}
-                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-cyan-400/60 bg-[#070B12] px-5 text-sm font-bold text-cyan-300 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-400 hover:text-blue-200 lg:w-auto"
-              >
-                <Play size={16} fill="currentColor" />
-                New agent run
-              </button>
-              <Link
-                to={fullReportPath}
-                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-slate-700 bg-[#0A0F1A] px-5 text-sm font-bold text-slate-200 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-500 hover:text-white lg:w-auto"
-              >
-                <Download size={16} />
-                Open Full Report
-              </Link>
-              <Link
-                to={workspacePath}
-                className="inline-flex h-11 w-full items-center justify-center rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-6 text-sm font-bold text-white shadow-lg shadow-blue-600/20 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-indigo-600/25 lg:w-auto"
-              >
-                Back to Workspace
-              </Link>
-              <Link
-                to={notebookPath}
-                className="inline-flex h-11 w-full items-center justify-center rounded-lg border border-slate-700 bg-[#0A0F1A] px-6 text-sm font-bold text-slate-200 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-500 hover:text-white lg:w-auto"
-              >
-                Open Notebook
-              </Link>
-              <Link
-                to="/"
-                className="inline-flex h-11 w-full items-center justify-center rounded-lg border border-cyan-400/70 bg-[#070B12] px-6 text-sm font-bold text-cyan-300 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-400 hover:text-blue-200 hover:shadow-lg hover:shadow-cyan-500/10 lg:w-auto"
-              >
-                Return Home
-              </Link>
-            </div>
-          </div>
-        </main>
-      </div>
-    );
-  }
+    showFeedback('Reproducible report generated with deterministic tool provenance.');
+  };
 
   return (
-    <div className="min-h-screen bg-[#070B12] text-slate-300 font-sans flex flex-col h-screen overflow-hidden">
-      <header className="h-12 border-b border-slate-800 bg-[#0A0F1A] flex items-center justify-between px-4 shrink-0">
+    <div className="flex h-screen flex-col overflow-hidden bg-[#070B12] text-slate-300 font-sans">
+      <style>{`
+        @keyframes agentInsightIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+        .agent-insight-in { animation: agentInsightIn 400ms ease-out both; }
+        .cockpit-scroll::-webkit-scrollbar{width:4px} .cockpit-scroll::-webkit-scrollbar-thumb{background:#1e293b;border-radius:2px}
+      `}</style>
+
+      {/* HEADER */}
+      <header className="flex h-11 shrink-0 items-center justify-between border-b border-slate-800 bg-[#08101D]/95 px-4">
         <div className="flex items-center gap-3">
-          <Link
-            to={selectedDatasetRows[0] ? getWorkspaceRoute(project, selectedDatasetRows[0].technique, selectedDatasetRows[0].id) : getWorkspaceRoute(project)}
-            className="text-slate-400 hover:text-white transition-colors"
-            aria-label="Back to workspace"
-          >
-            <ChevronLeft size={18} />
+          <Link to="/dashboard" className="flex items-center gap-2 text-sm font-bold text-white hover:text-cyan-300">
+            <Brain size={16} className="text-cyan-300" />DIFARYX
           </Link>
-          <Link to="/dashboard" className="flex items-center gap-2 hover:opacity-90 transition-opacity">
-            <div className="w-5 h-5 rounded bg-primary/20 flex items-center justify-center border border-primary/30">
-              <Brain size={12} className="text-primary" />
-            </div>
-            <span className="text-sm font-semibold text-white tracking-wide">DIFARYX Agent</span>
-          </Link>
-          <span className="hidden lg:inline text-[11px] text-slate-500 border-l border-slate-800 pl-3">{project.name}</span>
+          <span className="hidden text-[10px] font-bold uppercase tracking-widest text-slate-600 sm:inline">Agent Mode</span>
+          <span className="text-[10px] text-slate-600">→</span>
+          <span className="text-[10px] font-semibold text-slate-400">Project: {project.name}</span>
+          <span className="rounded-full border border-amber-400/30 bg-amber-400/10 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-300">Gemma v0.1</span>
         </div>
-
-        <div className="hidden md:flex items-center gap-1.5">
-          {PIPELINE_STEPS.map((step, idx) => {
-            const activeIndex = PIPELINE_STEPS.findIndex((item) => item.id === agentState);
-            const isActive = agentState === step.id;
-            const isPast = activeIndex > idx;
-            let color = 'text-slate-600 border-slate-700';
-            if (isActive) color = 'text-cyan border-cyan bg-cyan/10 animate-pulse';
-            else if (isPast) color = 'text-primary border-primary bg-primary/10';
-
-            return (
-              <React.Fragment key={step.id}>
-                <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-medium transition-colors ${color}`}>
-                  {isPast ? <CheckCircle2 size={10} /> : isActive && isRunning ? <Loader2 size={10} className="animate-spin" /> : <CircleDot size={10} />}
-                  {step.label}
-                </div>
-                {idx < PIPELINE_STEPS.length - 1 && (
-                  <ArrowRight size={12} className={isPast ? 'text-primary/50' : 'text-slate-700'} />
-                )}
-              </React.Fragment>
-            );
-          })}
-        </div>
-
-        <div className={`flex items-center gap-1.5 text-[11px] font-medium ${isRunning ? 'text-emerald-400' : 'text-slate-500'}`}>
-          <div className={`w-1.5 h-1.5 rounded-full ${isRunning ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'}`} />
-          {isRunning ? 'Agent Active' : 'Agent Idle'}
+        <div className="flex items-center gap-3">
+          <span className={`rounded-full border px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${isRunning ? 'border-cyan-400/40 bg-cyan-400/10 text-cyan-300' : runComplete ? 'border-emerald-400/40 bg-emerald-400/10 text-emerald-300' : 'border-slate-700 bg-[#070B12] text-slate-500'}`}>
+            {isRunning ? 'Running' : runComplete ? 'Complete' : 'Ready'}
+          </span>
+          <button type="button" onClick={runAgent} disabled={isRunning} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-4 text-xs font-bold text-white shadow-lg shadow-blue-600/20 transition-all hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60">
+            {isRunning ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} fill="currentColor" />}
+            {runComplete ? 'Re-run' : 'Run Agent'}
+          </button>
+          <Link to="/" className="text-[10px] font-semibold text-slate-500 hover:text-white">Landing</Link>
         </div>
       </header>
 
-      <section className="shrink-0 border-b border-slate-800 bg-[#0A0F1A] px-4 py-1.5">
-        <div className="grid gap-2 lg:grid-cols-[160px_minmax(0,1fr)_270px_135px] lg:items-end">
-          <div className="rounded-md border border-slate-800 bg-[#070B12] px-2.5 py-1.5">
-            <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-500">Project</p>
-            <p className="mt-0.5 text-xs font-semibold text-white">CuFe2O4 Spinel Formation</p>
-          </div>
-          <label className="block">
-            <span className="text-[9px] font-semibold uppercase tracking-wider text-slate-500">Goal</span>
-            <textarea
-              value={goal}
-              onChange={(event) => setGoal(event.target.value)}
-              disabled={isRunning}
-              className="mt-1 h-8 w-full resize-none overflow-hidden rounded-md border border-slate-800 bg-[#070B12] px-2.5 py-1.5 text-xs leading-tight text-slate-200 outline-none transition-colors focus:border-primary disabled:opacity-70"
-            />
-          </label>
-          <div>
-            <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-500">Mode selector</p>
-            <div className="mt-1 grid grid-cols-3 gap-1">
-              {['Quick Insight', 'Deep Analysis', 'Autonomous Workflow'].map((mode) => (
-                <button
-                  key={mode}
-                  type="button"
-                  onClick={() => setAgentMode(mode)}
-                  disabled={isRunning}
-                  className={`h-8 rounded-md border px-2 text-center text-[10px] font-semibold leading-tight transition-colors ${
-                    agentMode === mode
-                      ? 'border-cyan/50 bg-cyan/10 text-cyan'
-                      : 'border-slate-800 bg-[#070B12] text-slate-400 hover:border-slate-600 hover:text-slate-200'
-                  }`}
-                >
-                  {mode}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="flex flex-col gap-1">
-            <span
-              className={`inline-flex h-6 items-center justify-center rounded-full border px-2 text-[10px] font-semibold ${
-                statusLabel === 'Complete'
-                  ? 'border-emerald-400/40 bg-emerald-400/10 text-emerald-300'
-                  : statusLabel === 'Running' || statusLabel === 'Planning'
-                    ? 'border-cyan/40 bg-cyan/10 text-cyan'
-                    : 'border-slate-700 bg-[#070B12] text-slate-400'
-              }`}
-            >
-              {statusLabel}
-            </span>
-            <button
-              type="button"
-              onClick={runAgent}
-              disabled={isRunning || !goal.trim()}
-              className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md bg-gradient-to-r from-blue-600 to-indigo-600 px-3 text-xs font-bold text-white shadow-md shadow-blue-600/15 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-indigo-600/20 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {isRunning ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} fill="currentColor" />}
-              Run Agent
-            </button>
-          </div>
-        </div>
-      </section>
+      {/* 3-COLUMN COCKPIT */}
+      <div className="flex min-h-0 flex-1">
 
-      <div className="flex-1 flex overflow-hidden">
-        <div className="w-[240px] border-r border-slate-800 bg-[#0A0F1A]/50 p-3 flex flex-col gap-3 shrink-0 overflow-y-auto">
-          <div className="rounded-lg border border-slate-800 bg-[#070B12] p-2.5">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Project context</p>
-            <h1 className="mt-1 text-sm font-semibold text-white">{project.name}</h1>
-            <p className="mt-1 text-xs text-slate-500">{project.summary}</p>
-          </div>
-
-          <div>
-            <h2 className="text-xs font-semibold text-white flex items-center gap-2 mb-2">
-              <Activity size={14} className="text-primary" /> Define Goal
-            </h2>
-            <textarea
-              className="w-full bg-[#070B12] border border-slate-700 rounded-lg p-2 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-primary resize-none h-24"
-              placeholder="What do you want the agent to analyze?"
-              value={goal}
-              onChange={(event) => setGoal(event.target.value)}
-              disabled={isRunning}
-            />
-            <button
-              onClick={runAgent}
-              disabled={isRunning || !goal.trim()}
-              className="mt-2 h-8 w-full flex items-center justify-center gap-1.5 bg-primary hover:bg-primary-hover text-white rounded-md text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isRunning ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} fill="currentColor" />}
-              {isRunning ? 'Agent Running...' : 'Execute Agent'}
-            </button>
-          </div>
-
-          <div>
-            <h2 className="text-xs font-semibold text-white flex items-center gap-2 mb-2">
-              <Database size={14} className="text-primary" /> Available Datasets
-            </h2>
-            <div className="space-y-1.5">
-              {availableDatasets.map((dataset) => {
-                const checked = selectedDatasetIds.includes(dataset.id);
-                const savedEvidenceCount = getSavedEvidence(project.id, dataset.technique).length;
-                const savedRunCount = getProcessingRuns(dataset.id).length;
-                return (
-                  <div
-                    key={dataset.id}
-                    className={`rounded border p-2 transition-colors ${
-                      checked ? 'bg-primary/10 border-primary/30' : 'bg-[#070B12] border-slate-800 opacity-75'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <label className={`flex min-w-0 flex-1 items-center gap-2 ${isRunning ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => toggleDataset(dataset.id)}
-                          disabled={isRunning}
-                          className="rounded border-slate-600 bg-slate-800 text-primary focus:ring-primary focus:ring-offset-[#070B12]"
-                        />
-                        <span className="min-w-0">
-                          <span className="block truncate text-xs font-medium text-slate-300">{dataset.fileName}</span>
-                          <span className="block text-[10px] text-slate-500">
-                            {savedRunCount > 0
-                              ? `${savedRunCount} saved run${savedRunCount === 1 ? '' : 's'}`
-                              : savedEvidenceCount > 0
-                                ? `${savedEvidenceCount} saved evidence item${savedEvidenceCount === 1 ? '' : 's'}`
-                                : dataset.sampleName}
-                          </span>
-                        </span>
-                      </label>
-                      <div className="ml-2 flex shrink-0 flex-col items-end gap-1">
-                        <span className="text-[10px] bg-slate-800 px-1.5 py-0.5 rounded text-slate-400">{dataset.technique}</span>
-                        <Link
-                          to={getWorkspaceRoute(project, dataset.technique, dataset.id)}
-                          className="text-[10px] font-semibold text-cyan hover:text-blue-200"
-                        >
-                          Open Spectrum
-                        </Link>
-                      </div>
-                    </div>
-                    <div className="mt-1.5 h-12 rounded border border-slate-800 bg-[#050812] p-1">
-                      <Graph
-                        type={dataset.technique.toLowerCase() as 'xrd' | 'xps' | 'ftir' | 'raman'}
-                        height="100%"
-                        externalData={dataset.dataPoints}
-                        showCalculated={false}
-                        showResidual={false}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <p className="mt-2 text-[11px] leading-snug text-slate-500">
-              Project datasets start selected. Toggle evidence to see confidence and warnings change.
-            </p>
-          </div>
-        </div>
-
-        <div className="flex-1 flex flex-col min-w-0">
-          <div className="flex-1 p-4 flex flex-col min-h-0 relative">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-                <Microscope size={16} className="text-primary" /> Execution View: Evidence Pattern
-              </h2>
-              <div
-                className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-semibold ${
-                  isRunning
-                    ? 'border-cyan/40 bg-cyan/10 text-cyan'
-                    : isComplete
-                      ? 'border-emerald-400/40 bg-emerald-400/10 text-emerald-300'
-                      : 'border-slate-800 bg-[#0A0F1A] text-slate-500'
-                }`}
-              >
-                <span className={`h-1.5 w-1.5 rounded-full ${isRunning ? 'animate-pulse bg-cyan' : isComplete ? 'bg-emerald-400' : 'bg-slate-600'}`} />
-                <span>{isRunning ? `Agent is reasoning: ${agentReasoningMessage}` : agentReasoningMessage}</span>
+        {/* LEFT SIDEBAR — Mission Control */}
+        <aside className="cockpit-scroll w-[280px] shrink-0 overflow-y-auto border-r border-slate-800/50 bg-[#080E19] p-3 space-y-3">
+          <div className="rounded-lg border border-slate-800 bg-[#0A0F1A] p-3">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Target size={14} className="text-cyan-300" />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Mission</span>
               </div>
-            </div>
-            <div className="flex-1 bg-[#0A0F1A] border border-slate-800 rounded-xl p-3 relative min-h-0 overflow-y-auto">
-              {selectedDatasetRows.length === 0 ? (
-                <div className="flex h-full min-h-[260px] items-center justify-center text-center text-sm text-slate-500">
-                  Select at least one dataset to render technique evidence graphs.
-                </div>
-              ) : (
-                <div className={`grid gap-3 ${selectedDatasetRows.length === 1 ? 'grid-cols-1' : 'grid-cols-1 xl:grid-cols-2'}`}>
-                  {selectedDatasetRows.map((dataset, index) => {
-                    const isActiveGraph = isRunning && index === activeGraphIndex;
-                    const savedRunCount = getProcessingRuns(dataset.id).length;
-                    return (
-                      <div
-                        key={dataset.id}
-                        className={`rounded-lg border bg-[#070B12] p-3 transition-colors ${
-                          isActiveGraph ? 'border-cyan/70 shadow-lg shadow-cyan/10' : 'border-slate-800'
-                        }`}
-                      >
-                        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                          <div>
-                            <div className="text-xs font-semibold uppercase tracking-wider text-cyan">{dataset.technique} graph</div>
-                            <div className="text-xs text-slate-400">{dataset.fileName}</div>
-                          </div>
-                          <div className="flex flex-wrap justify-end gap-1">
-                            {isActiveGraph && (
-                              <span className="rounded-full border border-cyan/40 bg-cyan/10 px-2 py-0.5 text-[10px] font-semibold text-cyan">
-                                processing
-                              </span>
-                            )}
-                            {savedRunCount > 0 && (
-                              <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">
-                                saved run
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="h-60 rounded-md border border-slate-800 bg-[#050812] p-2">
-                          <Graph
-                            type={dataset.technique.toLowerCase() as 'xrd' | 'xps' | 'ftir' | 'raman'}
-                            height="100%"
-                            externalData={dataset.dataPoints}
-                            showCalculated={false}
-                            showResidual={false}
-                          />
-                        </div>
-                        <div className="mt-2 flex flex-wrap gap-1 text-[10px] text-slate-400">
-                          <span className="rounded bg-slate-800 px-1.5 py-0.5">{dataset.xLabel}</span>
-                          <span className="rounded bg-slate-800 px-1.5 py-0.5">{dataset.yLabel}</span>
-                          <span className="rounded bg-primary/10 px-1.5 py-0.5 text-primary">
-                            {getSavedEvidence(project.id, dataset.technique).length > 0 ? 'saved evidence' : 'project evidence'}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className={`${isLogExpanded ? 'h-52' : 'h-24'} border-t border-slate-800 bg-[#0A0F1A]/80 p-2.5 flex flex-col shrink-0 transition-[height] duration-200`}>
-            <div className="mb-2 flex items-center justify-between gap-3">
-              <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-                <Terminal size={13} /> Execution Log
-              </h2>
               <button
                 type="button"
-                onClick={() => setIsLogExpanded((expanded) => !expanded)}
-                className="rounded border border-slate-800 px-2 py-0.5 text-[10px] font-semibold text-slate-400 hover:border-slate-600 hover:text-slate-200"
+                onClick={() => setMissionText(DEFAULT_MISSION)}
+                className="rounded border border-slate-700 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-slate-400 transition-colors hover:border-cyan-400/40 hover:text-cyan-300"
               >
-                {isLogExpanded ? 'Collapse' : 'Expand'}
+                Reset
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto font-mono text-[10px] space-y-1 pr-2 custom-scrollbar">
-              {logs.length === 0 && <span className="text-slate-600">Waiting for agent execution...</span>}
-              {logs.map((log, i) => (
-                <div key={`${log.time}-${i}`} className="flex gap-3">
-                  <span className="text-slate-500 shrink-0">[{log.time}]</span>
-                  <span
-                    className={`
-                      ${log.type === 'system' ? 'text-cyan' : ''}
-                      ${log.type === 'error' ? 'text-amber-300' : ''}
-                      ${log.type === 'success' ? 'text-emerald-400' : ''}
-                      ${log.type === 'info' ? 'text-slate-300' : ''}
-                    `}
-                  >
-                    {log.type === 'system' && '> '}
-                    {log.msg}
-                  </span>
-                </div>
-              ))}
-              <div ref={logEndRef} />
-            </div>
-          </div>
-        </div>
-
-        <div className="w-[300px] border-l border-slate-800 bg-[#0A0F1A]/50 p-3 flex flex-col gap-3 shrink-0 overflow-y-auto">
-          <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-            <FileText size={16} className="text-primary" /> Final Decision
-          </h2>
-
-          <div className="rounded-xl border border-slate-800 bg-[#070B12] p-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Agent Insight</h3>
-            <p className="mt-2 text-xs leading-relaxed text-slate-300">{agentInsight.content}</p>
-            <div
-              className={`mt-3 flex items-center gap-2 rounded-md border px-2 py-1.5 text-[11px] ${
-                isRunning
-                  ? 'border-cyan/30 bg-cyan/10 text-cyan'
-                  : isComplete
-                    ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300'
-                    : 'border-slate-800 bg-[#0A0F1A] text-slate-500'
-              }`}
-            >
-              <span className={`h-1.5 w-1.5 rounded-full ${isRunning ? 'animate-pulse bg-cyan' : isComplete ? 'bg-emerald-400' : 'bg-slate-600'}`} />
-              <span>{agentReasoningMessage}</span>
-            </div>
-            <div className="mt-3 space-y-2 text-[11px] leading-snug">
-              <div className="rounded-md border border-slate-800 bg-[#0A0F1A] p-2">
-                <span className="font-semibold text-cyan">Evidence focus:</span> <span className="text-slate-400">{agentInsight.focus}</span>
-              </div>
-              <div className="rounded-md border border-slate-800 bg-[#0A0F1A] p-2">
-                <span className="font-semibold text-cyan">Confidence:</span> <span className="text-slate-400">{agentInsight.confidence}</span>
-              </div>
-              <div className="rounded-md border border-slate-800 bg-[#0A0F1A] p-2">
-                <span className="font-semibold text-cyan">Next action:</span> <span className="text-slate-400">{agentInsight.next}</span>
-              </div>
-            </div>
+            <label className="text-[9px] font-bold uppercase tracking-wider text-slate-600" htmlFor="agent-mission-prompt">
+              Editable mission prompt
+            </label>
+            <textarea
+              id="agent-mission-prompt"
+              value={missionText}
+              onChange={(event) => setMissionText(event.target.value)}
+              className="mt-1.5 h-24 w-full resize-none rounded-md border border-slate-800 bg-[#050812] px-2.5 py-2 text-xs leading-5 text-slate-200 outline-none transition-colors placeholder:text-slate-700 focus:border-cyan-400/50"
+            />
           </div>
 
-          <div className="rounded-xl border border-slate-800 bg-[#070B12] p-3">
+          <div className="rounded-lg border border-slate-800 bg-[#0A0F1A] p-3">
             <div className="mb-2 flex items-center justify-between gap-2">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Agent Timeline</h3>
-              <span className="rounded-full border border-slate-700 px-2 py-0.5 text-[9px] font-semibold text-slate-400">
-                {'Goal -> Plan -> Execute -> Evidence -> Decision'}
+              <div className="flex items-center gap-2">
+                <Database size={14} className="text-emerald-300" />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Project</span>
+              </div>
+              <span
+                className={`rounded-full border px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider ${
+                  selectedProjectIsPreview
+                    ? 'border-amber-400/30 bg-amber-400/10 text-amber-300'
+                    : 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300'
+                }`}
+              >
+                {selectedProjectIsPreview ? 'preview' : 'active'}
               </span>
             </div>
-            <div className="space-y-1.5">
-              {EXECUTION_STEPS.map((step, index) => {
-                const running = isRunning && index === timelineIndex;
-                const complete = isComplete || index < timelineIndex;
-                const status = running ? 'running' : complete ? 'complete' : 'pending';
+            <label className="text-[9px] font-bold uppercase tracking-wider text-slate-600" htmlFor="agent-project-selector">
+              Demo project
+            </label>
+            <select
+              id="agent-project-selector"
+              value={selectedProject}
+              onChange={(event) => handleProjectChange(event.target.value)}
+              className="mt-1.5 w-full rounded-md border border-slate-800 bg-[#050812] px-2.5 py-2 text-xs font-semibold text-slate-200 outline-none transition-colors focus:border-cyan-400/50"
+            >
+              {PROJECT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label} — {option.status}
+                </option>
+              ))}
+            </select>
+            {selectedProjectIsPreview && (
+              <p className="mt-2 rounded-md border border-amber-400/20 bg-amber-400/10 px-2 py-1.5 text-[10px] leading-4 text-amber-100/90">
+                Preview only — demo data locked to CuFe₂O₄ Spinel Ferrite
+              </p>
+            )}
+          </div>
 
+          <div className="rounded-lg border border-slate-800 bg-[#0A0F1A] p-3">
+            <div className="flex items-center gap-2 mb-2"><ClipboardList size={14} className="text-indigo-300" /><span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Objectives</span></div>
+            <div className="space-y-1.5">
+              {MISSION_OBJECTIVES.map((obj, i) => {
+                const done = currentStepIndex > i;
+                const active = currentStepIndex === i;
                 return (
-                  <div
-                    key={step.label}
-                    className={`rounded-lg border p-2 transition-colors ${
-                      status === 'complete'
-                        ? 'border-emerald-400/30 bg-emerald-400/5'
-                        : status === 'running'
-                          ? 'border-cyan/50 bg-cyan/10 shadow-sm shadow-cyan/10'
-                          : 'border-slate-800 bg-[#0A0F1A]'
-                    }`}
-                  >
-                    <div className="flex items-start gap-2">
-                      <span
-                        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[10px] font-bold ${
-                          status === 'complete'
-                            ? 'border-emerald-400/50 bg-emerald-400/10 text-emerald-300'
-                            : status === 'running'
-                              ? 'border-cyan/60 bg-cyan/10 text-cyan'
-                              : 'border-slate-700 bg-slate-900 text-slate-500'
-                        }`}
-                      >
-                        {status === 'complete' ? 'done' : index + 1}
-                      </span>
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-xs font-semibold text-white">{step.label}</p>
-                          <span
-                            className={`rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${
-                              status === 'complete'
-                                ? 'bg-emerald-400/10 text-emerald-300'
-                                : status === 'running'
-                                  ? 'bg-cyan/10 text-cyan'
-                                  : 'bg-slate-800 text-slate-500'
-                            }`}
-                          >
-                            {status}
-                          </span>
-                        </div>
-                        <p className="mt-1 text-[10px] leading-snug text-slate-500">{step.summary}</p>
-                      </div>
-                    </div>
+                  <div key={obj} className={`flex items-start gap-2 rounded-md px-2 py-1.5 text-[11px] ${done ? 'text-emerald-300' : active ? 'text-cyan-300 bg-cyan-400/5' : 'text-slate-600'}`}>
+                    {done ? <CheckCircle2 size={12} className="mt-0.5 shrink-0" /> : active ? <Loader2 size={12} className="mt-0.5 shrink-0 animate-spin" /> : <CircleDot size={12} className="mt-0.5 shrink-0" />}
+                    <span>{obj}</span>
                   </div>
                 );
               })}
             </div>
           </div>
 
-          <div className="rounded-xl border border-slate-800 bg-[#070B12] p-3">
-            <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-500">Evidence Summary</h3>
-            <div className="space-y-1.5">
-              {EVIDENCE_SUMMARY.map((item) => (
-                <div key={item.technique} className="rounded-lg border border-slate-800 bg-[#0A0F1A] p-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-xs font-semibold text-cyan">{item.technique}</span>
-                    <span className="text-[10px] font-semibold text-emerald-300">{item.contribution}</span>
-                  </div>
-                  <p className="mt-1 text-xs font-semibold text-white">{item.feature}</p>
-                  <p className="mt-1 text-[11px] leading-snug text-slate-500">{item.caveat}</p>
+          <div className="rounded-lg border border-slate-800 bg-[#0A0F1A] p-3">
+            <div className="flex items-center gap-2 mb-2"><Layers size={14} className="text-amber-300" /><span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Tool Stack</span></div>
+            <div className="space-y-1">
+              {TOOL_STACK.map((t, i) => (
+                <div key={t} className="flex items-center gap-2 text-[10px] font-mono">
+                  <span className="text-slate-600">{i + 1}.</span>
+                  <span className={currentStepIndex > i ? 'text-emerald-300' : currentStepIndex === i ? 'text-cyan-300' : 'text-slate-500'}>{t}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          {agentState === 'idle' && (
-            <div className="flex-1 flex flex-col items-center justify-center text-center opacity-50">
-              <Brain size={48} className="text-slate-700 mb-4" />
-              <p className="text-sm text-slate-400">Run the agent to see the final decision and evidence.</p>
-            </div>
-          )}
-
-          {agentState !== 'idle' && !result && (
-            <div className="flex-1 flex flex-col gap-4">
-              <div className="rounded-xl border border-slate-800 bg-[#070B12] p-4">
-                <p className="text-xs uppercase tracking-wider text-slate-500">Current state</p>
-                <p className="mt-2 text-lg font-semibold text-white capitalize">{agentState}</p>
-                <p className="mt-2 text-sm text-slate-400">Confidence preview: {previewRun.confidence}%</p>
-              </div>
-              <div>
-                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Evidence collected</h4>
-                <div className="space-y-2">
-                  {stagedEvidence.length === 0 && <p className="text-sm text-slate-500">Collecting selected project evidence...</p>}
-                  {stagedEvidence.map((item, idx) => (
-                    <div key={item} className="bg-[#070B12] border border-slate-800 rounded-lg p-3 flex gap-3 items-start">
-                      <div className="mt-0.5 w-4 h-4 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center shrink-0">
-                        <span className="text-[10px] text-primary font-bold">{idx + 1}</span>
-                      </div>
-                      <p className="text-sm text-slate-300 leading-snug">{item}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {result && (
-            <div className="animate-in fade-in slide-in-from-right-4 duration-500 flex flex-col gap-6">
-              <div className="bg-[#070B12] border border-emerald-500/30 rounded-xl p-5 text-center shadow-lg shadow-emerald-500/5">
-                <CheckCircle2 size={32} className="text-emerald-500 mx-auto mb-3" />
-                <h3 className="text-xl font-bold text-white mb-2 leading-tight">{result.decision}</h3>
-              </div>
-
-              <div className="bg-[#070B12] border border-slate-800 rounded-xl p-5 flex items-center justify-between">
-                <span className="text-sm font-medium text-slate-400">Confidence Score</span>
-                <span className="text-2xl font-bold text-emerald-400">{result.confidence}%</span>
-              </div>
-
-              <div>
-                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Key Evidence</h4>
-                <div className="space-y-2">
-                  {result.evidence.map((item, idx) => (
-                    <div key={item} className="bg-[#070B12] border border-slate-800 rounded-lg p-3 flex gap-3 items-start">
-                      <div className="mt-0.5 w-4 h-4 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center shrink-0">
-                        <span className="text-[10px] text-primary font-bold">{idx + 1}</span>
-                      </div>
-                      <p className="text-sm text-slate-300 leading-snug">{item}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-slate-800 bg-[#070B12] p-4">
-                <div className="flex flex-col gap-3">
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    <button
-                      type="button"
-                      onClick={handleAgentExportPdf}
-                      className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-cyan/40 bg-[#0A0F1A] px-3 text-xs font-semibold text-cyan transition-colors hover:bg-cyan/10"
-                    >
-                      <Download size={14} />
-                      Export PDF
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleAttachAgentRun}
-                      className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-slate-700 bg-[#0A0F1A] px-3 text-xs font-semibold text-slate-200 transition-colors hover:border-slate-500 hover:text-white"
-                    >
-                      <FileText size={14} />
-                      Attach to Notebook
-                    </button>
+          <div className="rounded-lg border border-slate-800 bg-[#0A0F1A] p-3">
+            <div className="flex items-center gap-2 mb-2"><Database size={14} className="text-emerald-300" /><span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Data Sources</span></div>
+            <div className="space-y-2">
+              {DATA_SOURCES.map(ds => (
+                <div key={ds.label} className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-bold text-white">{ds.label}</p>
+                    <p className="truncate text-[10px] text-slate-500">{ds.file}</p>
                   </div>
-                  {agentFeedback && (
-                    <div className="rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-xs font-semibold leading-relaxed text-primary">
-                      {agentFeedback}
-                    </div>
-                  )}
+                  <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[8px] font-bold uppercase ${ds.status === 'loaded' ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300' : 'border-violet-400/30 bg-violet-400/10 text-violet-300'}`}>{ds.status}</span>
                 </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-slate-800 bg-[#0A0F1A] p-3">
+            <div className="flex items-center gap-2 mb-2"><Activity size={14} className="text-slate-400" /><span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Agent Info</span></div>
+            <div className="space-y-1 text-[10px]">
+              <div className="flex justify-between"><span className="text-slate-500">Project</span><span className="text-white font-semibold text-right">{project.name}</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">Model</span><span className="text-amber-300 font-semibold">Gemma</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">Mode</span><span className="text-slate-300">Phase identification</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">Orchestration</span><span className="text-slate-300">Deterministic</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">Material</span><span className="text-white font-semibold text-right">{project.material}</span></div>
+            </div>
+          </div>
+        </aside>
+
+        {/* CENTER — Agent Flow + Evidence + Trace */}
+        <main className="cockpit-scroll flex min-w-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
+
+          {/* Horizontal Step Flow */}
+          <div className="rounded-lg border border-slate-800 bg-[#0A0F1A] px-4 py-3">
+            <div className="flex items-center gap-0">
+              {REASONING_TRACE_STEPS.map((step, i) => {
+                const st = reasoningStatus(i, currentStepIndex);
+                return (
+                  <React.Fragment key={step.label}>
+                    {i > 0 && <div className={`h-0.5 flex-1 transition-colors duration-300 ${st !== 'pending' ? 'bg-gradient-to-r from-cyan-400/40 to-emerald-400/40' : 'bg-slate-800'}`} />}
+                    <div className="flex flex-col items-center gap-1">
+                      <div className={`flex h-7 w-7 items-center justify-center rounded-full border-2 text-[10px] font-bold transition-all duration-300 ${st === 'complete' ? 'border-emerald-400 bg-emerald-400/20 text-emerald-300' : st === 'running' ? 'border-cyan-400 bg-cyan-400/20 text-cyan-300 animate-pulse' : 'border-slate-700 bg-[#070B12] text-slate-600'}`}>
+                        {st === 'complete' ? <CheckCircle2 size={13} /> : i + 1}
+                      </div>
+                      <span className={`w-16 text-center text-[8px] font-bold uppercase tracking-wider leading-tight ${st === 'complete' ? 'text-emerald-300/70' : st === 'running' ? 'text-cyan-300/70' : 'text-slate-600'}`}>
+                        {step.label.replace('_', '\n').split('_').pop()}
+                      </span>
+                    </div>
+                  </React.Fragment>
+                );
+              })}
+            </div>
+            <div className="mt-2 h-1 overflow-hidden rounded-full bg-slate-800"><div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-300 transition-all duration-300" style={{ width: `${progressPercent}%` }} /></div>
+          </div>
+
+          {/* Evidence Viewer — XRD + Raman side by side */}
+          <div className="grid gap-3 lg:grid-cols-2">
+            <div className="rounded-lg border border-slate-800 bg-[#0A0F1A] p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <div className="flex items-center gap-2"><Microscope size={13} className="text-cyan-300" /><span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">XRD Evidence</span></div>
+                {showPeakMarkers && <span className="rounded-full border border-cyan-400/30 bg-cyan-400/10 px-2 py-0.5 text-[9px] font-bold text-cyan-300">12 peaks</span>}
+              </div>
+              <div className="h-[180px] rounded border border-slate-800 bg-[#050812] p-1">
+                <Graph type="xrd" height="100%" externalData={dataset.dataPoints} baselineData={xrdAgentResult.baselineData} peakMarkers={showPeakMarkers ? detectedPeaks.slice(0, CANONICAL_PEAK_COUNT) : undefined} showBackground showCalculated={false} showResidual={false} />
+              </div>
+              <div className="mt-2 grid grid-cols-3 gap-1.5">
+                {[{ l: 'Peaks', v: '12' }, { l: 'Match', v: '0.92' }, { l: 'Phase', v: 'CuFe₂O₄' }].map(s => (
+                  <div key={s.l} className="rounded border border-slate-800 bg-[#070B12] px-2 py-1.5 text-center">
+                    <p className="text-[8px] font-bold uppercase text-slate-600">{s.l}</p>
+                    <p className="text-xs font-bold text-white">{s.v}</p>
+                  </div>
+                ))}
               </div>
             </div>
-          )}
-
-          <div className="rounded-xl border border-slate-800 bg-[#070B12] p-4">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Final Result</h3>
-            <div className="mt-3 space-y-3">
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Conclusion</p>
-                <p className="mt-1 text-sm leading-relaxed text-slate-200">
-                  {result
-                    ? 'Ferrite spinel formation is strongly supported by XRD and Raman evidence, while catalytic activation remains medium-confidence pending XPS validation.'
-                    : 'Run the agent to generate a traceable scientific conclusion.'}
-                </p>
+            <div className="rounded-lg border border-slate-800 bg-[#0A0F1A] p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <div className="flex items-center gap-2"><Zap size={13} className="text-violet-300" /><span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Raman Evidence</span></div>
+                <span className="rounded-full border border-violet-400/30 bg-violet-400/10 px-2 py-0.5 text-[8px] font-bold text-violet-300">supporting demo evidence</span>
               </div>
-              <div className="flex items-center justify-between rounded-lg border border-slate-800 bg-[#0A0F1A] px-3 py-2">
-                <span className="text-xs text-slate-500">Confidence</span>
-                <span className="text-xs font-semibold text-emerald-300">{result ? result.confidenceLabel : 'Pending'}</span>
+              <div className="h-[180px] rounded border border-slate-800 bg-[#050812] p-1">
+                <MiniRamanSvg />
               </div>
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Caveats</p>
-                <p className="mt-1 text-xs leading-relaxed text-amber-200/80">
-                  {result?.warnings.length
-                    ? result.warnings.join(' ')
-                    : 'Catalytic activation requires complete XPS validation before final reporting.'}
-                </p>
-              </div>
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Next recommended step</p>
-                <p className="mt-1 text-xs leading-relaxed text-slate-400">
-                  {result ? result.recommendations[0] : 'Start the run, then review workspace evidence and notebook report output.'}
-                </p>
+              <div className="mt-2 grid grid-cols-4 gap-1">
+                {RAMAN_EVIDENCE_PEAKS.map(p => (
+                  <div key={p.label} className="rounded border border-slate-800 bg-[#070B12] px-1.5 py-1.5 text-center">
+                    <p className="text-[8px] font-bold text-violet-300">{p.label}</p>
+                    <p className="text-[9px] text-slate-400">{p.pos}</p>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
-        </div>
+
+          {/* Execution Log + Reasoning Trace */}
+          <div className="grid gap-3 lg:grid-cols-[1fr_1fr]">
+            <div className="rounded-lg border border-slate-800 bg-[#0A0F1A] p-3">
+              <div className="mb-2 flex items-center gap-2"><Terminal size={13} className="text-slate-400" /><span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Execution Log</span></div>
+              <div className="h-[140px] overflow-y-auto rounded border border-slate-800 bg-[#050812] p-2 font-mono text-[10px]">
+                {logs.length === 0 ? <p className="text-slate-600">Awaiting Run Agent...</p> : (
+                  <div className="space-y-1">
+                    {logs.map((e, i) => (
+                      <div key={`${e.stamp}-${i}`} className="flex gap-2"><span className="shrink-0 text-slate-600">{e.stamp}</span><span className={logClass(e.type)}>{e.message}</span></div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="rounded-lg border border-slate-800 bg-[#0A0F1A] p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <div className="flex items-center gap-2"><Brain size={13} className="text-amber-300" /><span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Gemma Reasoning Trace</span></div>
+                <span className="text-[9px] font-bold uppercase text-slate-600">{isRunning ? 'running' : runComplete ? 'done' : 'idle'}</span>
+              </div>
+              <div className="h-[140px] space-y-1.5 overflow-y-auto pr-1">
+                {REASONING_TRACE_STEPS.map((step, index) => {
+                  const status = reasoningStatus(index, currentStepIndex);
+                  return (
+                    <div key={step.label} className={`rounded border p-2 transition-all duration-300 ${statusPillClass(status)} ${status === 'running' ? 'animate-pulse' : ''}`}>
+                      <div className="flex items-center gap-2">
+                        <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[9px] font-bold ${statusPillClass(status)}`}>
+                          {status === 'complete' ? <CheckCircle2 size={11} /> : status === 'running' ? <Loader2 size={11} className="animate-spin" /> : index + 1}
+                        </span>
+                        <span className="text-[10px] font-bold font-mono text-amber-300">{step.label}</span>
+                      </div>
+                      {status === 'complete' && (
+                        <div className="mt-1.5 space-y-1 pl-7">
+                          <pre className="whitespace-pre-wrap break-all rounded bg-black/40 px-1.5 py-1 font-mono text-[9px] leading-relaxed text-amber-200/70">{step.gemmaCmd}</pre>
+                          <p className="text-[10px] text-cyan-300/80">{step.toolResult}</p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </main>
+
+        {/* RIGHT PANEL — Insight & Action */}
+        <aside className="cockpit-scroll w-[360px] shrink-0 overflow-y-auto border-l border-slate-800/50 bg-[#080E19] p-3 space-y-3">
+          <div className={`rounded-lg border p-4 text-center transition-all duration-500 ${runComplete ? 'border-emerald-400/30 bg-emerald-400/5' : 'border-slate-800 bg-[#0A0F1A]'}`}>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Confidence</p>
+            <p className={`mt-1 text-4xl font-black ${runComplete ? 'text-emerald-300' : 'text-slate-700'}`}>{runComplete ? `${SCIENTIFIC_INSIGHT.confidence}%` : '—'}</p>
+            <p className="mt-1 text-[10px] text-slate-500">{runComplete ? 'High confidence — phase confirmed' : 'Pending agent execution'}</p>
+          </div>
+
+          <div className={`rounded-lg border p-3 ${runComplete ? 'border-cyan-400/20 bg-[#07111F]' : 'border-slate-800 bg-[#0A0F1A]'}`}>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Identified Phase</p>
+            <p className={`mt-1 text-lg font-bold ${runComplete ? 'text-white' : 'text-slate-700'}`}>{runComplete ? SCIENTIFIC_INSIGHT.phase : 'Pending'}</p>
+            {runComplete && <p className="mt-1 text-[11px] text-slate-400">Spinel ferrite · Fd-3m</p>}
+          </div>
+
+          {showScientificInsight && result ? (
+            <div className="agent-insight-in space-y-3">
+              <div className="rounded-lg border border-slate-800 bg-[#0A0F1A] p-3">
+                <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">Evidence</p>
+                <div className="space-y-1">
+                  {SCIENTIFIC_INSIGHT.evidence.map(e => (
+                    <div key={e} className="flex items-start gap-2 rounded-md border border-slate-800 bg-[#070B12] px-2 py-1.5 text-[11px] text-slate-300">
+                      <CheckCircle2 size={12} className="mt-0.5 shrink-0 text-emerald-300" /><span>{e}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded-lg border border-slate-800 bg-[#0A0F1A] p-3">
+                <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">Confidence Basis</p>
+                <div className="space-y-1">
+                  {SCIENTIFIC_INSIGHT.confidenceBasis.map(c => (
+                    <div key={c} className="flex items-center gap-2 rounded-md border border-indigo-400/20 bg-indigo-500/10 px-2 py-1.5 text-[11px] text-indigo-100">
+                      <CircleDot size={11} className="shrink-0 text-indigo-200" /><span>{c}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded-lg border border-slate-800 bg-[#0A0F1A] p-3">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Interpretation</p>
+                <p className="mt-1.5 text-[11px] leading-5 text-slate-300">{SCIENTIFIC_INSIGHT.interpretation}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-lg border border-amber-400/20 bg-amber-400/5 p-2.5">
+                  <p className="text-[9px] font-bold uppercase text-amber-300">Model</p>
+                  <p className="mt-1 text-[11px] text-slate-200">{SCIENTIFIC_INSIGHT.modelRole}</p>
+                </div>
+                <div className="rounded-lg border border-cyan-400/20 bg-cyan-400/5 p-2.5">
+                  <p className="text-[9px] font-bold uppercase text-cyan-300">Tools</p>
+                  <p className="mt-1 text-[11px] text-slate-200">{SCIENTIFIC_INSIGHT.toolRole}</p>
+                </div>
+              </div>
+              <div className="rounded-lg border border-orange-400/20 bg-orange-400/5 p-3">
+                <div className="flex items-center gap-1.5 mb-1"><AlertTriangle size={12} className="text-orange-300" /><p className="text-[9px] font-bold uppercase text-orange-300">Caveat</p></div>
+                <p className="text-[11px] leading-5 text-slate-300">{SCIENTIFIC_INSIGHT.caveat}</p>
+              </div>
+              <div className="rounded-lg border border-indigo-400/20 bg-indigo-500/10 p-3">
+                <p className="text-[9px] font-bold uppercase text-indigo-200">Recommended Next</p>
+                <p className="mt-1 text-[11px] leading-5 text-slate-200">{SCIENTIFIC_INSIGHT.nextStep}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" onClick={handleExportReport} className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-cyan-400/40 bg-[#0A0F1A] text-[11px] font-semibold text-cyan-300 hover:bg-cyan-400/10"><Download size={12} />Export</button>
+                <Link to={workspacePath} className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-slate-700 bg-[#0A0F1A] text-[11px] font-semibold text-slate-200 hover:border-slate-500"><Microscope size={12} />Workspace</Link>
+                <button type="button" onClick={handleSaveToNotebook} className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-indigo-400/40 bg-[#0A0F1A] text-[11px] font-semibold text-indigo-200 hover:bg-indigo-500/10"><FileText size={12} />Notebook</button>
+                <button type="button" onClick={handleGenerateReproducibleReport} className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-emerald-400/40 bg-[#0A0F1A] text-[11px] font-semibold text-emerald-200 hover:bg-emerald-500/10"><ClipboardList size={12} />Repro Report</button>
+              </div>
+              {feedback && <div className="rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-[11px] font-semibold text-primary">{feedback}</div>}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-slate-800 bg-[#0A0F1A] p-4 text-center">
+              <Brain size={28} className="mx-auto mb-2 text-slate-700" />
+              <p className="text-xs font-semibold text-white">Decision Pending</p>
+              <p className="mt-1.5 text-[11px] leading-5 text-slate-500">Run the agent to execute tools, collect evidence, and generate the scientific insight.</p>
+            </div>
+          )}
+
+          <div className="rounded-lg border border-emerald-400/20 bg-emerald-400/5 p-3">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-300 mb-1">Why This Matters</p>
+            <p className="text-[11px] leading-5 text-slate-300">{IMPACT_TEXT}</p>
+          </div>
+
+          <div className="rounded-lg border border-slate-800 bg-[#0A0F1A] p-2.5 text-center">
+            <span className="rounded-full border border-amber-400/30 bg-amber-400/10 px-2.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-amber-300">Demo build: structured Gemma orchestration</span>
+          </div>
+        </aside>
+
       </div>
     </div>
   );

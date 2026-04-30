@@ -3,10 +3,11 @@ import { ArrowLeft, ArrowRight, Mail, UserRound } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/Button';
 import { Card, CardContent } from '../components/ui/Card';
-import { isDemoMode } from '../config/demoMode';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function SignIn() {
   const navigate = useNavigate();
+  const { signIn } = useAuth();
   const [emailMode, setEmailMode] = useState(false);
   const [createMode, setCreateMode] = useState(false);
   const [name, setName] = useState('');
@@ -16,10 +17,7 @@ export default function SignIn() {
   const [emailError, setEmailError] = useState('');
 
   const enterDemo = (profile = { name: 'Demo Researcher', email: 'demo@difaryx.local', organization: 'DIFARYX Demo Lab' }) => {
-    if (isDemoMode) {
-      localStorage.setItem('demoAuth', 'true');
-      localStorage.setItem('demoProfile', JSON.stringify(profile));
-    }
+    signIn(profile);
     navigate('/dashboard');
   };
 
@@ -61,6 +59,9 @@ export default function SignIn() {
           <div className="w-full max-w-md">
             <div className="mb-7 text-center">
               <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">DIFARYX</p>
+              <span className="mb-3 inline-flex rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-blue-700">
+                Demo authentication
+              </span>
               <h1 className="text-4xl font-extrabold tracking-tight text-slate-950">Enter DIFARYX</h1>
               <p className="mt-3 text-sm leading-6 text-slate-500">
                 Access scientific workflows, notebooks, and autonomous agent reasoning.
@@ -74,7 +75,9 @@ export default function SignIn() {
                     <Button
                       variant="outline"
                       className="h-12 w-full justify-center gap-3 border-slate-200 bg-white text-base font-semibold text-slate-800 hover:border-blue-300 hover:bg-blue-50/60"
-                      onClick={() => enterDemo()}
+                      onClick={() => {
+                        enterDemo({ name: 'Demo Researcher', email: 'demo@difaryx.local', organization: 'DIFARYX Demo Lab' });
+                      }}
                     >
                       <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
                         <path d="M12.0003 4.75C13.7703 4.75 15.3553 5.36002 16.6053 6.54998L20.0303 3.125C17.9502 1.19 15.2353 0 12.0003 0C7.31028 0 3.25527 2.69 1.28027 6.60998L5.27028 9.70498C6.21525 6.86002 8.87028 4.75 12.0003 4.75Z" fill="#EA4335" />
@@ -82,7 +85,7 @@ export default function SignIn() {
                         <path d="M5.26498 14.2949C5.02498 13.5699 4.88501 12.7999 4.88501 11.9999C4.88501 11.1999 5.01998 10.4299 5.26498 9.7049L1.275 6.60986C0.46 8.22986 0 10.0599 0 11.9999C0 13.9399 0.46 15.7699 1.28 17.3899L5.26498 14.2949Z" fill="#FBBC05" />
                         <path d="M12.0004 24.0001C15.2404 24.0001 17.9654 22.935 19.9454 21.095L16.0804 18.095C15.0054 18.82 13.6204 19.245 12.0004 19.245C8.8704 19.245 6.21537 17.135 5.26537 14.29L1.27539 17.385C3.25539 21.31 7.3104 24.0001 12.0004 24.0001Z" fill="#34A853" />
                       </svg>
-                      Continue with Google
+                      Continue with Google (Demo)
                     </Button>
 
                     <Button

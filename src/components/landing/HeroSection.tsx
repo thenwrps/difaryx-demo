@@ -212,46 +212,37 @@ export default function HeroSection() {
           <div className="max-w-[480px] pt-2">
             <p className="mb-5 text-[11px] font-bold uppercase tracking-[0.15em] text-blue-600">Autonomous scientific agent</p>
             <h1 className="mb-5 text-[40px] font-extrabold leading-[1.1] tracking-tight text-slate-900 lg:text-[48px]">
-              From raw signal
-              <br />
-              to scientific
-              <br />
-              <span className="text-blue-600">decision.</span>
+              Autonomous Scientific Agent for Climate-Critical Material Discovery
             </h1>
             <div className="mb-8 max-w-[420px]">
               <p className="mb-3 text-[15px] leading-relaxed text-slate-500">
-                DIFARYX plans, executes, and validates multi-technique characterization workflows with traceable evidence, confidence, and caveats.
+                From raw experimental signals to decision-ready insights.
               </p>
               <p className="text-[15px] font-medium leading-relaxed text-slate-600">
-                Demo case: CuFe2O4 ferrite spinel formation using XRD, Raman, FTIR, and XPS.
+                Demo case: autonomous XRD phase identification for CuFe2O4 spinel ferrite in CO2-to-fuel catalyst discovery.
               </p>
             </div>
 
             <div className="flex flex-col items-start gap-3">
               <div className="flex flex-wrap gap-3">
                 <Link
-                  to="/login"
+                  to="/demo/agent"
                   className="inline-flex h-11 items-center justify-center rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-6 text-[14px] font-bold text-white shadow-lg shadow-blue-600/20 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-indigo-600/25"
                 >
-                  Enter DIFARYX
+                  Run Agent Demo
                 </Link>
                 <Link
-                  to="/demo/agent?project=cu-fe2o4-spinel"
-                  aria-label="Run Agent Demo"
+                  to="/dashboard"
+                  aria-label="Enter Workspace"
                   className="inline-flex h-11 items-center justify-center rounded-lg border border-cyan-400/70 bg-[#070B12] px-6 text-[14px] font-bold text-cyan-300 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-400 hover:text-blue-200 hover:shadow-lg hover:shadow-cyan-500/10"
                 >
-                  <span className="text-[14px]">Run Agent Demo</span>
+                  <span className="text-[14px]">Enter Workspace</span>
                 </Link>
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-2 pl-1 text-[12px] text-slate-500">
                 <span className="rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 font-semibold text-blue-700">
                   Goal -&gt; Plan -&gt; Execute -&gt; Evidence -&gt; Reason -&gt; Decision -&gt; Report
                 </span>
-                <span className="flex items-center gap-1.5 font-medium text-emerald-600">
-                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
-                  Live system
-                </span>
-                <span className="text-slate-300">|</span>
                 <span>Trace agent reasoning from evidence to report</span>
               </div>
             </div>

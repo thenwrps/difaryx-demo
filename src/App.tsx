@@ -9,25 +9,76 @@ import AgentDemo from "./pages/AgentDemo";
 import HistoryPage from "./pages/History";
 import SettingsPage from "./pages/Settings";
 import SignIn from "./pages/SignIn";
-import { isDemoMode } from "./config/demoMode";
+import { AuthProvider } from "./contexts/AuthContext";
+import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 
 function App() {
-  void isDemoMode;
-
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<Landing />} />
-        <Route path="/login" element={<SignIn />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/workspace/multi" element={<MultiTechWorkspace />} />
-        <Route path="/workspace/:technique" element={<TechniqueWorkspace />} />
-        <Route path="/notebook" element={<NotebookLab />} />
-        <Route path="/history" element={<HistoryPage />} />
-        <Route path="/settings" element={<SettingsPage />} />
-        <Route path="/demo/agent" element={<AgentDemo />} />
-      </Routes>
-    </Router>
+    <AuthProvider>
+      <Router>
+        <Routes>
+          <Route path="/" element={<Landing />} />
+          <Route path="/login" element={<SignIn />} />
+          <Route path="/signin" element={<SignIn />} />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/workspace/multi"
+            element={
+              <ProtectedRoute>
+                <MultiTechWorkspace />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/workspace/:technique"
+            element={
+              <ProtectedRoute>
+                <TechniqueWorkspace />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/notebook"
+            element={
+              <ProtectedRoute>
+                <NotebookLab />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/history"
+            element={
+              <ProtectedRoute>
+                <HistoryPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <SettingsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/demo/agent"
+            element={
+              <ProtectedRoute>
+                <AgentDemo />
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
+      </Router>
+    </AuthProvider>
   );
 }
 

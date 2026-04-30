@@ -22,6 +22,7 @@ import { DashboardLayout } from '../components/layout/DashboardLayout';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Graph } from '../components/ui/Graph';
+import XRDWorkspace from './XRDWorkspace';
 import {
   DEFAULT_PROJECT_ID,
   DemoDataset,
@@ -54,6 +55,7 @@ import {
   saveProcessingRun,
 } from '../data/demoProjects';
 import { DemoExportFormat, exportDemoArtifact } from '../utils/demoExport';
+import { getRun, type AgentRun } from '../data/runModel';
 
 type XpsRegion = 'Survey' | 'Cu 2p' | 'Fe 2p' | 'O 1s';
 
@@ -181,6 +183,8 @@ export default function TechniqueWorkspace() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const project = getProject(searchParams.get('project') ?? DEFAULT_PROJECT_ID);
+  const runId = searchParams.get('run');
+  const agentRun = runId ? getRun(runId) : null;
   const normalizedTechnique = normalizeTechnique(techniqueParam);
   const isMultiCompat = techniqueParam?.toLowerCase() === 'multi';
   const activeTechnique = project.techniques.includes(normalizedTechnique)
@@ -313,6 +317,10 @@ export default function TechniqueWorkspace() {
 
     return nextData;
   }, [activeTechnique, baseline, cropMax, cropMin, ftirOffset, ftirSlope, normalize, rawData, smoothing, xpsBackground, xpsRegion]);
+
+  if (activeTechnique === 'XRD') {
+    return <XRDWorkspace />;
+  }
 
   const insight = {
     ...getProjectInsight(project),
@@ -836,6 +844,59 @@ export default function TechniqueWorkspace() {
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {agentRun && (
+              <Card className="border-cyan/30 bg-cyan/5 p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Sparkles size={16} className="text-cyan shrink-0" />
+                      <h3 className="text-sm font-bold text-text-main">Agent Run Result</h3>
+                      <span className="rounded-full border border-cyan/30 bg-cyan/10 px-2 py-0.5 text-[10px] font-bold text-cyan">
+                        {agentRun.outputs.confidenceLabel}
+                      </span>
+                    </div>
+                    <div className="space-y-2">
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">Phase</p>
+                        <p className="text-sm font-semibold text-text-main">{agentRun.outputs.phase}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">Confidence</p>
+                        <p className="text-lg font-bold text-cyan">{agentRun.outputs.confidence}%</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">Evidence Summary</p>
+                        <ul className="mt-1 space-y-1">
+                          {agentRun.outputs.evidence.slice(0, 3).map((item, i) => (
+                            <li key={i} className="text-xs text-text-muted flex items-start gap-2">
+                              <CheckCircle2 size={12} className="text-cyan shrink-0 mt-0.5" />
+                              <span>{item}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2 shrink-0">
+                    <Button
+                      size="sm"
+                      className="gap-1.5 whitespace-nowrap"
+                      onClick={() => navigate(`/notebook?project=${project.id}&run=${agentRun.id}`)}
+                    >
+                      <Send size={14} /> Save to Notebook
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5 whitespace-nowrap"
+                      onClick={() => navigate(`/demo/agent?project=${project.id}`)}
+                    >
+                      <RotateCcw size={14} /> Re-run Agent
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            )}
             <div className="grid grid-cols-1 2xl:grid-cols-[1fr_360px] gap-6">
               <div className="space-y-4">
                 <Card className="p-4 min-h-[430px]">
