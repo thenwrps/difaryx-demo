@@ -2,6 +2,9 @@ import React from 'react';
 import Navbar from '../components/landing/Navbar';
 import HeroSection from '../components/landing/HeroSection';
 import ProblemSection from '../components/landing/ProblemSection';
+import WorkflowRealitySection from '../components/landing/WorkflowRealitySection';
+import TimeSpentSection from '../components/landing/TimeSpentSection';
+import WhatUsersWantSection from '../components/landing/WhatUsersWantSection';
 import EvidenceSection from '../components/landing/EvidenceSection';
 import SolutionSection from '../components/landing/SolutionSection';
 import WorkflowSection from '../components/landing/WorkflowSection';
@@ -18,6 +21,9 @@ export default function Landing() {
       <Navbar />
       <HeroSection />
       <ProblemSection />
+      <WorkflowRealitySection />
+      <TimeSpentSection />
+      <WhatUsersWantSection />
       <EvidenceSection />
       <SolutionSection />
       <WorkflowSection />

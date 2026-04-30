@@ -210,7 +210,6 @@ export default function HeroSection() {
       <div className="mx-auto max-w-[1200px] px-6">
         <div className="grid grid-cols-1 items-center gap-14 lg:grid-cols-[52%_48%]">
           <div className="max-w-[620px]">
-            <p className="mb-5 text-[12px] font-bold uppercase tracking-[0.16em] text-blue-600">Scientific Reasoning Infrastructure</p>
             <h1 className="mb-6 text-[36px] font-extrabold leading-[1.05] tracking-[-0.04em] text-[#0B1220] sm:text-[44px] lg:text-[56px] xl:text-[64px]">
               From Fragmented Workflows to Unified Scientific Decisions
             </h1>
@@ -235,7 +234,7 @@ export default function HeroSection() {
                 </Link>
               </div>
               <p className="mt-3.5 text-[13px] leading-[20px] text-slate-500">
-                Demonstration: autonomous phase identification from XRD for catalyst systems.
+                Derived from multi-source research across scientific workflows
               </p>
             </div>
           </div>

@@ -14,7 +14,7 @@ export default function ProblemSection() {
       <div className="mx-auto max-w-[1200px] px-6">
         <div className="mb-12">
           <h2 className="mb-4 text-[32px] font-bold leading-[1.2] text-slate-900 lg:text-[40px]">
-            Scientific workflows are fragmented — and it slows everything down
+            Scientific workflows are fragmented and slow
           </h2>
           <p className="max-w-3xl text-[16px] leading-relaxed text-slate-600">
             Across XRD, XPS, Raman, and microscopy workflows, researchers face disconnected tools, incompatible formats, manual export → convert → plot loops, and interpretation that depends on individual expertise.

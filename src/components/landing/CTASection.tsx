@@ -9,7 +9,7 @@ export default function CTASection() {
           <h2 className="mb-6 text-[32px] font-bold leading-[1.2] text-slate-900 lg:text-[48px]">
             Most tools analyze data.
             <br />
-            <span className="text-blue-600">DIFARYX fixes the workflow</span> — and makes scientific decisions reproducible.
+            <span className="text-blue-600">DIFARYX fixes the workflow</span> so scientific decisions can be reproduced.
           </h2>
           <Link
             to="/dashboard"

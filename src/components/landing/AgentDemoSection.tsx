@@ -9,11 +9,28 @@ export default function AgentDemoSection() {
         <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-2">
           <div>
             <h2 className="mb-4 text-[32px] font-bold leading-[1.2] text-slate-900 lg:text-[40px]">
-              Autonomous Scientific Agent
+              Autonomous Scientific Agent (Demo)
             </h2>
             <p className="mb-6 text-[16px] leading-relaxed text-slate-600">
-              The agent demo is one execution of the DIFARYX reasoning system. It loads data, extracts features, evaluates candidates, links evidence, and produces a decision with traceable reasoning.
+              The DIFARYX agent demonstrates one execution of the system.
             </p>
+            <p className="mb-6 text-[16px] leading-relaxed text-slate-600">
+              It:
+            </p>
+            <ul className="mb-6 space-y-2">
+              {[
+                'loads experimental data',
+                'extracts features',
+                'evaluates candidate interpretations',
+                'connects evidence',
+                'produces a decision with traceable reasoning',
+              ].map((item) => (
+                <li key={item} className="flex items-start gap-3 text-[15px] leading-relaxed text-slate-600">
+                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400" />
+                  {item}
+                </li>
+              ))}
+            </ul>
             <Link
               to="/demo/agent"
               className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-6 text-[15px] font-bold text-white shadow-lg shadow-indigo-600/20 transition-all duration-200 hover:-translate-y-0.5 hover:bg-indigo-700 hover:shadow-xl hover:shadow-indigo-600/25"
