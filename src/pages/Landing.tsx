@@ -1,18 +1,15 @@
 import React from 'react';
 import Navbar from '../components/landing/Navbar';
-import HeroSection from '../components/landing/HeroSection';
-import ProblemSection from '../components/landing/ProblemSection';
-import WorkflowRealitySection from '../components/landing/WorkflowRealitySection';
-import TimeSpentSection from '../components/landing/TimeSpentSection';
-import WhatUsersWantSection from '../components/landing/WhatUsersWantSection';
-import EvidenceSection from '../components/landing/EvidenceSection';
-import SolutionSection from '../components/landing/SolutionSection';
-import WorkflowSection from '../components/landing/WorkflowSection';
-import AgentDemoSection from '../components/landing/AgentDemoSection';
-import ResearcherControlSection from '../components/landing/ResearcherControlSection';
-import MultiTechniqueSection from '../components/landing/MultiTechniqueSection';
-import SystemCloudSection from '../components/landing/SystemCloudSection';
-import CTASection from '../components/landing/CTASection';
+import HeroSection from '../components/landing/HeroSection_NEW';
+import ProblemSection from '../components/landing/ProblemSection_NEW';
+import UserResearchSection from '../components/landing/UserResearchSection_NEW';
+import SolutionSection from '../components/landing/SolutionSection_NEW';
+import ProductFunctionSection from '../components/landing/ProductFunctionSection_NEW';
+import AgentDemoSection from '../components/landing/AgentDemoSection_NEW';
+import GoogleAlignmentSection from '../components/landing/GoogleAlignmentSection_NEW';
+import TechniqueCoverageSection from '../components/landing/TechniqueCoverageSection_NEW';
+import TrustControlSection from '../components/landing/TrustControlSection_NEW';
+import CTASection from '../components/landing/CTASection_NEW';
 import FooterSection from '../components/landing/FooterSection';
 
 export default function Landing() {
@@ -21,16 +18,13 @@ export default function Landing() {
       <Navbar />
       <HeroSection />
       <ProblemSection />
-      <WorkflowRealitySection />
-      <TimeSpentSection />
-      <WhatUsersWantSection />
-      <EvidenceSection />
+      <UserResearchSection />
       <SolutionSection />
-      <WorkflowSection />
+      <ProductFunctionSection />
       <AgentDemoSection />
-      <ResearcherControlSection />
-      <MultiTechniqueSection />
-      <SystemCloudSection />
+      <GoogleAlignmentSection />
+      <TechniqueCoverageSection />
+      <TrustControlSection />
       <CTASection />
       <FooterSection />
     </div>

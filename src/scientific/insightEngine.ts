@@ -28,13 +28,14 @@ export function generateInsight(
   const matched = bestMatch.details.filter((d) => d.matchedPeak !== null);
   const missing = bestMatch.details.filter((d) => d.matchedPeak === null);
 
-  // Build interpretation paragraph from computed values
+  // Build interpretation paragraph from computed values with enhanced crystallographic metadata
   const matchRatio = `${bestMatch.matchedCount}/${bestMatch.totalRefPeaks}`;
   const interpretation = [
-    `The XRD pattern shows ${confidence.label.toLowerCase()} agreement with ${phase.formula} (${phase.name}, ${phase.crystalSystem}).`,
-    `${matchRatio} reference peaks were matched within tolerance.`,
+    `The XRD pattern shows ${confidence.label.toLowerCase()} agreement with ${phase.formula} (${phase.name}, ${phase.crystalSystem} crystal system, space group ${phase.spaceGroup}).`,
+    `${matchRatio} reference peaks were matched within ±0.2° tolerance.`,
     `The strongest diffraction line at the ${phase.peaks.find((p) => p.relativeIntensity === 100)?.hkl || '(311)'} plane is ${matched.some((d) => d.referencePeak.relativeIntensity === 100) ? 'confirmed' : 'not confirmed'}.`,
-    `Reference: ${phase.jcpdsRef}.`,
+    `Lattice parameter: a = ${phase.latticeParameters.a.toFixed(3)} Å.`,
+    `Reference: ${phase.jcpdsCard ? `JCPDS card ${phase.jcpdsCard}` : phase.referenceNote}.`,
   ].join(' ');
 
   // Build evidence from actual matched peaks
@@ -43,7 +44,7 @@ export function generateInsight(
     return `Peak at ${d.matchedPeak!.position}° matches ${d.referencePeak.hkl} plane (ref: ${d.referencePeak.position}°, Δ2θ = ${dir}${d.delta?.toFixed(3)}°)`;
   });
 
-  // Warnings from computation
+  // Warnings from computation with enhanced scientific context
   const warnings: string[] = [];
   if (missing.length > 0) {
     const missingStrong = missing.filter((d) => d.referencePeak.relativeIntensity >= 30);
@@ -70,6 +71,12 @@ export function generateInsight(
         `${second.phase.formula} also shows significant overlap (score: ${second.score.toFixed(1)}) — consider complementary techniques to differentiate`,
       );
     }
+  }
+  
+  // Add general XRD limitations and caveats
+  warnings.push('XRD provides bulk crystallographic information; surface composition may differ (use XPS for surface analysis).');
+  if (confidence.label === 'Medium' || confidence.label === 'Low') {
+    warnings.push('Low confidence suggests additional data needed; consider higher-resolution scan or complementary techniques.');
   }
 
   // Recommendations based on confidence

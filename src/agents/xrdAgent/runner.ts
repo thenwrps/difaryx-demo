@@ -25,9 +25,12 @@ import {
   XrdValidationResult,
 } from './types';
 
-const STRONG_REFERENCE_THRESHOLD = 50;
+// Task 19.7: Peak position tolerance matching (±0.2° for XRD)
+const MATCH_TOLERANCE = 0.2;
+
+// Task 19.1: Strong peaks threshold (relative intensity > 30 weighted more heavily)
+const STRONG_PEAK_THRESHOLD = 30;
 const STRONG_OBSERVED_THRESHOLD = 28;
-const MATCH_TOLERANCE = 0.38;
 
 function confidenceLevel(score: number): XrdConfidenceLevel {
   if (score >= 0.85) return 'high';
@@ -261,33 +264,65 @@ export function search_phase_database(
   return phaseDatabase.map((phase) => matchReferencePeaks(phase, detectedPeaks));
 }
 
-function strongestAgreement(matches: XrdPeakMatch[], phase: XrdPhaseReference, detectedPeaks: XrdDetectedPeak[]) {
-  const strongReferencePeaks = phase.peaks
-    .filter((peak) => peak.relativeIntensity >= STRONG_REFERENCE_THRESHOLD)
-    .sort((a, b) => b.relativeIntensity - a.relativeIntensity);
-  const matchedStrongReferences = strongReferencePeaks.filter((referencePeak) =>
-    matches.some((match) => match.referencePeak === referencePeak),
-  );
-  const referenceAgreement = strongReferencePeaks.length > 0
-    ? matchedStrongReferences.length / strongReferencePeaks.length
-    : 0;
+// Task 19.1: Implement weighted scoring for strong peaks
+// Strong peaks (relative intensity > 30) are weighted more heavily in the confidence calculation
+function calculateWeightedPeakScore(matches: XrdPeakMatch[], phase: XrdPhaseReference): number {
+  if (phase.peaks.length === 0) return 0;
 
-  const strongestObserved = detectedPeaks
-    .filter((peak) => peak.classification === 'sharp')
-    .sort((a, b) => b.intensity - a.intensity)[0];
-  const strongestObservedMatched = strongestObserved
-    ? matches.some((match) => match.observedPeak.id === strongestObserved.id)
-    : false;
+  let totalWeight = 0;
+  let matchedWeight = 0;
 
-  return referenceAgreement * (strongestObservedMatched ? 1 : 0.72);
+  phase.peaks.forEach((referencePeak) => {
+    // Strong peaks get weight of 2.0, weak peaks get weight of 1.0
+    const weight = referencePeak.relativeIntensity > STRONG_PEAK_THRESHOLD ? 2.0 : 1.0;
+    totalWeight += weight;
+
+    const isMatched = matches.some((match) => match.referencePeak === referencePeak);
+    if (isMatched) {
+      matchedWeight += weight;
+    }
+  });
+
+  return totalWeight > 0 ? matchedWeight / totalWeight : 0;
 }
 
-function unexplainedStrongPenalty(explainedPeakIds: string[], detectedPeaks: XrdDetectedPeak[]) {
-  const strongObserved = detectedPeaks.filter((peak) => peak.intensity >= STRONG_OBSERVED_THRESHOLD);
-  if (strongObserved.length === 0) return 0;
+// Task 19.1: Calculate strong peak match ratio for threshold rules
+function calculateStrongPeakMatchRatio(matches: XrdPeakMatch[], phase: XrdPhaseReference): number {
+  const strongReferencePeaks = phase.peaks.filter((peak) => peak.relativeIntensity > STRONG_PEAK_THRESHOLD);
+  if (strongReferencePeaks.length === 0) return 1.0; // No strong peaks to match
+
+  const matchedStrongPeaks = strongReferencePeaks.filter((referencePeak) =>
+    matches.some((match) => match.referencePeak === referencePeak),
+  );
+
+  return matchedStrongPeaks.length / strongReferencePeaks.length;
+}
+
+// Task 19.2: Implement penalty for missing strong peaks
+// Reduces confidence when strong reference peaks (relative intensity > 30) are not matched
+function calculateMissingStrongPeaksPenalty(matches: XrdPeakMatch[], phase: XrdPhaseReference): number {
+  const strongReferencePeaks = phase.peaks.filter((peak) => peak.relativeIntensity > STRONG_PEAK_THRESHOLD);
+  if (strongReferencePeaks.length === 0) return 0;
+
+  const missingStrongPeaks = strongReferencePeaks.filter(
+    (referencePeak) => !matches.some((match) => match.referencePeak === referencePeak),
+  );
+
+  // Penalty is proportional to the number of missing strong peaks
+  return missingStrongPeaks.length / strongReferencePeaks.length;
+}
+
+// Task 19.3: Implement penalty for unexplained peaks
+// Reduces confidence when observed peaks cannot be matched to reference
+function calculateUnexplainedPeaksPenalty(explainedPeakIds: string[], detectedPeaks: XrdDetectedPeak[]): number {
+  const sharpPeaks = detectedPeaks.filter((peak) => peak.classification === 'sharp');
+  if (sharpPeaks.length === 0) return 0;
+
   const explained = new Set(explainedPeakIds);
-  const unexplained = strongObserved.filter((peak) => !explained.has(peak.id));
-  return unexplained.length / strongObserved.length;
+  const unexplainedPeaks = sharpPeaks.filter((peak) => !explained.has(peak.id));
+
+  // Penalty is proportional to the number of unexplained peaks
+  return unexplainedPeaks.length / sharpPeaks.length;
 }
 
 export function score_phase_candidates(
@@ -296,32 +331,57 @@ export function score_phase_candidates(
 ): XrdPhaseCandidate[] {
   return searchResults
     .map((result) => {
-      const strongReferencePeaks = result.phase.peaks.filter((peak) => peak.relativeIntensity >= STRONG_REFERENCE_THRESHOLD);
-      const missingStrongPeaks = result.missingPeaks.filter((peak) => peak.relativeIntensity >= STRONG_REFERENCE_THRESHOLD);
+      // Task 19.1: Calculate weighted peak score (strong peaks weighted more heavily)
+      const weightedPeakScore = calculateWeightedPeakScore(result.matches, result.phase);
+
+      // Calculate basic match ratio
       const matchedReferencePeakRatio = result.phase.peaks.length > 0
         ? result.matches.length / result.phase.peaks.length
         : 0;
-      const strongestPeakAgreement = strongestAgreement(result.matches, result.phase, detectedPeaks);
-      const missingStrongPeakPenalty = strongReferencePeaks.length > 0
-        ? missingStrongPeaks.length / strongReferencePeaks.length
-        : 0;
-      const unexplainedStrongPeakPenalty = unexplainedStrongPenalty(result.explainedObservedPeakIds, detectedPeaks);
-      const score = clamp(
-        matchedReferencePeakRatio * 0.55
-          + strongestPeakAgreement * 0.25
-          - missingStrongPeakPenalty * 0.10
-          - unexplainedStrongPeakPenalty * 0.10,
+
+      // Task 19.1: Calculate strong peak match ratio for threshold rules
+      const strongPeakMatchRatio = calculateStrongPeakMatchRatio(result.matches, result.phase);
+
+      // Task 19.2: Calculate penalty for missing strong peaks
+      const missingStrongPeakPenalty = calculateMissingStrongPeaksPenalty(result.matches, result.phase);
+
+      // Task 19.3: Calculate penalty for unexplained peaks
+      const unexplainedPeakPenalty = calculateUnexplainedPeaksPenalty(result.explainedObservedPeakIds, detectedPeaks);
+
+      // Calculate raw score using weighted components
+      let rawScore = clamp(
+        weightedPeakScore * 0.50 +
+          matchedReferencePeakRatio * 0.30 -
+          missingStrongPeakPenalty * 0.15 -
+          unexplainedPeakPenalty * 0.15,
         0,
         1,
       );
 
+      // Task 19.5: Implement confidence threshold rules
+      // Confidence > 85% only when ≥80% of strong peaks matched
+      if (rawScore > 0.85 && strongPeakMatchRatio < 0.80) {
+        rawScore = Math.min(rawScore, 0.85);
+      }
+
+      // Confidence < 50% when <50% of reference peaks matched
+      if (matchedReferencePeakRatio < 0.50) {
+        rawScore = Math.min(rawScore, 0.49);
+      }
+
+      const score = roundTo(rawScore, 3);
+
+      // Store strong peaks for conflict analysis
+      const strongReferencePeaks = result.phase.peaks.filter((peak) => peak.relativeIntensity > STRONG_PEAK_THRESHOLD);
+      const missingStrongPeaks = result.missingPeaks.filter((peak) => peak.relativeIntensity > STRONG_PEAK_THRESHOLD);
+
       return {
         ...result,
         matchedReferencePeakRatio: roundTo(matchedReferencePeakRatio, 3),
-        strongestPeakAgreement: roundTo(strongestPeakAgreement, 3),
+        strongestPeakAgreement: roundTo(weightedPeakScore, 3), // Reusing field for weighted score
         missingStrongPeakPenalty: roundTo(missingStrongPeakPenalty, 3),
-        unexplainedStrongPeakPenalty: roundTo(unexplainedStrongPeakPenalty, 3),
-        score: roundTo(score, 3),
+        unexplainedStrongPeakPenalty: roundTo(unexplainedPeakPenalty, 3),
+        score,
         confidenceLevel: confidenceLevel(score),
       };
     })
@@ -356,11 +416,18 @@ export function analyze_peak_conflicts(candidates: XrdPhaseCandidate[], detected
   const unexplainedPeaks = detectedPeaks.filter((peak) => !explained.has(peak.id) && peak.intensity >= 12);
   const broadFeatures = detectedPeaks.filter((peak) => peak.classification === 'broad');
   const missingStrongPeaks = primaryCandidate
-    ? primaryCandidate.missingPeaks.filter((peak) => peak.relativeIntensity >= STRONG_REFERENCE_THRESHOLD)
+    ? primaryCandidate.missingPeaks.filter((peak) => peak.relativeIntensity > STRONG_PEAK_THRESHOLD)
     : [];
+
+  // Task 19.6: Enhanced ambiguity detection
+  // Flag cases where multiple phases have similar confidence scores (within 5%)
   const ambiguousCandidates = primaryCandidate
-    ? candidates.filter((candidate) => candidate.phase.id !== primaryCandidate.phase.id && primaryCandidate.score - candidate.score <= 0.09)
+    ? candidates.filter((candidate) => 
+        candidate.phase.id !== primaryCandidate.phase.id && 
+        primaryCandidate.score - candidate.score <= 0.05
+      )
     : [];
+
   const possibleImpurities = findImpurityFlags(candidates, primaryCandidate, unexplainedPeaks);
   const notes: string[] = [];
 
@@ -373,8 +440,14 @@ export function analyze_peak_conflicts(candidates: XrdPhaseCandidate[], detected
   if (unexplainedPeaks.length > 0) {
     notes.push('Observed peaks remain unexplained by the primary phase assignment.');
   }
+
+  // Task 19.6: Add recommendation for complementary techniques when ambiguity is detected
   if (ambiguousCandidates.length > 0) {
-    notes.push('Close ferrite candidates share peak positions, so the assignment should be read with family-level ambiguity.');
+    notes.push(
+      `Multiple phases have similar confidence scores (within 5%). ` +
+      `Recommend complementary techniques (XPS for oxidation states, FTIR/Raman for vibrational modes) ` +
+      `to resolve ambiguity between ${primaryCandidate?.phase.name} and ${ambiguousCandidates.map(c => c.phase.name).join(', ')}.`
+    );
   }
 
   return {
@@ -396,26 +469,36 @@ export function generate_xrd_interpretation(conflicts: XrdConflictAnalysis, cand
   const phaseClaim = primary.score >= 0.65
     ? primary.phase.name
     : `Best low-confidence candidate: ${primary.phase.name}`;
+  
+  // Enhanced evidence with crystallographic metadata
   const matchedEvidence = primary.matches
     .sort((a, b) => b.referencePeak.relativeIntensity - a.referencePeak.relativeIntensity)
     .slice(0, 5)
     .map((match) =>
-      `${match.observedPeak.position.toFixed(2)} 2theta matches ${primary.phase.name} ${match.referencePeak.hkl} at ${match.referencePeak.position.toFixed(2)} 2theta (delta ${match.delta.toFixed(2)}).`,
+      `${match.observedPeak.position.toFixed(2)}° 2θ matches ${primary.phase.name} ${match.referencePeak.hkl} reflection at ${match.referencePeak.position.toFixed(2)}° (Δ2θ = ${match.delta.toFixed(2)}°, d = ${match.referencePeak.dSpacing.toFixed(3)} Å).`,
     );
+  
   const conflictsText = [
     ...conflicts.missingStrongPeaks.map((peak) => `Missing strong ${primary.phase.name} reference peak ${formatPeak(peak)}.`),
-    ...conflicts.unexplainedPeaks.slice(0, 6).map((peak) => `Unexplained observed ${peak.classification} feature at ${peak.position.toFixed(2)} 2theta with relative intensity ${peak.intensity.toFixed(1)}.`),
+    ...conflicts.unexplainedPeaks.slice(0, 6).map((peak) => `Unexplained observed ${peak.classification} feature at ${peak.position.toFixed(2)}° 2θ with relative intensity ${peak.intensity.toFixed(1)}.`),
     ...conflicts.possibleImpurities.map((flag) => `Possible impurity: ${flag.phase.name}; ${flag.reason}`),
     ...conflicts.ambiguousCandidates.slice(0, 3).map((candidate) => `Ambiguous close candidate: ${candidate.phase.name} scored ${(candidate.score * 100).toFixed(1)}%.`),
   ];
+  
+  // Enhanced caveats with crystallographic metadata and limitations
   const caveats = [
     ...conflicts.notes,
+    `Crystallographic data: ${primary.phase.crystalSystem} crystal system, space group ${primary.phase.spaceGroup}, lattice parameter a = ${primary.phase.latticeParameters.a.toFixed(3)} Å.`,
+    `Reference: JCPDS card ${primary.phase.jcpdsCard || 'not specified'}.`,
+    'XRD provides bulk crystallographic information; peak positions matched using ±0.2° tolerance.',
     'Reference matching is position-based and deterministic; intensity differences are used only through the configured score.',
   ];
+  
+  // Enhanced decision with crystallographic context
   const decision = primary.score >= 0.85
-    ? `${primary.phase.name} is strongly supported by the detected XRD peaks.`
+    ? `${primary.phase.name} (${primary.phase.crystalSystem}, space group ${primary.phase.spaceGroup}) is strongly supported by the detected XRD peaks.`
     : primary.score >= 0.65
-      ? `${primary.phase.name} is supported, but conflicts or ambiguity reduce confidence.`
+      ? `${primary.phase.name} (${primary.phase.crystalSystem}, space group ${primary.phase.spaceGroup}) is supported, but conflicts or ambiguity reduce confidence.`
       : `No confident phase claim: ${primary.phase.name} is only a low-confidence best match.`;
 
   return {

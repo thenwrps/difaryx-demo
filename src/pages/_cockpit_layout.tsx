@@ -26,7 +26,7 @@
         <aside className="cockpit-scroll w-[280px] shrink-0 overflow-y-auto border-r border-slate-800/50 bg-[#080E19] p-3 space-y-3">
           <div className="rounded-lg border border-slate-800 bg-[#0A0F1A] p-3">
             <div className="flex items-center gap-2 mb-2"><Target size={14} className="text-cyan-300" /><span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Mission</span></div>
-            <p className="text-xs leading-5 text-slate-300">Determine whether the uploaded sample is consistent with <span className="font-semibold text-white">CuFe₂O₄ spinel ferrite</span> phase from multi-technique evidence.</p>
+            <p className="text-xs leading-5 text-slate-300">Determine whether the uploaded sample is consistent with <span className="font-semibold text-white">{formatChemicalFormula('CuFe2O4')} spinel ferrite</span> phase from multi-technique evidence.</p>
           </div>
 
           <div className="rounded-lg border border-slate-800 bg-[#0A0F1A] p-3">

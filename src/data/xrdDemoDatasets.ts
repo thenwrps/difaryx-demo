@@ -45,22 +45,199 @@ function deterministicNoise(index: number, x: number, amplitude: number) {
   );
 }
 
+/**
+ * Generates Cu Kα₂ satellite peak contribution for a given main peak.
+ * 
+ * Cu Kα radiation consists of two components:
+ * - Kα₁ (λ = 1.54056 Å) - main peak
+ * - Kα₂ (λ = 1.54439 Å) - satellite peak at +0.2° with 15-20% intensity
+ * 
+ * Literature: JCPDS 25-0283, standard XRD reference data
+ * 
+ * @param x - Current 2θ position
+ * @param mainPeakPosition - Position of the main Kα₁ peak (degrees 2θ)
+ * @param relativeIntensity - Relative intensity of the main peak
+ * @param width - Peak width (FWHM)
+ * @returns Intensity contribution from the Kα₂ satellite peak
+ */
+function addKAlphaSatellites(
+  x: number,
+  mainPeakPosition: number,
+  relativeIntensity: number,
+  width: number
+): number {
+  // Cu Kα₂ satellite appears at +0.2° from main peak
+  const satelliteOffset = 0.2;
+  
+  // Satellite intensity is 15-20% of main peak (using 17.5% as midpoint)
+  const satelliteIntensity = 0.175;
+  
+  // Satellite peak is slightly broader than main peak
+  const satelliteWidth = width * 1.15;
+  
+  // Generate satellite peak using pseudo-Voigt profile
+  return relativeIntensity * satelliteIntensity * pseudoVoigt(
+    x,
+    mainPeakPosition + satelliteOffset,
+    satelliteWidth,
+    0.35
+  );
+}
+
+/**
+ * Generates realistic exponentially decaying background for XRD patterns.
+ * 
+ * XRD patterns typically exhibit exponentially decreasing background intensity
+ * from low to high 2θ angles due to:
+ * - Air scattering (decreases with angle)
+ * - Sample fluorescence (decreases with angle)
+ * - Incoherent scattering (decreases with angle)
+ * 
+ * The background is monotonically decreasing from 10° to 80° 2θ, which is
+ * characteristic of real experimental XRD data collected with Cu Kα radiation.
+ * 
+ * Literature: Standard XRD background modeling, typical of powder diffraction
+ * 
+ * @param twoTheta - Diffraction angle in degrees (2θ)
+ * @returns Background intensity at the given angle
+ */
+export function exponentialBackground(twoTheta: number): number {
+  // Base background level
+  const baseLevel = 12;
+  
+  // Exponential decay component (decreases from low to high angle)
+  // Decay constant chosen to give realistic background shape over 10-80° range
+  const decayAmplitude = 3.6;
+  const decayConstant = 38;
+  const exponentialComponent = decayAmplitude * Math.exp(-(twoTheta - 10) / decayConstant);
+  
+  // Small sinusoidal modulation to simulate instrument artifacts
+  const modulationAmplitude = 0.42;
+  const modulationFrequency = 0.24;
+  const modulationComponent = modulationAmplitude * Math.sin(twoTheta * modulationFrequency);
+  
+  return baseLevel + exponentialComponent + modulationComponent;
+}
+
+/**
+ * Calculates instrument-broadened peak width (FWHM) as a function of 2θ angle.
+ * 
+ * In real XRD instruments, peak widths increase with increasing diffraction angle
+ * due to several instrumental factors:
+ * - Axial divergence (increases with tan θ)
+ * - Flat specimen error (increases with cos θ / sin² θ)
+ * - Wavelength dispersion (increases with tan θ)
+ * 
+ * This function models the angular dependence of peak broadening using a
+ * simplified monotonic function that ensures peak widths increase with 2θ.
+ * The implementation is based on the Caglioti function (FWHM² = U·tan²θ + V·tanθ + W)
+ * but uses parameters that ensure monotonic behavior across the full 10-80° range.
+ * 
+ * The implementation ensures peak widths increase monotonically (or remain constant)
+ * with increasing 2θ, producing realistic XRD patterns where high-angle peaks
+ * are broader than low-angle peaks.
+ * 
+ * Literature: 
+ * - Caglioti et al., Nucl. Instrum. 3, 223 (1958)
+ * - Standard instrument broadening models in Rietveld refinement
+ * 
+ * @param twoTheta - Diffraction angle in degrees (2θ)
+ * @param intrinsicWidth - Intrinsic peak width (FWHM) in degrees, representing
+ *                         sample-dependent broadening (crystallite size, strain)
+ * @returns Instrument-broadened peak width (FWHM) in degrees
+ */
+export function instrumentBroadening(twoTheta: number, intrinsicWidth: number): number {
+  // Convert 2θ to θ (in radians) for trigonometric functions
+  const thetaRad = (twoTheta / 2) * (Math.PI / 180);
+  
+  // Simplified monotonic broadening model
+  // Uses tan²θ term to ensure monotonic increase with angle
+  // Parameters chosen to give realistic broadening over 10-80° range
+  const U = 0.0035;  // tan²θ coefficient (controls high-angle broadening)
+  const W = 0.0015;  // constant term (minimum instrument broadening)
+  
+  // Calculate instrument broadening contribution
+  const tanTheta = Math.tan(thetaRad);
+  const instrumentFWHM_squared = U * tanTheta * tanTheta + W;
+  const instrumentFWHM = Math.sqrt(instrumentFWHM_squared);
+  
+  // Combine intrinsic and instrument broadening using quadratic addition
+  // (appropriate for Gaussian-like peak shapes)
+  const totalFWHM_squared = intrinsicWidth * intrinsicWidth + instrumentFWHM * instrumentFWHM;
+  const totalFWHM = Math.sqrt(totalFWHM_squared);
+  
+  // Ensure result stays within realistic range for well-crystallized samples
+  // (0.15° to 0.25° for CuFe₂O₄, but can be broader at high angles)
+  return Math.max(0.15, totalFWHM);
+}
+
+/**
+ * Applies preferred orientation correction factor for specific Miller indices.
+ * 
+ * Preferred orientation (texture) occurs when crystallites in a powder sample
+ * are not randomly oriented but have a tendency to align along certain
+ * crystallographic directions. This is common in:
+ * - Plate-like or needle-like crystal morphologies
+ * - Samples prepared by pressing, sedimentation, or thin film deposition
+ * - Materials with anisotropic crystal structures
+ * 
+ * In spinel ferrites like CuFe₂O₄, preferred orientation along <111> directions
+ * is commonly observed due to the octahedral site occupancy and crystal growth
+ * habits. This causes (111) and (222) reflections to have reduced intensities
+ * compared to random powder patterns.
+ * 
+ * The March-Dollase model is commonly used to describe preferred orientation:
+ * P(hkl) = (r² cos²α + sin²α/r)^(-3/2)
+ * where r is the March parameter (r < 1 for reduced intensity) and α is the
+ * angle between the scattering vector and the preferred orientation direction.
+ * 
+ * For simplicity, this implementation applies a fixed reduction factor of 0.7
+ * (30% reduction) to (111) and (222) reflections, representing moderate
+ * preferred orientation effects typical of pressed pellet samples.
+ * 
+ * Literature:
+ * - Dollase, W. A. (1986). "Correction of intensities for preferred orientation
+ *   in powder diffractometry." J. Appl. Cryst. 19, 267-272.
+ * - March, A. (1932). "Mathematische Theorie der Regelung nach der Korngestalt
+ *   bei affiner Deformation." Z. Kristallogr. 81, 285-297.
+ * 
+ * @param hkl - Miller indices as a string, e.g., "(111)", "(222)", "(311)"
+ * @returns Intensity scaling factor (0.7 for (111) and (222), 1.0 for others)
+ */
+export function preferredOrientationFactor(hkl: string): number {
+  // Apply 30% reduction (factor of 0.7) to (111) and (222) reflections
+  // These reflections are most affected by preferred orientation along <111>
+  if (hkl === '(111)' || hkl === '(222)') {
+    return 0.7;
+  }
+  
+  // No preferred orientation correction for other reflections
+  return 1.0;
+}
+
 function synthesizeXrdPattern(options: SynthesisOptions): XrdPoint[] {
   const count = options.count ?? 701;
   const noiseAmplitude = options.noiseAmplitude ?? 0.65;
 
   return Array.from({ length: count }, (_, index) => {
     const x = 10 + (70 * index) / (count - 1);
-    const baseline = 12 + 3.6 * Math.exp(-(x - 10) / 38) + 0.42 * Math.sin(x * 0.24);
+    const baseline = exponentialBackground(x);
     const halo = options.amorphousHalo
       ? options.amorphousHalo.amplitude * gaussian(x, options.amorphousHalo.center, options.amorphousHalo.width)
       : 0;
     const crystallineSignal = options.components.reduce((sum, component) => {
       const phase = phaseById(component.phaseId);
       const phaseSignal = phase.peaks.reduce((phaseSum, peak) => {
-        const main = peak.relativeIntensity * pseudoVoigt(x, peak.position, component.width, 0.3);
-        const kAlphaShoulder = peak.relativeIntensity * 0.08 * pseudoVoigt(x, peak.position + 0.13, component.width * 1.4, 0.4);
-        return phaseSum + main + kAlphaShoulder;
+        // Apply instrument broadening: peak width increases with 2θ angle
+        const broadenedWidth = instrumentBroadening(peak.position, component.width);
+        
+        // Apply preferred orientation correction: reduces (111) and (222) intensities
+        const orientationFactor = preferredOrientationFactor(peak.hkl);
+        const correctedIntensity = peak.relativeIntensity * orientationFactor;
+        
+        const main = correctedIntensity * pseudoVoigt(x, peak.position, broadenedWidth, 0.3);
+        const satellite = addKAlphaSatellites(x, peak.position, correctedIntensity, broadenedWidth);
+        return phaseSum + main + satellite;
       }, 0);
       return sum + phaseSignal * component.scale;
     }, 0);

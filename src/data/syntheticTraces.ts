@@ -39,30 +39,63 @@ export function generateXrdTrace(count = 260): SyntheticTracePoint[] {
 }
 
 export function generateRamanTrace(count = 260): SyntheticTracePoint[] {
+  // Raman modes for CuFe₂O₄ based on reference data (Graves et al., 1988)
+  // Mode positions match src/data/ramanReferenceData.ts
+  // Group theory predicts 5 Raman-active modes for spinel: A₁g + Eg + 3T₂g
+  // Width parameter is σ (standard deviation); FWHM = 2.355 × σ
   const peaks: Peak[] = [
-    { center: 205, width: 9, amplitude: 10 },
-    { center: 300, width: 12, amplitude: 36 },
-    { center: 480, width: 15, amplitude: 42 },
-    { center: 560, width: 18, amplitude: 18 },
-    { center: 690, width: 14, amplitude: 66 },
+    // T₂g mode 1 - Asymmetric bending (lowest frequency)
+    // Target FWHM: 20-40 cm⁻¹ → σ ≈ 12.7 cm⁻¹ (for FWHM ~30 cm⁻¹)
+    { center: 210, width: 12.7, amplitude: 20 },
+    // Eg mode - Symmetric bending vibration
+    // Target FWHM: 20-40 cm⁻¹ → σ ≈ 12.7 cm⁻¹ (for FWHM ~30 cm⁻¹)
+    { center: 300, width: 12.7, amplitude: 40 },
+    // T₂g mode 2 - Asymmetric bending/stretching (intermediate frequency)
+    // Target FWHM: 15-35 cm⁻¹ → σ ≈ 10.6 cm⁻¹ (for FWHM ~25 cm⁻¹)
+    { center: 480, width: 10.6, amplitude: 50 },
+    // T₂g mode 3 - Asymmetric stretching (highest frequency)
+    // Target FWHM: 15-35 cm⁻¹ → σ ≈ 10.6 cm⁻¹ (for FWHM ~25 cm⁻¹)
+    { center: 560, width: 10.6, amplitude: 60 },
+    // A₁g mode - Symmetric stretching (strongest mode)
+    // Target FWHM: 15-30 cm⁻¹ → σ ≈ 9.3 cm⁻¹ (for FWHM ~22 cm⁻¹)
+    { center: 690, width: 9.3, amplitude: 100 },
   ];
 
   return sampleRange(150, 850, count, (x, index) => {
-    const baseline = 11 + 1.1 * Math.sin(index * 0.08) + 0.5 * Math.sin(index * 0.29);
+    // Fluorescence background typical of visible excitation (532 nm or 633 nm laser)
+    // Exponentially decaying background with gentle slope
+    const normalizedX = (x - 150) / 700; // Normalize to [0, 1]
+    const fluorescenceDecay = 15 * Math.exp(-normalizedX * 0.8); // Exponential decay
+    const gentleSlope = 8 - 2 * normalizedX; // Slight downward slope
+    const undulation = 0.8 * Math.sin(index * 0.06) + 0.4 * Math.sin(index * 0.23);
+    const baseline = fluorescenceDecay + gentleSlope + undulation;
+    
     return baseline + peaks.reduce((sum, peak) => sum + gaussian(x, peak), 0);
   });
 }
 
 export function generateFtirTrace(count = 260): SyntheticTracePoint[] {
+  // FTIR bands for CuFe₂O₄ based on reference data (Waldron, 1955)
+  // Band positions match src/data/ftirReferenceData.ts
   const bands: Peak[] = [
-    { center: 560, width: 55, amplitude: 22 },
-    { center: 1100, width: 90, amplitude: 17 },
-    { center: 1630, width: 80, amplitude: 12 },
-    { center: 3400, width: 220, amplitude: 24 },
+    // Octahedral site metal-oxygen stretching (400 cm⁻¹)
+    { center: 400, width: 60, amplitude: 18 },
+    // Tetrahedral site Fe-O stretching (580 cm⁻¹)
+    { center: 580, width: 55, amplitude: 24 },
+    // Adsorbed water H-O-H bending (1630 cm⁻¹)
+    { center: 1630, width: 65, amplitude: 12 },
+    // Surface hydroxyl O-H stretching (3400 cm⁻¹)
+    { center: 3400, width: 95, amplitude: 20 },
   ];
 
   return sampleRange(400, 4000, count, (x, index) => {
-    const baseline = 91 + 1.2 * Math.sin(index * 0.045);
+    // Realistic baseline drift typical of transmission measurements
+    // Combines linear drift with gentle undulation
+    const normalizedX = (x - 400) / 3600; // Normalize to [0, 1]
+    const linearDrift = 91 + 3.5 * normalizedX; // Gradual upward drift
+    const undulation = 1.8 * Math.sin(index * 0.035) + 0.9 * Math.sin(index * 0.12);
+    const baseline = linearDrift + undulation;
+    
     return baseline - bands.reduce((sum, band) => sum + gaussian(x, band), 0);
   });
 }

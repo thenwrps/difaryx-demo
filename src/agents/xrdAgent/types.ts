@@ -45,6 +45,7 @@ export interface XrdReferencePeak {
   position: number;
   relativeIntensity: number;
   hkl: string;
+  dSpacing: number;
 }
 
 export interface XrdPhaseReference {
@@ -52,6 +53,18 @@ export interface XrdPhaseReference {
   name: string;
   formula: string;
   family: string;
+  crystalSystem: 'cubic' | 'tetragonal' | 'hexagonal' | 'rhombohedral' | 'orthorhombic' | 'monoclinic' | 'triclinic';
+  spaceGroup: string;
+  latticeParameters: {
+    a: number;
+    b?: number;
+    c?: number;
+    alpha?: number;
+    beta?: number;
+    gamma?: number;
+  };
+  jcpdsCard?: string;
+  icddPdf?: string;
   referenceNote: string;
   peaks: XrdReferencePeak[];
 }

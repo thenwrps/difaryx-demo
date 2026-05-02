@@ -29,12 +29,6 @@ export default function Navbar() {
             ))}
           </nav>
         </div>
-        <Link
-          to="/login"
-          className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 text-[13px] font-bold text-slate-700 shadow-sm transition-colors hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
-        >
-          Sign in
-        </Link>
       </div>
     </header>
   );

@@ -7,6 +7,7 @@ import {
   generateXpsTrace,
   generateXrdTrace,
 } from '../../data/syntheticTraces';
+import { formatChemicalFormula } from '../../utils/chemicalFormula';
 
 const signalTraces = [
   {
@@ -78,7 +79,7 @@ function MultiTechSignalPanel() {
       <div className="mb-2 flex items-center justify-between gap-3">
         <div>
           <span className="text-[9px] font-bold text-slate-700">Multi-tech scientific signals</span>
-          <p className="mt-0.5 text-[7px] text-slate-400">CuFe2O4 evidence stack</p>
+          <p className="mt-0.5 text-[7px] text-slate-400">{formatChemicalFormula('CuFe2O4')} evidence stack</p>
         </div>
         <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[7px] font-bold text-emerald-700">
           93.3% match
@@ -220,7 +221,7 @@ export default function HeroSection() {
             <div className="flex flex-col items-start gap-3">
               <div className="flex flex-wrap gap-3">
                 <Link
-                  to="/dashboard"
+                  to="/login"
                   className="inline-flex h-12 items-center justify-center rounded-xl bg-blue-600 px-6 text-[15px] font-bold text-white shadow-lg shadow-blue-600/20 transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-xl hover:shadow-blue-600/25"
                 >
                   Explore Workflow
