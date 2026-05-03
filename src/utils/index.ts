@@ -1,0 +1,1 @@
+export { formatChemicalFormula } from './chemicalFormula';

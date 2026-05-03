@@ -1,6 +1,64 @@
 import React, { useState } from 'react';
 import { CheckCircle2, Send, XCircle } from 'lucide-react';
 
+// Inline chemical formula utility
+function formatChemicalFormula(input: string): React.ReactNode {
+  if (!input) return input;
+
+  const parts: React.ReactNode[] = [];
+  let i = 0;
+  let key = 0;
+
+  while (i < input.length) {
+    const chargeMatch = input.slice(i).match(/^(\^?)(\d+)([+-])/);
+    if (chargeMatch) {
+      const [full, caret, number, sign] = chargeMatch;
+      parts.push(<sup key={key++}>{number}{sign}</sup>);
+      i += full.length;
+      continue;
+    }
+
+    const parenMatch = input.slice(i).match(/^\(([^)]+)\)(\d+)/);
+    if (parenMatch) {
+      const [full, content, subscript] = parenMatch;
+      parts.push('(');
+      parts.push(formatChemicalFormula(content));
+      parts.push(')');
+      parts.push(<sub key={key++}>{subscript}</sub>);
+      i += full.length;
+      continue;
+    }
+
+    const phaseMatch = input.slice(i).match(/^\((s|l|g|aq)\)/);
+    if (phaseMatch) {
+      parts.push(phaseMatch[0]);
+      i += phaseMatch[0].length;
+      continue;
+    }
+
+    const subscriptMatch = input.slice(i).match(/^([A-Z][a-z]?)(\d+)/);
+    if (subscriptMatch) {
+      const [full, element, number] = subscriptMatch;
+      parts.push(element);
+      parts.push(<sub key={key++}>{number}</sub>);
+      i += full.length;
+      continue;
+    }
+
+    const elementMatch = input.slice(i).match(/^[A-Z][a-z]?/);
+    if (elementMatch) {
+      parts.push(elementMatch[0]);
+      i += elementMatch[0].length;
+      continue;
+    }
+
+    parts.push(input[i]);
+    i++;
+  }
+
+  return <>{parts}</>;
+}
+
 type TabType = 'thinking' | 'evidence' | 'parameters' | 'logs';
 
 interface CandidateData {
@@ -859,7 +917,7 @@ export function RightPanel({
                     {displayCandidates.map((candidate, index) => (
                       <tr key={index} className="border-b border-slate-800/50">
                         <td className="py-3 pr-2">
-                          <div className="text-slate-200 font-medium mb-1">{candidate.phase}</div>
+                          <div className="text-slate-200 font-medium mb-1">{formatChemicalFormula(candidate.phase)}</div>
                           <div className="flex items-center gap-1.5">
                             {candidate.result === 'Match' ? (
                               <span className="px-1.5 py-0.5 rounded bg-emerald-400/10 border border-emerald-400/30 text-emerald-300 text-[9px] font-bold">

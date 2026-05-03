@@ -135,4 +135,11 @@ export interface XrdAgentResult {
   conflicts: XrdConflictAnalysis;
   interpretation: XrdInterpretation;
   executionLog: XrdExecutionLogEntry[];
+  parameterImpact?: {
+    appliedParams: any;
+    baselineShift: { meanShift: number; maxShift: number; description: string };
+    peakCount: { detected: number; sharp: number; broad: number; description: string };
+    noiseLevel: { estimated: number; description: string };
+    summary: string;
+  };
 }

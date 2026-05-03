@@ -4,6 +4,7 @@ import { Bot, ClipboardList, FileText, FolderOpen, GitCompare, History, Notebook
 import { DashboardLayout } from '../components/layout/DashboardLayout';
 import { Card } from '../components/ui/Card';
 import { getAllHistoryEntries } from '../data/demoProjects';
+import { formatChemicalFormula } from '../utils';
 
 const agentRuns = [
   {
@@ -139,7 +140,7 @@ export default function HistoryPage() {
                         {run.status}
                       </span>
                     </div>
-                    <h3 className="mt-3 text-base font-semibold text-text-main">{run.project}</h3>
+                    <h3 className="mt-3 text-base font-semibold text-text-main">{formatChemicalFormula(run.project)}</h3>
                     <p className="mt-2 text-sm text-text-muted">{run.goal}</p>
                     <p className="mt-3 text-sm text-text-main">
                       <span className="font-semibold">Decision:</span> {run.decision}

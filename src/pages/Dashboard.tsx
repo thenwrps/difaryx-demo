@@ -17,6 +17,7 @@ import {
   getProject,
   getWorkspaceRoute,
 } from '../data/demoProjects';
+import { formatChemicalFormula } from '../utils';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -55,7 +56,7 @@ export default function Dashboard() {
                 </div>
                 <div className="mt-1.5 rounded-md border border-primary/15 bg-background/60 px-2.5 py-1">
                   <span className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">Project</span>
-                  <span className="ml-2 text-xs font-semibold text-text-main">CuFe2O4 Spinel Formation</span>
+                  <span className="ml-2 text-xs font-semibold text-text-main">{formatChemicalFormula('CuFe2O4')} Spinel Formation</span>
                 </div>
               </div>
               <button
@@ -159,7 +160,7 @@ export default function Dashboard() {
             >
               <div className="p-4 border-b border-border bg-surface-hover/30 flex justify-between items-start">
                 <div>
-                  <h3 className="font-semibold text-text-main group-hover:text-primary transition-colors">{project.name}</h3>
+                  <h3 className="font-semibold text-text-main group-hover:text-primary transition-colors">{formatChemicalFormula(project.name)}</h3>
                   <div className="flex items-center gap-1.5 text-xs text-text-muted mt-1.5">
                     <Clock size={12} /> {project.lastUpdated}
                   </div>

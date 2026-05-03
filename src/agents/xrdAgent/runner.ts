@@ -95,10 +95,61 @@ export function validate_xrd_input(input: XrdAgentInput): XrdValidationResult {
   };
 }
 
-export function preprocess_xrd(dataPoints: XrdPoint[]): XrdPreprocessedPoint[] {
+export interface XrdProcessingParams {
+  // Baseline correction parameters
+  baselineRadius?: number;
+  baselineFraction?: number;
+  
+  // Smoothing parameters
+  smoothingRadius?: number;
+  
+  // Peak detection parameters
+  minProminence?: number;
+  minDistance?: number;
+  minHeight?: number;
+}
+
+export interface XrdParameterImpact {
+  // Applied parameters
+  appliedParams: XrdProcessingParams | null;
+  
+  // Baseline impact
+  baselineShift: {
+    meanShift: number;
+    maxShift: number;
+    description: string;
+  };
+  
+  // Peak detection impact
+  peakCount: {
+    detected: number;
+    sharp: number;
+    broad: number;
+    description: string;
+  };
+  
+  // Noise level
+  noiseLevel: {
+    estimated: number;
+    description: string;
+  };
+  
+  // Processing summary
+  summary: string;
+}
+
+export function preprocess_xrd(dataPoints: XrdPoint[], params?: XrdProcessingParams): XrdPreprocessedPoint[] {
   const sorted = sortPoints(dataPoints).filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y));
-  const smoothed = movingAverage(sorted, 2);
-  const baseline = rollingPercentileBaseline(smoothed, 42, 0.16);
+  
+  // Use provided smoothing radius or default to 2
+  const smoothingRadius = params?.smoothingRadius ?? 2;
+  const smoothed = movingAverage(sorted, smoothingRadius);
+  
+  // Use provided baseline parameters or defaults
+  const baselineRadius = params?.baselineRadius ?? 42;
+  const baselineFraction = params?.baselineFraction ?? 0.16;
+  const baseline = rollingPercentileBaseline(smoothed, baselineRadius, baselineFraction);
+  
   const corrected = smoothed.map((point, index) => Math.max(0, point.y - baseline[index].y));
   const maxCorrected = Math.max(...corrected, 1);
 
@@ -181,13 +232,17 @@ function mergeNearbyPeaks(peaks: XrdDetectedPeak[], minSeparation: number) {
   }));
 }
 
-export function detect_xrd_peaks(preprocessedData: XrdPreprocessedPoint[]): XrdDetectedPeak[] {
+export function detect_xrd_peaks(preprocessedData: XrdPreprocessedPoint[], params?: XrdProcessingParams): XrdDetectedPeak[] {
   if (preprocessedData.length < 5) return [];
 
   const normalizedValues = preprocessedData.map((point) => point.normalizedIntensity);
   const noise = estimateNoise(normalizedValues);
-  const minHeight = Math.max(5.5, noise * 4);
-  const minProminence = Math.max(3.2, noise * 3.5);
+  
+  // Use provided parameters or defaults
+  const minHeight = params?.minHeight ?? Math.max(5.5, noise * 4);
+  const minProminence = params?.minProminence ?? Math.max(3.2, noise * 3.5);
+  const minSeparation = params?.minDistance ?? 0.44;
+  
   const candidates: XrdDetectedPeak[] = [];
 
   for (let i = 2; i < preprocessedData.length - 2; i += 1) {
@@ -216,7 +271,7 @@ export function detect_xrd_peaks(preprocessedData: XrdPreprocessedPoint[]): XrdD
     });
   }
 
-  return mergeNearbyPeaks(candidates, 0.44);
+  return mergeNearbyPeaks(candidates, minSeparation);
 }
 
 function matchReferencePeaks(phase: XrdPhaseReference, observedPeaks: XrdDetectedPeak[]): XrdPhaseSearchResult {
@@ -513,7 +568,7 @@ export function generate_xrd_interpretation(conflicts: XrdConflictAnalysis, cand
   };
 }
 
-export function runXrdPhaseIdentificationAgent(input: XrdAgentInput): XrdAgentResult {
+export function runXrdPhaseIdentificationAgent(input: XrdAgentInput, params?: XrdProcessingParams): XrdAgentResult {
   const executionLog: XrdExecutionLogEntry[] = [];
   const validation = validate_xrd_input(input);
   executionLog.push(makeLog(
@@ -547,17 +602,30 @@ export function runXrdPhaseIdentificationAgent(input: XrdAgentInput): XrdAgentRe
     };
   }
 
-  const preprocessedData = preprocess_xrd(input.dataPoints);
+  // Preprocess with custom or default parameters
+  const preprocessedData = preprocess_xrd(input.dataPoints, params);
   const baselineData = preprocessedData.map((point) => ({ x: point.x, y: point.baselineIntensity }));
+  
+  // Calculate baseline shift for parameter impact tracking
+  const baselineShifts = preprocessedData.map(p => p.rawIntensity - p.baselineIntensity);
+  const meanBaselineShift = baselineShifts.reduce((sum, val) => sum + val, 0) / baselineShifts.length;
+  const maxBaselineShift = Math.max(...baselineShifts);
+  
   executionLog.push(makeLog(
     'preprocess_xrd',
     'complete',
     'Applied moving-average smoothing, rolling-percentile baseline correction, and max-intensity normalization.',
   ));
 
-  const detectedPeaks = detect_xrd_peaks(preprocessedData);
+  // Detect peaks with custom or default parameters
+  const detectedPeaks = detect_xrd_peaks(preprocessedData, params);
   const sharpCount = detectedPeaks.filter((peak) => peak.classification === 'sharp').length;
   const broadCount = detectedPeaks.length - sharpCount;
+  
+  // Estimate noise level for parameter impact tracking
+  const normalizedValues = preprocessedData.map((point) => point.normalizedIntensity);
+  const noiseLevel = estimateNoise(normalizedValues);
+  
   executionLog.push(makeLog(
     'detect_xrd_peaks',
     detectedPeaks.length > 0 ? 'complete' : 'warning',
@@ -596,6 +664,27 @@ export function runXrdPhaseIdentificationAgent(input: XrdAgentInput): XrdAgentRe
     interpretation.summary,
   ));
 
+  // Build parameter impact tracking (only when custom params provided)
+  const parameterImpact = params ? {
+    appliedParams: params,
+    baselineShift: {
+      meanShift: roundTo(meanBaselineShift, 2),
+      maxShift: roundTo(maxBaselineShift, 2),
+      description: `Baseline removed ${meanBaselineShift.toFixed(1)} counts on average (max: ${maxBaselineShift.toFixed(1)})`,
+    },
+    peakCount: {
+      detected: detectedPeaks.length,
+      sharp: sharpCount,
+      broad: broadCount,
+      description: `Detected ${detectedPeaks.length} total peaks (${sharpCount} sharp, ${broadCount} broad)`,
+    },
+    noiseLevel: {
+      estimated: roundTo(noiseLevel, 3),
+      description: `Estimated noise level: ${noiseLevel.toFixed(2)} (normalized intensity units)`,
+    },
+    summary: `Parameters: baseline radius=${params.baselineRadius ?? 42}, smoothing radius=${params.smoothingRadius ?? 2}, min prominence=${params.minProminence?.toFixed(1) ?? 'auto'}, min distance=${params.minDistance ?? 0.44}°`,
+  } : undefined;
+
   return {
     input,
     validation,
@@ -606,5 +695,6 @@ export function runXrdPhaseIdentificationAgent(input: XrdAgentInput): XrdAgentRe
     conflicts,
     interpretation,
     executionLog,
+    parameterImpact,
   };
 }

@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import {
   CartesianGrid,
+  Legend,
   Line,
   LineChart,
   ReferenceLine,
@@ -281,13 +282,22 @@ function convertExternalData(
 
 const tooltipNames: Record<string, string> = {
   observed: 'Observed',
-  calculated: 'Calculated',
+  calculated: 'Fitted',
   background: 'Background',
   baseline: 'Baseline',
   residualDisplay: 'Residual (offset)',
 };
 
-// ── Custom peak marker dot ───────────────────────────────────────────
+const legendNames: Record<string, string> = {
+  observed: 'Observed',
+  calculated: 'Fitted',
+  background: 'Background',
+  baseline: 'Baseline',
+  residualDisplay: 'Residual',
+  referencePeaks: 'Reference Peaks',
+};
+
+// ── Custom peak marker dot (reduced size + opacity) ─────────────────
 
 function PeakMarkerDot(props: {
   cx?: number;
@@ -298,16 +308,15 @@ function PeakMarkerDot(props: {
   const { cx, cy, payload, peakMarkers } = props;
   if (!cx || !cy || !payload) return null;
 
-  const isPeak = peakMarkers.some(
+  const marker = peakMarkers.find(
     (m) => Math.abs(m.position - payload.x) < 0.15,
   );
-  if (!isPeak) return null;
+  if (!marker) return null;
 
+  // Reduced size (40% smaller) and opacity (60%)
   return (
-    <g>
-      <circle cx={cx} cy={cy} r={4} fill="#f59e0b" stroke="#fbbf24" strokeWidth={1.5} />
-      <line x1={cx} y1={cy} x2={cx} y2={cy - 16} stroke="#f59e0b" strokeWidth={1} strokeDasharray="2 2" />
-      <circle cx={cx} cy={cy - 18} r={2} fill="#fbbf24" />
+    <g opacity={0.6}>
+      <circle cx={cx} cy={cy} r={2.5} fill="#f59e0b" stroke="#fbbf24" strokeWidth={0.8} />
     </g>
   );
 }
@@ -395,36 +404,89 @@ export function Graph({
               itemStyle={{ color: '#e2e8f0' }}
               labelStyle={{ color: '#cbd5e1' }}
             />
+            <Legend
+              formatter={(value, entry) => {
+                const name = legendNames[String(value)] ?? value;
+                // Apply hierarchy: Observed (bold), Fitted (medium), Baseline/Reference (faint)
+                if (value === 'observed') {
+                  return <span style={{ fontWeight: 700, opacity: 1 }}>{name}</span>;
+                } else if (value === 'calculated') {
+                  return <span style={{ fontWeight: 600, opacity: 0.9 }}>{name}</span>;
+                } else if (value === 'baseline' || value === 'referencePeaks') {
+                  return <span style={{ fontWeight: 500, opacity: 0.6 }}>{name}</span>;
+                }
+                return name;
+              }}
+              wrapperStyle={{
+                paddingTop: '20px',
+                fontSize: '13px',
+                fontWeight: 600,
+                letterSpacing: '0.02em',
+              }}
+              iconType="line"
+              iconSize={24}
+            />
 
-            {/* Peak position reference lines */}
+            {/* Reference peak sticks (ultra subtle, publication-ready) */}
             {markers.map((m, i) => (
               <ReferenceLine
-                key={`peak-line-${i}`}
+                key={`peak-stick-${i}`}
                 x={m.position}
-                stroke="#f59e0b"
-                strokeDasharray="3 3"
-                strokeOpacity={0.4}
+                stroke="#a0a0a0"
+                strokeWidth={1}
+                strokeOpacity={0.18}
+                label={
+                  m.label && i % 2 === 0
+                    ? {
+                        value: m.label,
+                        position: 'top',
+                        fill: '#9ca3af',
+                        fontSize: 8,
+                        fontWeight: 400,
+                        offset: 10,
+                      }
+                    : undefined
+                }
               />
             ))}
 
-            {/* Baseline */}
+            {/* Baseline - ultra faint */}
             {showBackground && baselineData && (
               <Line
                 type="monotone"
                 dataKey="baseline"
-                stroke="#64748b"
+                name="baseline"
+                stroke="#94a3b8"
+                strokeOpacity={0.15}
                 dot={false}
-                strokeWidth={1.25}
-                strokeDasharray="5 5"
+                strokeWidth={1}
+                strokeDasharray="4 4"
                 isAnimationActive={false}
               />
             )}
 
-            {/* Spectrum line with peak marker dots */}
+            {/* Reference Peaks - dummy line for legend only (actual rendering via ReferenceLine above) */}
+            {markers.length > 0 && (
+              <Line
+                type="monotone"
+                dataKey="__referencePeaks"
+                name="referencePeaks"
+                stroke="#a78bca"
+                strokeOpacity={0.28}
+                dot={false}
+                strokeWidth={1}
+                isAnimationActive={false}
+                hide={true}
+              />
+            )}
+
+            {/* Observed line - strong primary color */}
             <Line
               type="monotone"
               dataKey="observed"
+              name="observed"
               stroke={settings.color}
+              strokeWidth={2.5}
               dot={
                 markers.length > 0
                   ? (dotProps: any) => (
@@ -436,7 +498,6 @@ export function Graph({
                     )
                   : false
               }
-              strokeWidth={1.25}
               isAnimationActive={false}
             />
           </LineChart>
@@ -493,6 +554,17 @@ export function Graph({
             itemStyle={{ color: '#e2e8f0' }}
             labelStyle={{ color: '#cbd5e1' }}
           />
+          <Legend
+            formatter={(value) => legendNames[String(value)] ?? value}
+            wrapperStyle={{
+              paddingTop: '16px',
+              fontSize: '13px',
+              fontWeight: 600,
+              letterSpacing: '0.01em',
+            }}
+            iconType="line"
+            iconSize={20}
+          />
 
           {showResidual && (
             <>
@@ -500,6 +572,7 @@ export function Graph({
               <Line
                 type="monotone"
                 dataKey="residualDisplay"
+                name="residualDisplay"
                 stroke="#f97316"
                 dot={false}
                 strokeWidth={1}
@@ -511,10 +584,12 @@ export function Graph({
             <Line
               type="monotone"
               dataKey="background"
-              stroke="#64748b"
+              name="background"
+              stroke="#94a3b8"
+              strokeOpacity={0.35}
               dot={false}
-              strokeWidth={1.25}
-              strokeDasharray="5 5"
+              strokeWidth={1}
+              strokeDasharray="4 4"
               isAnimationActive={false}
             />
           )}
@@ -522,9 +597,11 @@ export function Graph({
             <Line
               type="monotone"
               dataKey="calculated"
-              stroke="#e2e8f0"
+              name="calculated"
+              stroke="#60a5fa"
+              strokeOpacity={0.7}
               dot={false}
-              strokeWidth={1.75}
+              strokeWidth={2}
               isAnimationActive={false}
             />
           )}
@@ -532,9 +609,10 @@ export function Graph({
             <Line
               type="monotone"
               dataKey="observed"
+              name="observed"
               stroke={settings.color}
               dot={false}
-              strokeWidth={1.15}
+              strokeWidth={2.5}
               isAnimationActive={false}
             />
           )}

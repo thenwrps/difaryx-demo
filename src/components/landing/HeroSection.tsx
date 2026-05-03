@@ -7,7 +7,7 @@ import {
   generateXpsTrace,
   generateXrdTrace,
 } from '../../data/syntheticTraces';
-import { formatChemicalFormula } from '../../utils/chemicalFormula';
+import { formatChemicalFormula } from '../../utils';
 
 const signalTraces = [
   {

@@ -683,34 +683,7 @@ function toolStatusIcon(status: ToolStatus) {
   return <CircleDot size={12} className="text-slate-600" />;
 }
 
-const FORMULA_TOKENS = new Set([
-  'CuFe2O4',
-  'NiFe2O4',
-  'CoFe2O4',
-  'Fe3O4',
-  'Fe2O3',
-  'CuFeO2',
-  'CuO',
-]);
-
-const FORMULA_SPLIT_PATTERN = /(CuFe2O4|NiFe2O4|CoFe2O4|Fe3O4|Fe2O3|CuFeO2|CuO)/g;
-
-function renderFormula(formula: string) {
-  return formula.split(/(\d+)/).map((part, index) =>
-    /^\d+$/.test(part) ? <sub key={index}>{part}</sub> : part,
-  );
-}
-
-function renderFormulaText(text: string | number) {
-  const value = String(text);
-  return value.split(FORMULA_SPLIT_PATTERN).map((part, index) =>
-    FORMULA_TOKENS.has(part) ? (
-      <React.Fragment key={`${part}-${index}`}>{renderFormula(part)}</React.Fragment>
-    ) : (
-      part
-    ),
-  );
-}
+import { formatChemicalFormula } from '../utils';
 
 function FormulaText({
   children,
@@ -719,7 +692,7 @@ function FormulaText({
   children: string | number;
   className?: string;
 }) {
-  return <span className={`agent-formula ${className}`}>{renderFormulaText(children)}</span>;
+  return <span className={`agent-formula ${className}`}>{formatChemicalFormula(String(children))}</span>;
 }
 
 function asDemoPeaks(peaks: Array<{ position: number; intensity: number; label?: string }>): DemoPeak[] {

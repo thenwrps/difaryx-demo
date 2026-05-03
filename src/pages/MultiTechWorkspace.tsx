@@ -21,6 +21,7 @@ import {
   getWorkspaceRoute,
 } from '../data/demoProjects';
 import { DemoExportFormat, exportDemoArtifact } from '../utils/demoExport';
+import { formatChemicalFormula } from '../utils';
 
 const techniqueClaims: Record<Technique, string> = {
   XRD: 'Bulk ferrite phase reflections and reference peak match.',
@@ -155,7 +156,7 @@ export default function MultiTechWorkspace() {
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-primary">Multi-Tech Hub</p>
-                <h1 className="text-base font-bold leading-tight tracking-tight text-text-main">{project.name}</h1>
+                <h1 className="text-base font-bold leading-tight tracking-tight text-text-main">{formatChemicalFormula(project.name)}</h1>
               </div>
               <div className="flex flex-wrap items-center gap-1.5">
                 <span className="rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
