@@ -9,6 +9,7 @@ import AgentDemo from "./pages/AgentDemo";
 import HistoryPage from "./pages/History";
 import SettingsPage from "./pages/Settings";
 import SignIn from "./pages/SignIn";
+import XPSWorkspace from "./pages/XPSWorkspace";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 
@@ -26,6 +27,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <MultiTechWorkspace />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/workspace/xps"
+            element={
+              <ProtectedRoute>
+                <XPSWorkspace />
               </ProtectedRoute>
             }
           />

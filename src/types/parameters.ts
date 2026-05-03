@@ -153,30 +153,97 @@ export interface XrdParameters {
 }
 
 // ============================================================================
-// XPS Parameter Interfaces (for future use)
+// XPS Parameter Interfaces
 // ============================================================================
 
 /**
- * XPS parameters (placeholder for Phase 4)
+ * Energy calibration parameters for XPS
+ */
+export interface XpsEnergyCalibrationParams {
+  /** Reference peak for calibration */
+  reference_peak: 'C1s' | 'Au4f7' | 'Ag3d5';
+  
+  /** Reference energy value (eV) */
+  reference_energy: number;
+  
+  /** Energy shift to apply (eV) */
+  shift_value: number;
+}
+
+/**
+ * Background subtraction parameters for XPS
+ */
+export interface XpsBackgroundSubtractionParams {
+  /** Background subtraction method */
+  method: 'Shirley' | 'Linear' | 'Tougaard';
+  
+  /** Number of iterations */
+  iterations: number;
+  
+  /** Smoothing factor (0.0 to 1.0) */
+  smoothing_factor: number;
+}
+
+/**
+ * Smoothing parameters for XPS
+ */
+export interface XpsSmoothingParams {
+  /** Smoothing method */
+  method: 'Moving Average' | 'Savitzky-Golay';
+  
+  /** Window size (must be odd) */
+  window_size: number;
+}
+
+/**
+ * Peak detection parameters for XPS
+ */
+export interface XpsPeakDetectionParams {
+  /** Peak prominence threshold (0.0 to 1.0) */
+  prominence: number;
+  
+  /** Minimum distance between peaks (eV) */
+  min_distance: number;
+}
+
+/**
+ * Peak fitting parameters for XPS
+ */
+export interface XpsPeakFittingParams {
+  /** Peak model type */
+  model: 'Gaussian' | 'Lorentzian' | 'Pseudo-Voigt';
+  
+  /** Convergence tolerance */
+  tolerance: number;
+  
+  /** Maximum iterations */
+  max_iterations: number;
+}
+
+/**
+ * Chemical state assignment parameters for XPS
+ */
+export interface XpsChemicalStateAssignmentParams {
+  /** Reference database */
+  database: 'NIST XPS' | 'PHI Handbook';
+  
+  /** Binding energy tolerance (eV) */
+  binding_energy_tolerance: number;
+  
+  /** Use intensity in matching */
+  use_intensity: boolean;
+}
+
+/**
+ * Complete XPS parameter set
  */
 export interface XpsParameters {
-  backgroundSubtraction: {
-    method: 'Shirley' | 'Tougaard';
-    iterations: number;
-  };
-  peakDeconvolution: {
-    model: 'Gaussian-Lorentzian';
-    num_components: number;
-    constrain_fwhm: boolean;
-  };
-  energyCalibration: {
-    reference_peak: 'C1s' | 'Au4f7' | 'Ag3d5';
-    reference_energy: number;
-  };
-  assignment: {
-    binding_energy_tolerance: number;
-    satellite_check: boolean;
-  };
+  energyCalibration: XpsEnergyCalibrationParams;
+  backgroundSubtraction: XpsBackgroundSubtractionParams;
+  smoothing: XpsSmoothingParams;
+  peakDetection: XpsPeakDetectionParams;
+  peakFitting: XpsPeakFittingParams;
+  chemicalStateAssignment: XpsChemicalStateAssignmentParams;
 }
 
 // ============================================================================

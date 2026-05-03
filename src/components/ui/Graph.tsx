@@ -294,7 +294,23 @@ const legendNames: Record<string, string> = {
   background: 'Background',
   baseline: 'Baseline',
   residualDisplay: 'Residual',
-  referencePeaks: 'Reference Peaks',
+  referencePeaks: 'Reference Peaks', // Default for XRD
+};
+
+// Technique-specific legend overrides
+const techniqueLegendOverrides: Record<SpectrumType, Partial<Record<string, string>>> = {
+  xrd: {
+    referencePeaks: 'Reference Peaks',
+  },
+  xps: {
+    referencePeaks: 'Chemical References',
+  },
+  ftir: {
+    referencePeaks: 'Band References',
+  },
+  raman: {
+    referencePeaks: 'Mode References',
+  },
 };
 
 // ── Custom peak marker dot (reduced size + opacity) ─────────────────
@@ -378,6 +394,7 @@ export function Graph({
               label={{ value: settings.xLabel, position: 'bottom', fill: '#94a3b8', fontSize: 12 }}
               type="number"
               domain={xDomain}
+              reversed={settings.reversed}
             />
             <YAxis
               stroke="#94a3b8"
@@ -406,7 +423,9 @@ export function Graph({
             />
             <Legend
               formatter={(value, entry) => {
-                const name = legendNames[String(value)] ?? value;
+                // Get technique-specific legend name or fall back to default
+                const overrides = techniqueLegendOverrides[type];
+                const name = (overrides && overrides[String(value)]) || legendNames[String(value)] || value;
                 // Apply hierarchy: Observed (bold), Fitted (medium), Baseline/Reference (faint)
                 if (value === 'observed') {
                   return <span style={{ fontWeight: 700, opacity: 1 }}>{name}</span>;
@@ -555,7 +574,11 @@ export function Graph({
             labelStyle={{ color: '#cbd5e1' }}
           />
           <Legend
-            formatter={(value) => legendNames[String(value)] ?? value}
+            formatter={(value) => {
+              // Get technique-specific legend name or fall back to default
+              const overrides = techniqueLegendOverrides[type];
+              return (overrides && overrides[String(value)]) || legendNames[String(value)] || value;
+            }}
             wrapperStyle={{
               paddingTop: '16px',
               fontSize: '13px',
