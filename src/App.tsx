@@ -4,6 +4,7 @@ import Landing from "./pages/Landing";
 import Dashboard from "./pages/Dashboard";
 import MultiTechWorkspace from "./pages/MultiTechWorkspace";
 import TechniqueWorkspace from "./pages/TechniqueWorkspace";
+import WorkspaceLauncher from "./pages/WorkspaceLauncher";
 import NotebookLab from "./pages/NotebookLab";
 import AgentDemo from "./pages/AgentDemo";
 import HistoryPage from "./pages/History";
@@ -25,6 +26,14 @@ function App() {
           <Route path="/login" element={<SignIn />} />
           <Route path="/signin" element={<SignIn />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route
+            path="/workspace"
+            element={
+              <ProtectedRoute>
+                <WorkspaceLauncher />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/workspace/multi"
             element={

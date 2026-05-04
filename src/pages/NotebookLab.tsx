@@ -638,7 +638,7 @@ export default function NotebookLab() {
 
             <section className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <Link to={workspaceRun ? getWorkspaceRoute(project, workspaceRun.technique, workspaceRun.datasetId) : getWorkspaceRoute(project)} className="rounded-md border border-border bg-surface p-3 text-sm font-semibold text-text-main hover:border-primary/40 transition-colors">
-                Open Workspace <ArrowRight size={14} className="inline ml-1" />
+                {workspaceRun ? `Open ${workspaceRun.technique} Analysis` : 'Open Workspace'} <ArrowRight size={14} className="inline ml-1" />
               </Link>
               <Link to={getAgentPath(project)} className="rounded-md border border-cyan/40 bg-surface p-3 text-sm font-semibold text-cyan hover:bg-cyan/10 transition-colors">
                 Run Agent <ArrowRight size={14} className="inline ml-1" />

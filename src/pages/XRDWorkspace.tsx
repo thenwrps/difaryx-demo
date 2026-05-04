@@ -21,6 +21,9 @@ import type { XrdAgentResult, XrdDetectedPeak } from '../agents/xrdAgent';
 import { useParameterPersistence } from '../hooks/useParameterPersistence';
 import { XRD_DEFAULT_PARAMETERS, getStepParameterDefinitions } from '../data/parameterDefinitions';
 import type { XrdParameters } from '../types/parameters';
+import { getWorkspaceEntryMode, getSampleDatasetName } from '../utils/workspaceEntry';
+import { DatasetInfoBar } from '../components/workspace/DatasetInfoBar';
+import { EmptyWorkspaceState } from '../components/workspace/EmptyWorkspaceState';
 
 function statusClass(status: 'complete' | 'warning' | 'error') {
   if (status === 'error') return 'border-red-500/30 bg-red-500/10 text-red-700';
@@ -53,6 +56,15 @@ function topCandidateRows(result: XrdAgentResult) {
 
 export default function XRDWorkspace() {
   const [searchParams, setSearchParams] = useSearchParams();
+  
+  // Entry mode detection
+  const entryMode = getWorkspaceEntryMode(searchParams, 'xrd');
+  
+  // Dataset state
+  const [hasDatasetLoaded, setHasDatasetLoaded] = useState(false);
+  const [datasetSource, setDatasetSource] = useState<'sample' | 'upload' | 'project' | null>(null);
+  const [datasetName, setDatasetName] = useState<string>('');
+  
   const project = getProject(searchParams.get('project'));
   const [selectedProjectId, setSelectedProjectId] = useState(project.id);
   const datasetFromQuery = getXrdDemoDataset(searchParams.get('dataset') ?? searchParams.get('xrdDataset'));
@@ -133,8 +145,58 @@ export default function XRDWorkspace() {
   useEffect(() => {
     setSelectedDatasetId(datasetFromQuery.id);
   }, [datasetFromQuery.id]);
+  
+  // Entry mode initialization
+  useEffect(() => {
+    if (!entryMode) {
+      // Project mode - use existing behavior
+      setHasDatasetLoaded(true);
+      setDatasetSource('project');
+      setDatasetName(datasetFromQuery.fileName);
+      return;
+    }
+
+    if (entryMode.mode === 'sample') {
+      // Auto-load sample dataset
+      const sampleName = getSampleDatasetName('xrd');
+      const sampleDataset = getXrdDemoDataset('xrd-cufe2o4-clean');
+      setSelectedDatasetId(sampleDataset.id);
+      setHasDatasetLoaded(true);
+      setDatasetSource('sample');
+      setDatasetName(sampleName);
+    } else if (entryMode.mode === 'upload') {
+      // Upload mode - do NOT auto-load anything
+      setHasDatasetLoaded(false);
+      setDatasetSource(null);
+    } else {
+      // Empty mode
+      setHasDatasetLoaded(false);
+      setDatasetSource(null);
+    }
+  }, [entryMode, datasetFromQuery.fileName, datasetFromQuery.id]);
 
   const selectedDataset = getXrdDemoDataset(selectedDatasetId);
+  
+  // Handlers for empty state
+  const handleLoadSample = () => {
+    const sampleName = getSampleDatasetName('xrd');
+    const sampleDataset = getXrdDemoDataset('xrd-cufe2o4-clean');
+    setSelectedDatasetId(sampleDataset.id);
+    setHasDatasetLoaded(true);
+    setDatasetSource('sample');
+    setDatasetName(sampleName);
+  };
+
+  const handleUploadDataset = () => {
+    // Upload functionality placeholder
+    // In a real implementation, this would:
+    // 1. Show file picker
+    // 2. Parse CSV/TXT/XY file
+    // 3. Validate data format
+    // 4. Load into workspace
+    // For now, show coming soon message
+    alert('File upload functionality coming soon. Please use "Load Sample Dataset" to try the workspace.');
+  };
   
   // Agent result (recomputes when dataset or parameters change in manual mode)
   const agentResult = useMemo(
@@ -265,7 +327,29 @@ export default function XRDWorkspace() {
 
   return (
     <DashboardLayout>
-      <div className="flex-1 h-full flex overflow-hidden bg-background">
+      {/* Show empty state when no dataset is loaded */}
+      {!hasDatasetLoaded && entryMode && (
+        <EmptyWorkspaceState
+          technique="XRD"
+          onLoadSample={handleLoadSample}
+          onUploadDataset={handleUploadDataset}
+        />
+      )}
+      
+      {/* Show workspace when dataset is loaded or in project mode */}
+      {(hasDatasetLoaded || !entryMode) && (
+      <div className="flex-1 h-full flex flex-col overflow-hidden bg-background">
+        {/* Dataset Info Bar */}
+        {datasetSource && (
+          <DatasetInfoBar
+            technique="XRD"
+            source={datasetSource}
+            datasetName={datasetName}
+            projectName={datasetSource === 'project' ? project.name : undefined}
+          />
+        )}
+        
+        <div className="flex-1 flex overflow-hidden">
         {/* LEFT SIDEBAR */}
         <aside className="w-72 border-r border-border bg-surface flex flex-col shrink-0">
           <div className="p-4 border-b border-border">
@@ -680,6 +764,8 @@ export default function XRDWorkspace() {
           </div>
         </aside>
       </div>
+      </div>
+      )}
       
       {/* Parameter Drawer */}
       <ParameterDrawer

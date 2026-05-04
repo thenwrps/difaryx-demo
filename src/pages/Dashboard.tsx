@@ -69,8 +69,8 @@ export default function Dashboard() {
             return (
             <Card 
               key={project.id} 
-              className="cursor-pointer hover:border-primary/50 transition-colors group flex flex-col"
-              onClick={() => navigate(project.techniques.length > 1 ? `/workspace/multi?project=${project.id}` : getWorkspaceRoute(project))}
+              className="cursor-pointer hover:border-primary/50 transition-colors group flex flex-col h-full"
+              onClick={() => navigate(`/workspace?project=${project.id}`)}
             >
               <div className="p-4 border-b border-border bg-surface-hover/30 flex justify-between items-start">
                 <div>
@@ -88,69 +88,74 @@ export default function Dashboard() {
                 <div className="h-[180px] mb-3">
                   <Graph type={currentTechnique.toLowerCase() as any} height="100%" showBackground={false} showCalculated={false} showResidual={false} showLegend={false} />
                 </div>
-                <p className="mt-3 line-clamp-2 text-xs text-text-muted leading-relaxed">{project.summary}</p>
-                <div className="mt-4 flex items-center justify-between">
-                  <div className="flex gap-1.5">
-                    {project.techniques.map(tag => (
-                      <button
-                        key={tag}
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setSelectedTechniques(prev => ({ ...prev, [project.id]: tag }));
-                        }}
-                        className={`px-2 py-0.5 border rounded text-[10px] font-medium uppercase tracking-wider transition-colors ${
-                          currentTechnique === tag
-                            ? 'bg-primary/10 border-primary/40 text-primary'
-                            : 'bg-surface border-border text-text-dim hover:border-primary/40 hover:text-primary'
-                        }`}
-                      >
-                        {tag}
-                      </button>
-                    ))}
+                <div className="flex-1 flex flex-col">
+                  <p className="mt-3 line-clamp-2 text-xs text-text-muted leading-relaxed">{project.summary}</p>
+                  <div className="mt-4 flex items-center justify-between">
+                    <div className="flex gap-1.5">
+                      {project.techniques.map(tag => (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setSelectedTechniques(prev => ({ ...prev, [project.id]: tag }));
+                          }}
+                          className={`px-2 py-0.5 border rounded text-[10px] font-medium uppercase tracking-wider transition-colors ${
+                            currentTechnique === tag
+                              ? 'bg-primary/10 border-primary/40 text-primary'
+                              : 'bg-surface border-border text-text-dim hover:border-primary/40 hover:text-primary'
+                          }`}
+                          title={`Preview ${tag}`}
+                        >
+                          {tag}
+                        </button>
+                      ))}
+                    </div>
+                    {project.status === 'In Progress' ? (
+                      <span className="text-xs text-cyan flex items-center gap-1">
+                        <div className="w-1.5 h-1.5 rounded-full bg-cyan animate-pulse" />
+                        In Progress
+                      </span>
+                    ) : (
+                      <span className="text-xs text-primary flex items-center gap-1">
+                        <FileText size={12} /> Report Ready
+                      </span>
+                    )}
                   </div>
-                  {project.status === 'In Progress' ? (
-                    <span className="text-xs text-cyan flex items-center gap-1">
-                      <div className="w-1.5 h-1.5 rounded-full bg-cyan animate-pulse" />
-                      In Progress
-                    </span>
-                  ) : (
-                    <span className="text-xs text-primary flex items-center gap-1">
-                      <FileText size={12} /> Report Ready
-                    </span>
-                  )}
                 </div>
-                <div className="mt-4 grid grid-cols-3 gap-2 border-t border-border pt-4">
+                <div className="mt-auto pt-4 flex items-center justify-between border-t border-border min-h-[52px]">
                   <Link
-                    to={getWorkspaceRoute(project)}
+                    to={`/workspace/${currentTechnique.toLowerCase()}?project=${project.id}`}
                     onClick={(event) => event.stopPropagation()}
-                    className="inline-flex h-8 items-center justify-center rounded-md bg-primary/10 px-2 text-[11px] font-semibold text-primary hover:bg-primary/20 transition-colors"
+                    className="inline-flex h-8 items-center justify-center rounded-md border border-primary bg-primary/10 px-3 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors whitespace-nowrap"
                   >
-                    Open Workspace
+                    Open {currentTechnique}
                   </Link>
-                  <Link
-                    to={getNotebookPath(project)}
-                    onClick={(event) => event.stopPropagation()}
-                    className="inline-flex h-8 items-center justify-center rounded-md border border-border px-2 text-[11px] font-semibold text-text-muted hover:text-text-main hover:bg-surface-hover transition-colors"
-                  >
-                    Open Notebook
-                  </Link>
-                  <Link
-                    to={getAgentPath(project)}
-                    onClick={(event) => event.stopPropagation()}
-                    className="inline-flex h-8 items-center justify-center rounded-md border border-cyan/40 px-2 text-[11px] font-semibold text-cyan hover:bg-cyan/10 transition-colors"
-                  >
-                    Run Agent
-                  </Link>
-                  {project.techniques.length > 1 && (
+                  <div className="flex items-center gap-3">
                     <Link
-                      to={`/workspace/multi?project=${project.id}`}
+                      to={getNotebookPath(project)}
                       onClick={(event) => event.stopPropagation()}
-                      className="col-span-3 inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-primary/30 bg-primary/5 px-2 text-[11px] font-semibold text-primary hover:bg-primary/10 transition-colors"
+                      className="inline-flex h-8 items-center justify-center text-xs font-medium text-text-muted hover:text-text-main transition-colors whitespace-nowrap"
                     >
-                      <Layers3 size={12} /> Open Multi-Tech Hub
+                      Notebook
                     </Link>
-                  )}
+                    <Link
+                      to={getAgentPath(project)}
+                      onClick={(event) => event.stopPropagation()}
+                      className="inline-flex h-8 items-center justify-center text-xs font-medium text-text-muted hover:text-text-main transition-colors whitespace-nowrap"
+                    >
+                      Agent
+                    </Link>
+                    {project.techniques.length > 1 && (
+                      <Link
+                        to={`/workspace/multi?project=${project.id}`}
+                        onClick={(event) => event.stopPropagation()}
+                        className="inline-flex h-8 items-center justify-center text-xs font-medium text-text-muted hover:text-text-main transition-colors whitespace-nowrap"
+                      >
+                        Multi-Tech
+                      </Link>
+                    )}
+                  </div>
                 </div>
               </div>
             </Card>
@@ -165,8 +170,8 @@ export default function Dashboard() {
             return (
               <Card
                 key={experiment.id}
-                className="cursor-pointer hover:border-primary/50 transition-colors group flex flex-col"
-                onClick={() => navigate(getWorkspaceRoute(project, workspaceTechnique, experiment.datasetIds[0]))}
+                className="cursor-pointer hover:border-primary/50 transition-colors group flex flex-col h-full"
+                onClick={() => navigate(`/workspace/${workspaceTechnique.toLowerCase()}?project=${project.id}`)}
               >
                 <div className="p-4 border-b border-border bg-primary/5 flex justify-between items-start">
                   <div>
@@ -184,48 +189,52 @@ export default function Dashboard() {
                   <div className="h-[180px] mb-3">
                     <Graph type={workspaceTechnique.toLowerCase() as any} height="100%" showBackground={false} showCalculated={false} showResidual={false} showLegend={false} />
                   </div>
-                  <p className="mt-3 line-clamp-2 text-xs text-text-muted leading-relaxed">{experiment.notes}</p>
-                  <div className="mt-4 flex items-center justify-between">
-                    <span className="px-2 py-0.5 bg-surface border border-border rounded text-[10px] font-medium text-text-dim uppercase tracking-wider">
-                      {experiment.technique}
-                    </span>
-                    <span className="text-xs text-primary flex items-center gap-1">
-                      <FileText size={12} /> Added dataset
-                    </span>
+                  <div className="flex-1 flex flex-col">
+                    <p className="mt-3 line-clamp-2 text-xs text-text-muted leading-relaxed">{experiment.notes}</p>
+                    <div className="mt-4 flex items-center justify-between">
+                      <span className="px-2 py-0.5 bg-surface border border-border rounded text-[10px] font-medium text-text-dim uppercase tracking-wider">
+                        {experiment.technique}
+                      </span>
+                      <span className="text-xs text-primary flex items-center gap-1">
+                        <FileText size={12} /> Added dataset
+                      </span>
+                    </div>
                   </div>
-                  <div className="mt-4 grid grid-cols-3 gap-2 border-t border-border pt-4">
+                  <div className="mt-auto pt-4 flex items-center justify-between border-t border-border min-h-[52px]">
                     <Link
-                      to={getWorkspaceRoute(project, workspaceTechnique, experiment.datasetIds[0])}
+                      to={`/workspace/${workspaceTechnique.toLowerCase()}?project=${project.id}`}
                       onClick={(event) => event.stopPropagation()}
-                      className="inline-flex h-8 items-center justify-center rounded-md bg-primary/10 px-2 text-[11px] font-semibold text-primary hover:bg-primary/20 transition-colors"
+                      className="inline-flex h-8 items-center justify-center rounded-md border border-primary bg-primary/10 px-3 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors whitespace-nowrap"
                     >
-                      Open Workspace
+                      Open {workspaceTechnique}
                     </Link>
-                    <Link
-                      to={getNotebookPath(project)}
-                      onClick={(event) => event.stopPropagation()}
-                      className="inline-flex h-8 items-center justify-center rounded-md border border-border px-2 text-[11px] font-semibold text-text-muted hover:text-text-main hover:bg-surface-hover transition-colors"
-                    >
-                      Open Notebook
-                    </Link>
-                    <Link
-                      to={getAgentPath(project)}
-                      onClick={(event) => event.stopPropagation()}
-                      className="inline-flex h-8 items-center justify-center rounded-md border border-cyan/40 px-2 text-[11px] font-semibold text-cyan hover:bg-cyan/10 transition-colors"
-                    >
-                      Run Agent
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setExperimentProjectId(project.id);
-                        setExperimentModalOpen(true);
-                      }}
-                      className="col-span-3 inline-flex h-8 items-center justify-center rounded-md border border-primary/30 bg-primary/5 px-2 text-[11px] font-semibold text-primary hover:bg-primary/10 transition-colors"
-                    >
-                      Add related dataset
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <Link
+                        to={getNotebookPath(project)}
+                        onClick={(event) => event.stopPropagation()}
+                        className="inline-flex h-8 items-center justify-center text-xs font-medium text-text-muted hover:text-text-main transition-colors whitespace-nowrap"
+                      >
+                        Notebook
+                      </Link>
+                      <Link
+                        to={getAgentPath(project)}
+                        onClick={(event) => event.stopPropagation()}
+                        className="inline-flex h-8 items-center justify-center text-xs font-medium text-text-muted hover:text-text-main transition-colors whitespace-nowrap"
+                      >
+                        Agent
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setExperimentProjectId(project.id);
+                          setExperimentModalOpen(true);
+                        }}
+                        className="inline-flex h-8 items-center justify-center text-xs font-medium text-text-muted hover:text-text-main transition-colors whitespace-nowrap"
+                      >
+                        Add Dataset
+                      </button>
+                    </div>
                   </div>
                 </div>
               </Card>

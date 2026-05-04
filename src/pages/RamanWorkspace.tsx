@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle,
   ArrowRight,
@@ -12,8 +12,21 @@ import { Graph } from '../components/ui/Graph';
 import { ParameterDrawer } from '../components/workspace/ParameterDrawer';
 import { ramanDemoData, RAMAN_DEMO_DATASETS, getRamanDemoDataset } from '../data/ramanDemoData';
 import { runRamanProcessing } from '../agents/ramanAgent/runner';
+import { getWorkspaceEntryMode, getSampleDatasetName } from '../utils/workspaceEntry';
+import { DatasetInfoBar } from '../components/workspace/DatasetInfoBar';
+import { EmptyWorkspaceState } from '../components/workspace/EmptyWorkspaceState';
 
 export default function RamanWorkspace() {
+  const [searchParams] = useSearchParams();
+  
+  // Entry mode detection
+  const entryMode = getWorkspaceEntryMode(searchParams, 'raman');
+  
+  // Dataset state
+  const [hasDatasetLoaded, setHasDatasetLoaded] = useState(false);
+  const [datasetSource, setDatasetSource] = useState<'sample' | 'upload' | 'project' | null>(null);
+  const [datasetName, setDatasetName] = useState<string>('');
+  
   const [activeTab, setActiveTab] = useState<'spectrum' | 'peakList' | 'modeAssignments'>('spectrum');
   const [selectedDatasetId, setSelectedDatasetId] = useState(ramanDemoData.id);
   
@@ -26,6 +39,50 @@ export default function RamanWorkspace() {
   
   // Get selected dataset
   const selectedDataset = getRamanDemoDataset(selectedDatasetId);
+  
+  // Entry mode initialization
+  useEffect(() => {
+    if (!entryMode) {
+      // Project mode - use existing behavior
+      setHasDatasetLoaded(true);
+      setDatasetSource('project');
+      setDatasetName(selectedDataset.fileName);
+      return;
+    }
+
+    if (entryMode.mode === 'sample') {
+      // Auto-load sample dataset
+      const sampleName = getSampleDatasetName('raman');
+      const sampleDataset = getRamanDemoDataset('raman-demo-001');
+      setSelectedDatasetId(sampleDataset.id);
+      setHasDatasetLoaded(true);
+      setDatasetSource('sample');
+      setDatasetName(sampleName);
+    } else if (entryMode.mode === 'upload') {
+      // Upload mode - do NOT auto-load anything
+      setHasDatasetLoaded(false);
+      setDatasetSource(null);
+    } else {
+      // Empty mode
+      setHasDatasetLoaded(false);
+      setDatasetSource(null);
+    }
+  }, [entryMode, selectedDataset.fileName]);
+  
+  // Handlers for empty state
+  const handleLoadSample = () => {
+    const sampleName = getSampleDatasetName('raman');
+    const sampleDataset = getRamanDemoDataset('raman-demo-001');
+    setSelectedDatasetId(sampleDataset.id);
+    setHasDatasetLoaded(true);
+    setDatasetSource('sample');
+    setDatasetName(sampleName);
+  };
+
+  const handleUploadDataset = () => {
+    // Upload functionality placeholder
+    alert('File upload functionality coming soon. Please use "Load Sample Dataset" to try the workspace.');
+  };
   
   // Run Raman processing with current parameters
   const processingResult = useMemo(() => {
@@ -161,7 +218,29 @@ export default function RamanWorkspace() {
 
   return (
     <DashboardLayout>
-      <div className="flex-1 h-full flex overflow-hidden bg-background">
+      {/* Show empty state when no dataset is loaded */}
+      {!hasDatasetLoaded && entryMode && (
+        <EmptyWorkspaceState
+          technique="RAMAN"
+          onLoadSample={handleLoadSample}
+          onUploadDataset={handleUploadDataset}
+        />
+      )}
+      
+      {/* Show workspace when dataset is loaded or in project mode */}
+      {(hasDatasetLoaded || !entryMode) && (
+      <div className="flex-1 h-full flex flex-col overflow-hidden bg-background">
+        {/* Dataset Info Bar */}
+        {datasetSource && (
+          <DatasetInfoBar
+            technique="RAMAN"
+            source={datasetSource}
+            datasetName={datasetName}
+            projectName={undefined}
+          />
+        )}
+        
+        <div className="flex-1 flex overflow-hidden">
         {/* LEFT SIDEBAR */}
         <aside className="w-72 border-r border-border bg-surface flex flex-col shrink-0">
           <div className="p-4 border-b border-border">
@@ -568,6 +647,8 @@ export default function RamanWorkspace() {
           </div>
         </aside>
       </div>
+      </div>
+      )}
       
       {/* Parameter Drawer */}
       <ParameterDrawer

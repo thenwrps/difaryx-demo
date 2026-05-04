@@ -53,7 +53,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
 
   const navItems = [
     { label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
-    { label: 'XRD Workspace', icon: FolderKanban, path: `/workspace/xrd?project=${DEFAULT_PROJECT_ID}` },
+    { label: 'Workspace', icon: FolderKanban, path: '/workspace' },
     { label: 'Multi-Tech', icon: FolderKanban, path: '/workspace/multi?project=cufe2o4-sba15' },
     { label: 'Notebook Lab', icon: BookOpen, path: `/notebook?project=${DEFAULT_PROJECT_ID}` },
     { label: 'Agent Mode', icon: Bot, path: `/demo/agent?project=${DEFAULT_PROJECT_ID}` },
@@ -184,7 +184,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                   <ChevronDown size={13} />
                 </button>
                 {isProfileOpen && (
-                  <div className="absolute right-0 top-10 z-50 w-64 rounded-lg border border-border bg-surface p-2 shadow-xl shadow-slate-900/10">
+                  <div className="absolute right-0 top-10 z-50 w-64 rounded-lg border border-border bg-white p-2 shadow-xl shadow-slate-900/10">
                     <div className="rounded-md border border-border bg-background px-3 py-2">
                       <p className="text-sm font-bold text-text-main">{profile.name ?? 'Demo Researcher'}</p>
                       <p className="mt-0.5 truncate text-xs text-text-muted">{profile.email ?? 'demo@difaryx.local'}</p>
