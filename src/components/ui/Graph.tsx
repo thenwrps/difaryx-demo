@@ -34,6 +34,7 @@ interface GraphProps {
   showCalculated?: boolean;
   showBackground?: boolean;
   showResidual?: boolean;
+  showLegend?: boolean;
   /** When provided, renders this data instead of internally generated data */
   externalData?: ExternalPoint[];
   /** Baseline curve to overlay */
@@ -345,6 +346,7 @@ export function Graph({
   showCalculated = true,
   showBackground = false,
   showResidual = true,
+  showLegend = true,
   externalData,
   baselineData,
   peakMarkers,
@@ -421,6 +423,7 @@ export function Graph({
               itemStyle={{ color: '#e2e8f0' }}
               labelStyle={{ color: '#cbd5e1' }}
             />
+            {showLegend && (
             <Legend
               formatter={(value, entry) => {
                 // Get technique-specific legend name or fall back to default
@@ -445,6 +448,7 @@ export function Graph({
               iconType="line"
               iconSize={24}
             />
+            )}
 
             {/* Reference peak sticks (ultra subtle, publication-ready) */}
             {markers.map((m, i) => (
@@ -573,6 +577,7 @@ export function Graph({
             itemStyle={{ color: '#e2e8f0' }}
             labelStyle={{ color: '#cbd5e1' }}
           />
+          {showLegend && (
           <Legend
             formatter={(value) => {
               // Get technique-specific legend name or fall back to default
@@ -588,6 +593,7 @@ export function Graph({
             iconType="line"
             iconSize={20}
           />
+          )}
 
           {showResidual && (
             <>

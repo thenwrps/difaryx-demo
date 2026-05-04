@@ -10,6 +10,7 @@ import {
   DEFAULT_PROJECT_ID,
   Technique,
   calculateDemoConfidence,
+  demoProjects,
   getAgentPath,
   getDatasetsByTechnique,
   getNotebookPath,
@@ -156,7 +157,24 @@ export default function MultiTechWorkspace() {
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-primary">Multi-Tech Hub</p>
-                <h1 className="text-base font-bold leading-tight tracking-tight text-text-main">{formatChemicalFormula(project.name)}</h1>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-xs font-semibold text-text-muted">Project:</span>
+                  <select
+                    value={project.id}
+                    onChange={(event) => {
+                      const newProjectId = event.target.value;
+                      searchParams.set('project', newProjectId);
+                      window.location.href = `/workspace/multi?${searchParams.toString()}`;
+                    }}
+                    className="rounded border border-border bg-background px-2 py-1 text-base font-bold leading-tight tracking-tight text-text-main outline-none hover:border-primary/40 focus:border-primary"
+                  >
+                    {demoProjects.map((proj) => (
+                      <option key={proj.id} value={proj.id}>
+                        {formatChemicalFormula(proj.name)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
               <div className="flex flex-wrap items-center gap-1.5">
                 <span className="rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
@@ -227,34 +245,7 @@ export default function MultiTechWorkspace() {
 
         <div className="grid grid-cols-1 gap-6 2xl:grid-cols-[1fr_360px]">
           <div className="space-y-6">
-            <Card className="p-2.5">
-              <div className="grid gap-2 lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:items-center">
-                <div className="min-w-[190px]">
-                  <div className="flex items-center gap-2">
-                    <Sparkles size={14} className="text-primary" />
-                    <h2 className="text-sm font-semibold">Evidence Output Panel</h2>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-1.5 md:grid-cols-4">
-                  {[
-                    ['XRD', 'Ready'],
-                    ['Raman', 'Ready'],
-                    ['FTIR', 'Ready'],
-                    ['XPS', 'Partial'],
-                  ].map(([technique, status]) => (
-                    <div key={technique} className="rounded-md border border-border bg-background px-2 py-1.5">
-                      <div className="text-[11px] font-semibold text-text-main">{technique}</div>
-                      <div className={`mt-0.5 text-[10px] font-semibold ${status === 'Partial' ? 'text-amber-500' : 'text-primary'}`}>{status}</div>
-                    </div>
-                  ))}
-                </div>
-                <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary lg:justify-self-end">
-                  Ready for fusion
-                </span>
-              </div>
-            </Card>
-
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
               {project.techniques.map((technique) => {
                 const techniqueDatasets = getDatasetsByTechnique(project.id, technique);
                 const dataset = techniqueDatasets[0];
@@ -270,7 +261,7 @@ export default function MultiTechWorkspace() {
                           {state.status}
                         </span>
                       </div>
-                      <p className="mt-2 min-h-[42px] text-xs text-text-muted">{techniqueClaims[technique]}</p>
+                      <p className="mt-2 text-xs text-text-muted">{techniqueClaims[technique]}</p>
                       <div className="mt-3 flex flex-wrap gap-1.5">
                         <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
                           Agent-compatible output
@@ -281,78 +272,18 @@ export default function MultiTechWorkspace() {
                       </div>
                     </div>
                     <div className="p-4">
-                      <div className="h-36 rounded-md border border-border bg-background p-2">
+                      <div className="h-48 rounded-md border border-border bg-background p-2">
                         <Graph
                           type={technique.toLowerCase() as 'xrd' | 'xps' | 'ftir' | 'raman'}
                           height="100%"
                           externalData={dataset?.dataPoints}
                           showCalculated={false}
                           showResidual={false}
+                          showLegend={false}
                         />
                       </div>
                       <div className="mt-3 text-xs text-text-muted">
                         <div className="font-semibold text-text-main">{dataset?.fileName ?? `${technique} demo spectrum`}</div>
-                        <div>{techniqueDatasets.length} dataset{techniqueDatasets.length === 1 ? '' : 's'} available / {state.confidence}% confidence</div>
-                      </div>
-                      <div className="mt-3 flex flex-wrap gap-1">
-                        {state.labels.length === 0 ? (
-                          <span className="rounded bg-background px-2 py-1 text-[10px] font-medium text-text-muted">raw preview</span>
-                        ) : (
-                          state.labels.map((label) => (
-                            <span key={label} className="rounded bg-primary/10 px-2 py-1 text-[10px] font-medium text-primary">
-                              {label}
-                            </span>
-                          ))
-                        )}
-                      </div>
-                      <div className="mt-4 rounded-md border border-border bg-background p-2">
-                        <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-text-muted">Demo processing controls</p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {hubControls[technique].map((control) => (
-                            <Button
-                              key={control}
-                              variant={state.labels.includes(control) ? 'primary' : 'outline'}
-                              size="sm"
-                              className="h-7 px-2 text-[10px]"
-                              onClick={() => applyHubControl(technique, control)}
-                            >
-                              {control}
-                            </Button>
-                          ))}
-                        </div>
-                        {technique === 'FTIR' && (
-                          <div className="mt-3 grid grid-cols-2 gap-2">
-                            <label className="text-[10px] font-medium text-text-muted">
-                              Offset
-                              <input
-                                type="range"
-                                min="-12"
-                                max="12"
-                                value={state.offset}
-                                onChange={(event) => updateFtirAdjustment('offset', Number(event.target.value))}
-                                className="mt-1 w-full"
-                              />
-                            </label>
-                            <label className="text-[10px] font-medium text-text-muted">
-                              Slope
-                              <input
-                                type="range"
-                                min="-8"
-                                max="8"
-                                value={state.slope}
-                                onChange={(event) => updateFtirAdjustment('slope', Number(event.target.value))}
-                                className="mt-1 w-full"
-                              />
-                            </label>
-                          </div>
-                        )}
-                        <div className="mt-3 space-y-1">
-                          {state.log.slice(0, 2).map((entry) => (
-                            <div key={entry} className="truncate rounded border border-border bg-surface px-2 py-1 text-[10px] text-text-muted">
-                              {entry}
-                            </div>
-                          ))}
-                        </div>
                       </div>
                       {evidenceCount > 0 && (
                         <p className="mt-2 text-[10px] font-semibold text-primary">{evidenceCount} saved evidence item{evidenceCount === 1 ? '' : 's'}</p>

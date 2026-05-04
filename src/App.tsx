@@ -11,6 +11,8 @@ import SettingsPage from "./pages/Settings";
 import SignIn from "./pages/SignIn";
 import XPSWorkspace from "./pages/XPSWorkspace";
 import FTIRWorkspace from "./pages/FTIRWorkspace";
+import RamanWorkspace from "./pages/RamanWorkspace";
+import FusionWorkspace from "./pages/FusionWorkspace";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 
@@ -44,6 +46,22 @@ function App() {
             element={
               <ProtectedRoute>
                 <FTIRWorkspace />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/workspace/raman"
+            element={
+              <ProtectedRoute>
+                <RamanWorkspace />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/workspace/fusion"
+            element={
+              <ProtectedRoute>
+                <FusionWorkspace />
               </ProtectedRoute>
             }
           />

@@ -10,12 +10,12 @@ import {
 import { DashboardLayout } from '../components/layout/DashboardLayout';
 import { Graph } from '../components/ui/Graph';
 import { ParameterDrawer } from '../components/workspace/ParameterDrawer';
-import { ftirDemoData, FTIR_DEMO_DATASETS, getFtirDemoDataset } from '../data/ftirDemoData';
-import { runFtirProcessing } from '../agents/ftirAgent/runner';
+import { ramanDemoData, RAMAN_DEMO_DATASETS, getRamanDemoDataset } from '../data/ramanDemoData';
+import { runRamanProcessing } from '../agents/ramanAgent/runner';
 
-export default function FTIRWorkspace() {
-  const [activeTab, setActiveTab] = useState<'spectrum' | 'bandList' | 'functionalGroups'>('spectrum');
-  const [selectedDatasetId, setSelectedDatasetId] = useState(ftirDemoData.id);
+export default function RamanWorkspace() {
+  const [activeTab, setActiveTab] = useState<'spectrum' | 'peakList' | 'modeAssignments'>('spectrum');
+  const [selectedDatasetId, setSelectedDatasetId] = useState(ramanDemoData.id);
   
   // Parameter state management
   const [autoMode, setAutoMode] = useState(true);
@@ -25,43 +25,65 @@ export default function FTIRWorkspace() {
   const [activeStep, setActiveStep] = useState<string | null>(null);
   
   // Get selected dataset
-  const selectedDataset = getFtirDemoDataset(selectedDatasetId);
+  const selectedDataset = getRamanDemoDataset(selectedDatasetId);
   
-  // Run FTIR processing with current parameters
+  // Run Raman processing with current parameters
   const processingResult = useMemo(() => {
-    return runFtirProcessing(selectedDataset);
+    return runRamanProcessing(selectedDataset);
   }, [selectedDataset, autoMode]);
   
-  // Convert processed FTIR data to graph format (x, y points)
-  const graphData = processingResult.signal.wavenumber.map((wn, i) => ({
-    x: wn,
-    y: processingResult.signal.absorbance[i],
+  // Convert processed Raman data to graph format (x, y points)
+  const graphData = processingResult.signal.ramanShift.map((rs, i) => ({
+    x: rs,
+    y: processingResult.signal.intensity[i],
   }));
   
   // Convert baseline to graph format
-  const baselineData = processingResult.signal.wavenumber.map((wn, i) => ({
-    x: wn,
+  const baselineData = processingResult.signal.ramanShift.map((rs, i) => ({
+    x: rs,
     y: processingResult.baseline[i],
   }));
   
-  // Convert bands to graph markers
-  const bandMarkers = processingResult.bands.map(band => ({
-    position: band.wavenumber,
-    intensity: band.intensity,
-    label: band.assignment || '',
+  // Convert peaks to graph markers
+  const peakMarkers = processingResult.peaks.map(peak => ({
+    position: peak.ramanShift,
+    intensity: peak.intensity,
+    label: peak.assignment || '',
   }));
   
   // Calculate summary statistics from processed results
-  const totalBands = processingResult.bands.length;
+  const totalPeaks = processingResult.peaks.length;
   
-  // Count unique matched bands (not total matches, since one band can match multiple references)
-  const uniqueMatchedBandIds = new Set(
-    processingResult.matches.map(match => match.observedBand.id)
+  // Count unique matched peaks (not total matches, since one peak can match multiple references)
+  const uniqueMatchedPeakIds = new Set(
+    processingResult.matches.map(match => match.observedPeak.id)
   );
-  const matchedBands = uniqueMatchedBandIds.size;
+  const matchedPeaks = uniqueMatchedPeakIds.size;
   
   const confidencePercent = processingResult.interpretation.confidenceScore.toFixed(1);
   const confidenceBadge = processingResult.interpretation.confidenceLevel;
+  
+  // Create ranked evidence list with strict hierarchy:
+  // 1. A1g first
+  // 2. Eg/T2g/Lower ferrite modes
+  // 3. Others (D/G carbon bands)
+  const rankedEvidence = [...processingResult.modeCandidate].sort((a, b) => {
+    const aIsA1g = a.modeName.includes('A1g');
+    const bIsA1g = b.modeName.includes('A1g');
+    const aIsSupporting = a.modeName.includes('Eg') || a.modeName.includes('T2g') || a.modeName.includes('Lower ferrite');
+    const bIsSupporting = b.modeName.includes('Eg') || b.modeName.includes('T2g') || b.modeName.includes('Lower ferrite');
+    
+    // A1g always first
+    if (aIsA1g && !bIsA1g) return -1;
+    if (!aIsA1g && bIsA1g) return 1;
+    
+    // Then supporting ferrite modes
+    if (aIsSupporting && !bIsSupporting) return -1;
+    if (!aIsSupporting && bIsSupporting) return 1;
+    
+    // Then by score
+    return b.score - a.score;
+  });
   
   // Handle Auto Mode toggle
   const handleAutoModeChange = (enabled: boolean) => {
@@ -97,7 +119,7 @@ export default function FTIRWorkspace() {
     // TODO: Handle parameter changes
   };
   
-  // Processing status for FTIR steps
+  // Processing status for Raman steps
   const processingStatus = [
     {
       id: 'baselineCorrection',
@@ -109,31 +131,31 @@ export default function FTIRWorkspace() {
       id: 'smoothing',
       label: 'Smoothing',
       status: 'complete' as const,
-      summary: autoMode ? 'Savitzky-Golay (window=9)' : 'Savitzky-Golay (window=9)'
+      summary: autoMode ? 'Moving Average (window=9)' : 'Moving Average (window=9)'
     },
     {
-      id: 'bandDetection',
-      label: 'Band Detection',
+      id: 'peakDetection',
+      label: 'Peak Detection',
       status: 'complete' as const,
-      summary: autoMode ? `${totalBands} bands detected` : `${totalBands} bands detected`
+      summary: autoMode ? `${totalPeaks} peaks detected` : `${totalPeaks} peaks detected`
     },
     {
-      id: 'bandAssignment',
-      label: 'Band Assignment',
+      id: 'modeAssignment',
+      label: 'Mode Assignment',
       status: 'complete' as const,
-      summary: autoMode ? `${matchedBands}/${totalBands} matched` : `${matchedBands}/${totalBands} matched`
+      summary: autoMode ? `${matchedPeaks}/${totalPeaks} matched` : `${matchedPeaks}/${totalPeaks} matched`
     },
     {
-      id: 'functionalGroupMatching',
-      label: 'Functional Group Matching',
+      id: 'phaseInterpretation',
+      label: 'Phase / Defect Interpretation',
       status: 'complete' as const,
       summary: autoMode ? 'Evidence aggregation' : 'Evidence aggregation'
     },
     {
-      id: 'interpretationSummary',
-      label: 'Interpretation Summary',
+      id: 'scientificSummary',
+      label: 'Scientific Summary',
       status: 'complete' as const,
-      summary: autoMode ? 'Scientific summary' : 'Scientific summary'
+      summary: autoMode ? 'Phase interpretation' : 'Phase interpretation'
     }
   ];
 
@@ -144,14 +166,14 @@ export default function FTIRWorkspace() {
         <aside className="w-72 border-r border-border bg-surface flex flex-col shrink-0">
           <div className="p-4 border-b border-border">
             <label className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">
-              FTIR Project
+              Raman Project
             </label>
             <select
               className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-text-main focus:outline-none focus:border-primary"
             >
               <option>Demo Project</option>
             </select>
-            <p className="mt-2 text-[10px] text-text-muted">Metal oxide catalyst</p>
+            <p className="mt-2 text-[10px] text-text-muted">Spinel ferrite catalyst</p>
           </div>
 
           <div className="p-4 border-b border-border">
@@ -163,7 +185,7 @@ export default function FTIRWorkspace() {
               onChange={(e) => setSelectedDatasetId(e.target.value)}
               className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-text-main focus:outline-none focus:border-primary"
             >
-              {FTIR_DEMO_DATASETS.map(dataset => (
+              {RAMAN_DEMO_DATASETS.map(dataset => (
                 <option key={dataset.id} value={dataset.id}>
                   {dataset.label}
                 </option>
@@ -253,29 +275,29 @@ export default function FTIRWorkspace() {
                     Spectrum
                   </button>
                   <button 
-                    onClick={() => setActiveTab('bandList')}
+                    onClick={() => setActiveTab('peakList')}
                     className={`px-2 py-1 text-[10px] font-semibold uppercase tracking-wider transition-colors flex items-center gap-1.5 ${
-                      activeTab === 'bandList' 
+                      activeTab === 'peakList' 
                         ? 'text-primary border-b-2 border-primary -mb-px' 
                         : 'text-text-muted hover:text-text-main'
                     }`}
                   >
-                    Band List
+                    Peak List
                     <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-primary/10 text-primary text-[9px] font-bold px-1">
-                      {totalBands}
+                      {totalPeaks}
                     </span>
                   </button>
                   <button 
-                    onClick={() => setActiveTab('functionalGroups')}
+                    onClick={() => setActiveTab('modeAssignments')}
                     className={`px-2 py-1 text-[10px] font-semibold uppercase tracking-wider transition-colors flex items-center gap-1.5 ${
-                      activeTab === 'functionalGroups' 
+                      activeTab === 'modeAssignments' 
                         ? 'text-primary border-b-2 border-primary -mb-px' 
                         : 'text-text-muted hover:text-text-main'
                     }`}
                   >
-                    Functional Groups
+                    Mode Assignments
                     <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-primary/10 text-primary text-[9px] font-bold px-1">
-                      {matchedBands}/{totalBands}
+                      {matchedPeaks}/{totalPeaks}
                     </span>
                   </button>
                 </div>
@@ -285,20 +307,20 @@ export default function FTIRWorkspace() {
                   <>
                     <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2 bg-surface/20">
                       <div>
-                        <h3 className="text-[10px] font-semibold uppercase tracking-wider text-text-main">FTIR Spectrum</h3>
-                        <p className="text-[9px] text-text-muted mt-0.5">Absorbance vs. Wavenumber with baseline correction</p>
+                        <h3 className="text-[10px] font-semibold uppercase tracking-wider text-text-main">Raman Spectrum</h3>
+                        <p className="text-[9px] text-text-muted mt-0.5">Intensity vs. Raman Shift with baseline correction</p>
                       </div>
-                      <span className="text-[9px] font-mono text-text-muted tabular-nums">Mid-IR (400-4000 cm⁻¹)</span>
+                      <span className="text-[9px] font-mono text-text-muted tabular-nums">100-2000 cm⁻¹</span>
                     </div>
                     
                     {/* Graph */}
                     <div className="h-[420px] w-full min-w-0 px-2 py-2">
                       <Graph
-                        type="ftir"
+                        type="raman"
                         height="100%"
                         externalData={graphData}
                         baselineData={baselineData}
-                        peakMarkers={bandMarkers}
+                        peakMarkers={peakMarkers}
                         showBackground
                         showCalculated={false}
                         showResidual={false}
@@ -307,25 +329,25 @@ export default function FTIRWorkspace() {
                     
                     <div className="mx-3 mb-2 flex items-center gap-2 text-[10px] text-text-muted bg-surface/40 rounded px-2 py-1.5 border border-border/50">
                       <CheckCircle2 size={12} className="text-primary shrink-0" />
-                      <span>{totalBands} bands detected and assigned to functional groups.</span>
+                      <span>{totalPeaks} peaks detected and assigned to vibrational modes.</span>
                     </div>
                   </>
                 )}
                 
-                {activeTab === 'bandList' && (
+                {activeTab === 'peakList' && (
                   <div className="p-3 space-y-3">
-                    {/* Detected Bands Table */}
+                    {/* Detected Peaks Table */}
                     <div className="border border-border/40 bg-surface/50 rounded">
                       <div className="px-3 py-2 border-b border-border/30 bg-surface/20">
-                        <h3 className="text-sm font-semibold text-text-main">Detected Bands ({totalBands})</h3>
-                        <p className="text-[10px] text-text-muted mt-0.5">Band positions, FWHM, and functional group assignments</p>
+                        <h3 className="text-sm font-semibold text-text-main">Detected Peaks ({totalPeaks})</h3>
+                        <p className="text-[10px] text-text-muted mt-0.5">Peak positions, FWHM, and mode assignments</p>
                       </div>
                       <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
                         <table className="w-full">
                           <thead className="text-[10px] uppercase tracking-wide text-text-muted bg-surface/10 sticky top-0">
                             <tr>
                               <th className="text-center px-3 py-2 font-medium">#</th>
-                              <th className="text-right px-3 py-2 font-medium">Wavenumber <span className="text-[8px]">(cm⁻¹)</span></th>
+                              <th className="text-right px-3 py-2 font-medium">Raman Shift <span className="text-[8px]">(cm⁻¹)</span></th>
                               <th className="text-right px-3 py-2 font-medium">Intensity</th>
                               <th className="text-right px-3 py-2 font-medium">FWHM <span className="text-[8px]">(cm⁻¹)</span></th>
                               <th className="text-right px-3 py-2 font-medium">Area</th>
@@ -333,14 +355,14 @@ export default function FTIRWorkspace() {
                             </tr>
                           </thead>
                           <tbody>
-                            {processingResult.bands.map((band, index) => (
-                              <tr key={band.id} className="border-t border-border/20 hover:bg-surface/10">
+                            {processingResult.peaks.map((peak, index) => (
+                              <tr key={peak.id} className="border-t border-border/20 hover:bg-surface/10">
                                 <td className="px-3 py-2 text-center text-text-muted text-sm tabular-nums">{index + 1}</td>
-                                <td className="px-3 py-2 font-mono text-right text-text-main text-sm font-medium tabular-nums">{band.wavenumber.toFixed(0)}</td>
-                                <td className="px-3 py-2 font-mono text-right text-text-main text-sm font-medium tabular-nums">{band.intensity.toFixed(2)}</td>
-                                <td className="px-3 py-2 font-mono text-right text-text-main text-sm font-medium tabular-nums">{band.fwhm.toFixed(0)}</td>
-                                <td className="px-3 py-2 font-mono text-right text-text-main text-sm font-medium tabular-nums">{band.area.toFixed(1)}</td>
-                                <td className="px-3 py-2 font-mono text-left text-primary text-sm font-medium">{band.assignment || '-'}</td>
+                                <td className="px-3 py-2 font-mono text-right text-text-main text-sm font-medium tabular-nums">{peak.ramanShift.toFixed(0)}</td>
+                                <td className="px-3 py-2 font-mono text-right text-text-main text-sm font-medium tabular-nums">{peak.intensity.toFixed(2)}</td>
+                                <td className="px-3 py-2 font-mono text-right text-text-main text-sm font-medium tabular-nums">{peak.fwhm.toFixed(0)}</td>
+                                <td className="px-3 py-2 font-mono text-right text-text-main text-sm font-medium tabular-nums">{peak.area.toFixed(1)}</td>
+                                <td className="px-3 py-2 font-mono text-left text-primary text-sm font-medium">{peak.assignment || '-'}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -357,24 +379,24 @@ export default function FTIRWorkspace() {
                       <div className="px-3 py-3">
                         <div className="grid grid-cols-3 gap-4">
                           <div className="space-y-1">
-                            <span className="text-[10px] uppercase tracking-wide text-text-muted block">BANDS</span>
-                            <span className="text-lg font-semibold text-text-main tabular-nums block">{totalBands}</span>
+                            <span className="text-[10px] uppercase tracking-wide text-text-muted block">PEAKS</span>
+                            <span className="text-lg font-semibold text-text-main tabular-nums block">{totalPeaks}</span>
                           </div>
                           <div className="space-y-1">
                             <span className="text-[10px] uppercase tracking-wide text-text-muted block">MATCHED</span>
-                            <span className="text-lg font-semibold text-text-main tabular-nums block">{matchedBands}/{totalBands}</span>
+                            <span className="text-lg font-semibold text-text-main tabular-nums block">{matchedPeaks}/{totalPeaks}</span>
                           </div>
                           <div className="space-y-1">
                             <span className="text-[10px] uppercase tracking-wide text-text-muted block">UNASSIGNED</span>
-                            <span className={`text-lg font-semibold tabular-nums block ${totalBands - matchedBands > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>{totalBands - matchedBands}</span>
+                            <span className={`text-lg font-semibold tabular-nums block ${totalPeaks - matchedPeaks > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>{totalPeaks - matchedPeaks}</span>
                           </div>
                           <div className="space-y-1">
                             <span className="text-[10px] uppercase tracking-wide text-text-muted block">SNR</span>
-                            <span className="text-lg font-semibold text-emerald-600 tabular-nums block">28.5 dB</span>
+                            <span className="text-lg font-semibold text-emerald-600 tabular-nums block">32.0 dB</span>
                           </div>
                           <div className="space-y-1">
                             <span className="text-[10px] uppercase tracking-wide text-text-muted block">DATA POINTS</span>
-                            <span className="text-lg font-semibold text-text-main tabular-nums block">{processingResult.signal.wavenumber.length}</span>
+                            <span className="text-lg font-semibold text-text-main tabular-nums block">{processingResult.signal.ramanShift.length}</span>
                           </div>
                           <div className="space-y-1">
                             <span className="text-[10px] uppercase tracking-wide text-text-muted block">CONFIDENCE</span>
@@ -386,37 +408,37 @@ export default function FTIRWorkspace() {
                   </div>
                 )}
                 
-                {activeTab === 'functionalGroups' && (
+                {activeTab === 'modeAssignments' && (
                   <div className="p-3">
                     <div className="border border-border/40 bg-surface/50 rounded">
                       <div className="px-3 py-2 border-b border-border/30 bg-surface/20">
-                        <h3 className="text-sm font-semibold text-text-main">Functional Group Matching ({processingResult.functionalGroupCandidates.length})</h3>
-                        <p className="text-[10px] text-text-muted mt-0.5">Comparison with reference wavenumber ranges</p>
+                        <h3 className="text-sm font-semibold text-text-main">Mode Assignments ({processingResult.modeCandidate.length})</h3>
+                        <p className="text-[10px] text-text-muted mt-0.5">Vibrational mode identification and phase matching</p>
                       </div>
                       <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
                         <table className="w-full">
                           <thead className="text-[10px] uppercase tracking-wide text-text-muted bg-surface/10 sticky top-0">
                             <tr>
-                              <th className="text-left px-3 py-2 font-medium">Functional Group</th>
+                              <th className="text-left px-3 py-2 font-medium">Mode</th>
                               <th className="text-left px-3 py-2 font-medium">Assignment</th>
-                              <th className="text-right px-3 py-2 font-medium">Wavenumber <span className="text-[8px]">(cm⁻¹)</span></th>
+                              <th className="text-right px-3 py-2 font-medium">Raman Shift <span className="text-[8px]">(cm⁻¹)</span></th>
                               <th className="text-right px-3 py-2 font-medium">Conf.</th>
-                              <th className="text-left px-3 py-2 font-medium">Ambiguity</th>
+                              <th className="text-left px-3 py-2 font-medium">Type</th>
                             </tr>
                           </thead>
                           <tbody>
-                            {processingResult.functionalGroupCandidates.map((candidate, index) => (
+                            {processingResult.modeCandidate.map((candidate, index) => (
                               <tr key={index} className="border-t border-border/20 hover:bg-surface/10">
-                                <td className="px-3 py-2 font-mono text-left text-primary text-sm font-medium">{candidate.functionalGroup}</td>
+                                <td className="px-3 py-2 font-mono text-left text-primary text-sm font-medium">{candidate.modeName}</td>
                                 <td className="px-3 py-2 text-left text-text-main text-sm">{candidate.assignment}</td>
                                 <td className="px-3 py-2 font-mono text-right text-text-main text-sm font-medium tabular-nums">
-                                  {candidate.matches[0]?.observedBand.wavenumber.toFixed(0) || '-'}
+                                  {candidate.matches[0]?.observedPeak.ramanShift.toFixed(0) || '-'}
                                 </td>
                                 <td className="px-3 py-2 font-mono text-right text-emerald-600 text-sm font-medium tabular-nums">
                                   {(candidate.score * 100).toFixed(0)}%
                                 </td>
-                                <td className="px-3 py-2 text-left text-amber-600 text-sm">
-                                  {candidate.ambiguity || '-'}
+                                <td className="px-3 py-2 text-left text-text-muted text-sm">
+                                  {candidate.phaseType}
                                 </td>
                               </tr>
                             ))}
@@ -449,41 +471,39 @@ export default function FTIRWorkspace() {
                 </span>
               </div>
 
-              <div className="space-y-1.5">
                 <div>
-                  <p className="text-[9px] font-semibold uppercase tracking-wide text-text-muted mb-0.5">Dominant Functional Groups</p>
-                  <p className="text-xs font-bold text-text-main">{processingResult.interpretation.dominantFunctionalGroups.slice(0, 2).join(', ')}</p>
+                  <p className="text-[9px] font-semibold uppercase tracking-wide text-text-muted mb-0.5">Dominant Modes</p>
+                  <p className="text-xs font-bold text-text-main">{processingResult.interpretation.dominantModes.slice(0, 2).join(', ')}</p>
                 </div>
 
                 <div>
-                  <p className="text-[9px] font-semibold uppercase tracking-wide text-text-muted mb-0.5">Chemical Interpretation</p>
-                  <p className="text-[10px] text-text-main">{processingResult.interpretation.chemicalInterpretation}</p>
+                  <p className="text-[9px] font-semibold uppercase tracking-wide text-text-muted mb-0.5">Phase Interpretation</p>
+                  <p className="text-[10px] text-text-main">{processingResult.interpretation.phaseInterpretation}</p>
                 </div>
 
                 <div>
                   <p className="text-[9px] font-semibold uppercase tracking-wide text-text-muted mb-0.5">Reliability</p>
-                  <p className="text-[10px] text-text-main tabular-nums">{matchedBands}/{totalBands} matched, {totalBands - matchedBands} unassigned</p>
+                  <p className="text-[10px] text-text-main tabular-nums">{matchedPeaks}/{totalPeaks} matched, {totalPeaks - matchedPeaks} unassigned</p>
                 </div>
-              </div>
             </div>
 
             {/* EVIDENCE SNAPSHOT */}
             <div className="border border-border/40 bg-surface/50 px-2 py-1.5">
               <h3 className="text-[10px] font-semibold uppercase tracking-wide mb-1">Evidence (Top 3)</h3>
               <div className="space-y-1">
-                {processingResult.functionalGroupCandidates.slice(0, 3).map((candidate, index) => {
-                  const band = candidate.matches[0]?.observedBand;
-                  if (!band) return null;
+                {rankedEvidence.slice(0, 3).map((candidate, index) => {
+                  const peak = candidate.matches[0]?.observedPeak;
+                  if (!peak) return null;
                   return (
                     <div key={index} className="bg-background/50 p-1 rounded">
                       <div className="flex items-start justify-between gap-2 mb-0.5">
                         <span className="text-[9px] font-semibold text-text-muted uppercase tracking-wide">#{index + 1}</span>
-                        <span className="text-[10px] font-mono text-emerald-600 tabular-nums">{candidate.functionalGroup}</span>
+                        <span className="text-[10px] font-mono text-emerald-600 tabular-nums">{candidate.modeName}</span>
                       </div>
                       <div className="grid grid-cols-3 gap-1 text-[10px]">
                         <div>
-                          <span className="text-text-muted text-[8px] uppercase">Wavenumber</span>
-                          <div className="font-mono font-semibold text-text-main tabular-nums">{band.wavenumber.toFixed(0)} cm⁻¹</div>
+                          <span className="text-text-muted text-[8px] uppercase">Raman Shift</span>
+                          <div className="font-mono font-semibold text-text-main tabular-nums">{peak.ramanShift.toFixed(0)} cm⁻¹</div>
                         </div>
                         <div>
                           <span className="text-text-muted text-[8px] uppercase">Δcm⁻¹</span>
@@ -491,7 +511,7 @@ export default function FTIRWorkspace() {
                         </div>
                         <div>
                           <span className="text-text-muted text-[8px] uppercase">Int</span>
-                          <div className="font-semibold text-text-main tabular-nums">{band.intensity.toFixed(2)}</div>
+                          <div className="font-semibold text-text-main tabular-nums">{peak.intensity.toFixed(2)}</div>
                         </div>
                       </div>
                     </div>
@@ -507,7 +527,7 @@ export default function FTIRWorkspace() {
                 <div className="space-y-0.5">
                   <div className="flex items-start gap-1 text-[10px]">
                     <CheckCircle2 size={10} className="mt-0.5 shrink-0 text-emerald-600" />
-                    <span className="text-text-main leading-tight">Raman for vibrational modes</span>
+                    <span className="text-text-main leading-tight">FTIR for functional groups</span>
                   </div>
                   <div className="flex items-start gap-1 text-[10px]">
                     <CheckCircle2 size={10} className="mt-0.5 shrink-0 text-emerald-600" />
@@ -563,7 +583,7 @@ export default function FTIRWorkspace() {
         onApply={handleApplyParameters}
         onReset={handleResetParameters}
         validationErrors={{}}
-        previewImpact="Adjust parameters to fine-tune the FTIR processing step."
+        previewImpact="Adjust parameters to fine-tune the Raman processing step."
       />
     </DashboardLayout>
   );

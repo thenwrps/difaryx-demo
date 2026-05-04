@@ -26,10 +26,7 @@ export default function Dashboard() {
   const [localExperiments, setLocalExperiments] = useState<DemoExperiment[]>([]);
   const [experimentModalOpen, setExperimentModalOpen] = useState(false);
   const [experimentProjectId, setExperimentProjectId] = useState(DEFAULT_PROJECT_ID);
-  const [agentGoal, setAgentGoal] = useState(
-    'Determine whether the ferrite spinel phase formed and whether the evidence supports catalytic activation.',
-  );
-  const [agentMode, setAgentMode] = useState('Deep Analysis');
+  const [selectedTechniques, setSelectedTechniques] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const timer = window.setTimeout(() => setIsInitializing(false), 1400);
@@ -41,89 +38,6 @@ export default function Dashboard() {
     <>
     <DashboardLayout>
       <div className="p-4 h-full overflow-y-auto">
-        <section className="mb-3">
-          <Card className="border-primary/20 bg-gradient-to-br from-primary/10 via-surface to-surface p-2.5">
-            <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-primary/20 bg-primary/10 text-primary">
-                    <Sparkles size={14} />
-                  </span>
-                  <div>
-                    <h2 className="text-base font-bold tracking-tight text-text-main">DIFARYX Scientific Agent</h2>
-                    <p className="text-[11px] text-text-muted">Plan, execute, and validate multi-technique characterization workflows</p>
-                  </div>
-                </div>
-                <div className="mt-1.5 rounded-md border border-primary/15 bg-background/60 px-2.5 py-1">
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">Project</span>
-                  <span className="ml-2 text-xs font-semibold text-text-main">{formatChemicalFormula('CuFe2O4')} Spinel Formation</span>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => navigate('/demo/agent?project=cu-fe2o4-spinel')}
-                className="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-md bg-gradient-to-r from-blue-600 to-indigo-600 px-3 text-xs font-semibold text-white shadow-md shadow-blue-600/15 transition-all hover:-translate-y-0.5 hover:shadow-indigo-600/20"
-              >
-                <Sparkles size={14} /> Run Autonomous Agent
-              </button>
-            </div>
-
-            <div className="mt-2 grid grid-cols-1 gap-2 lg:grid-cols-[1fr_260px]">
-              <label className="block">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">Goal input</span>
-                <textarea
-                  value={agentGoal}
-                  onChange={(event) => setAgentGoal(event.target.value)}
-                  className="mt-1 h-8 w-full resize-none rounded-md border border-border bg-background px-2.5 py-1 text-xs text-text-main outline-none transition-colors focus:border-primary"
-                />
-              </label>
-              <div>
-                <div className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">Mode selector</div>
-                <div className="mt-1 grid grid-cols-3 gap-1">
-                  {['Quick Insight', 'Deep Analysis', 'Autonomous Workflow'].map((mode) => (
-                    <button
-                      key={mode}
-                      type="button"
-                      onClick={() => setAgentMode(mode)}
-                      className={`rounded-md border px-2 py-1 text-center text-[10px] font-semibold transition-colors ${
-                        agentMode === mode
-                          ? 'border-primary/40 bg-primary/10 text-primary'
-                          : 'border-border bg-background text-text-muted hover:border-primary/30 hover:text-text-main'
-                      }`}
-                    >
-                      {mode}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-2 flex flex-col gap-2 border-t border-border/70 pt-2 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
-                <span className="font-semibold uppercase tracking-wider text-text-muted">Readiness</span>
-                {[
-                  ['XRD', 'Ready'],
-                  ['Raman', 'Ready'],
-                  ['FTIR', 'Ready'],
-                  ['XPS', 'Partial'],
-                ].map(([technique, status]) => (
-                  <span key={technique} className="rounded-full border border-border bg-background px-2 py-0.5 font-semibold text-text-main">
-                    {technique} <span className={status === 'Partial' ? 'text-amber-500' : 'text-primary'}>{status}</span>
-                  </span>
-                ))}
-              </div>
-              <div className="flex flex-wrap items-center gap-2 text-[11px] text-text-muted">
-                <span>
-                  Recent: <span className="font-semibold text-text-main">Spinel phase formation</span> / <span className="font-semibold text-primary">High confidence</span> / Report-ready
-                </span>
-                <Link to="/history" className="font-semibold text-primary hover:text-cyan">
-                  View History
-                </Link>
-              </div>
-            </div>
-          </Card>
-        </section>
-
         <div className="flex justify-between items-center mb-4">
           <div>
             <h1 className="text-xl font-bold tracking-tight">Project Dashboard</h1>
@@ -135,9 +49,6 @@ export default function Dashboard() {
                 {feedback}
               </span>
             )}
-            <Button variant="secondary" className="gap-2 border-primary/30 text-primary hover:bg-primary/10" onClick={() => navigate(`/demo/agent?project=${DEFAULT_PROJECT_ID}`)}>
-              <Sparkles size={16} /> Run Autonomous Agent
-            </Button>
             <Button
               variant="primary"
               className="gap-2"
@@ -152,10 +63,13 @@ export default function Dashboard() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {demoProjects.map((project) => (
+          {demoProjects.map((project) => {
+            const currentTechnique = selectedTechniques[project.id] || project.techniques[0];
+            
+            return (
             <Card 
               key={project.id} 
-              className="cursor-pointer hover:border-primary/50 transition-colors group flex flex-col min-h-[300px]"
+              className="cursor-pointer hover:border-primary/50 transition-colors group flex flex-col"
               onClick={() => navigate(project.techniques.length > 1 ? `/workspace/multi?project=${project.id}` : getWorkspaceRoute(project))}
             >
               <div className="p-4 border-b border-border bg-surface-hover/30 flex justify-between items-start">
@@ -170,22 +84,29 @@ export default function Dashboard() {
                   <div className="text-[10px] text-text-muted uppercase tracking-wider">confidence</div>
                 </div>
               </div>
-              <div className="flex-1 p-4 flex flex-col justify-between">
-                <div className="flex-1 pointer-events-none opacity-80 group-hover:opacity-100 transition-opacity">
-                  <Graph type={project.techniques[0].toLowerCase() as any} height={100} showBackground={false} showCalculated={false} showResidual={false} />
+              <div className="flex-1 p-4 flex flex-col">
+                <div className="h-[180px] mb-3">
+                  <Graph type={currentTechnique.toLowerCase() as any} height="100%" showBackground={false} showCalculated={false} showResidual={false} showLegend={false} />
                 </div>
                 <p className="mt-3 line-clamp-2 text-xs text-text-muted leading-relaxed">{project.summary}</p>
                 <div className="mt-4 flex items-center justify-between">
                   <div className="flex gap-1.5">
                     {project.techniques.map(tag => (
-                      <Link
+                      <button
                         key={tag}
-                        to={getWorkspaceRoute(project, tag)}
-                        onClick={(event) => event.stopPropagation()}
-                        className="px-2 py-0.5 bg-surface border border-border rounded text-[10px] font-medium text-text-dim uppercase tracking-wider hover:border-primary/40 hover:text-primary transition-colors"
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setSelectedTechniques(prev => ({ ...prev, [project.id]: tag }));
+                        }}
+                        className={`px-2 py-0.5 border rounded text-[10px] font-medium uppercase tracking-wider transition-colors ${
+                          currentTechnique === tag
+                            ? 'bg-primary/10 border-primary/40 text-primary'
+                            : 'bg-surface border-border text-text-dim hover:border-primary/40 hover:text-primary'
+                        }`}
                       >
                         {tag}
-                      </Link>
+                      </button>
                     ))}
                   </div>
                   {project.status === 'In Progress' ? (
@@ -233,7 +154,8 @@ export default function Dashboard() {
                 </div>
               </div>
             </Card>
-          ))}
+            );
+          })}
           {localExperiments.map((experiment) => {
             const project = getProject(experiment.projectId);
             const workspaceTechnique = project.techniques.includes(experiment.technique)
@@ -243,7 +165,7 @@ export default function Dashboard() {
             return (
               <Card
                 key={experiment.id}
-                className="cursor-pointer hover:border-primary/50 transition-colors group flex flex-col min-h-[300px]"
+                className="cursor-pointer hover:border-primary/50 transition-colors group flex flex-col"
                 onClick={() => navigate(getWorkspaceRoute(project, workspaceTechnique, experiment.datasetIds[0]))}
               >
                 <div className="p-4 border-b border-border bg-primary/5 flex justify-between items-start">
@@ -258,9 +180,9 @@ export default function Dashboard() {
                     <div className="text-[10px] text-text-muted uppercase tracking-wider">local</div>
                   </div>
                 </div>
-                <div className="flex-1 p-4 flex flex-col justify-between">
-                  <div className="flex-1 pointer-events-none opacity-80 group-hover:opacity-100 transition-opacity">
-                    <Graph type={workspaceTechnique.toLowerCase() as any} height={100} showBackground={false} showCalculated={false} showResidual={false} />
+                <div className="flex-1 p-4 flex flex-col">
+                  <div className="h-[180px] mb-3">
+                    <Graph type={workspaceTechnique.toLowerCase() as any} height="100%" showBackground={false} showCalculated={false} showResidual={false} showLegend={false} />
                   </div>
                   <p className="mt-3 line-clamp-2 text-xs text-text-muted leading-relaxed">{experiment.notes}</p>
                   <div className="mt-4 flex items-center justify-between">

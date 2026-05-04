@@ -20,7 +20,7 @@ export default function SignIn() {
   // Get the page they were trying to access, or default to dashboard
   const from = (location.state as any)?.from?.pathname || '/dashboard';
 
-  const enterDemo = (profile = { name: 'Demo Researcher', email: 'demo@difaryx.local', organization: 'DIFARYX Demo Lab' }) => {
+  const enterDemo = (profile = { name: 'Researcher', email: 'user@difaryx.local', organization: 'DIFARYX Lab' }) => {
     signIn(profile);
     navigate(from, { replace: true });
   };
@@ -28,26 +28,26 @@ export default function SignIn() {
   const handleEmailSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!email.trim() || !password.trim()) {
-      setEmailError('Enter an email and password to continue in demo mode.');
+      setEmailError('Enter an email and password to continue.');
       return;
     }
     enterDemo({
-      name: email.split('@')[0] || 'Demo Researcher',
+      name: email.split('@')[0] || 'Researcher',
       email: email.trim(),
-      organization: 'DIFARYX Demo Lab',
+      organization: 'DIFARYX Lab',
     });
   };
 
   const handleCreateSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!name.trim() || !email.trim() || !password.trim()) {
-      setEmailError('Enter a name, email, and password to create a demo account.');
+      setEmailError('Enter a name, email, and password to create an account.');
       return;
     }
     enterDemo({
       name: name.trim(),
       email: email.trim(),
-      organization: organization.trim() || 'DIFARYX Demo Lab',
+      organization: organization.trim() || 'DIFARYX Lab',
     });
   };
 
@@ -64,7 +64,7 @@ export default function SignIn() {
             <div className="mb-7 text-center">
               <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">DIFARYX</p>
               <span className="mb-3 inline-flex rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-blue-700">
-                Demo authentication
+                Authentication
               </span>
               <h1 className="text-4xl font-extrabold tracking-tight text-slate-950">Enter DIFARYX</h1>
               <p className="mt-3 text-sm leading-6 text-slate-500">
@@ -80,7 +80,7 @@ export default function SignIn() {
                       variant="outline"
                       className="h-12 w-full justify-center gap-3 border-slate-200 bg-white text-base font-semibold text-slate-800 hover:border-blue-300 hover:bg-blue-50/60"
                       onClick={() => {
-                        enterDemo({ name: 'Demo Researcher', email: 'demo@difaryx.local', organization: 'DIFARYX Demo Lab' });
+                        enterDemo({ name: 'Researcher', email: 'user@difaryx.local', organization: 'DIFARYX Lab' });
                       }}
                     >
                       <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
@@ -89,7 +89,7 @@ export default function SignIn() {
                         <path d="M5.26498 14.2949C5.02498 13.5699 4.88501 12.7999 4.88501 11.9999C4.88501 11.1999 5.01998 10.4299 5.26498 9.7049L1.275 6.60986C0.46 8.22986 0 10.0599 0 11.9999C0 13.9399 0.46 15.7699 1.28 17.3899L5.26498 14.2949Z" fill="#FBBC05" />
                         <path d="M12.0004 24.0001C15.2404 24.0001 17.9654 22.935 19.9454 21.095L16.0804 18.095C15.0054 18.82 13.6204 19.245 12.0004 19.245C8.8704 19.245 6.21537 17.135 5.26537 14.29L1.27539 17.385C3.25539 21.31 7.3104 24.0001 12.0004 24.0001Z" fill="#34A853" />
                       </svg>
-                      Continue with Google (Demo)
+                      Continue with Google
                     </Button>
 
                     <Button
@@ -119,7 +119,7 @@ export default function SignIn() {
                     >
                       <span className="flex items-center gap-3">
                         <UserRound size={18} />
-                        Create demo account
+                        Create account
                       </span>
                       <ArrowRight size={18} className="text-slate-400" />
                     </Button>
@@ -130,7 +130,7 @@ export default function SignIn() {
                     >
                       <span className="flex items-center gap-3">
                         <UserRound size={18} />
-                        Continue as Guest / Demo Researcher
+                        Continue as Guest / Researcher
                       </span>
                       <ArrowRight size={18} />
                     </Button>
@@ -155,7 +155,7 @@ export default function SignIn() {
                         type="text"
                         value={name}
                         onChange={(event) => setName(event.target.value)}
-                        placeholder="Demo Researcher"
+                        placeholder="Researcher"
                         className="mt-2 h-11 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                       />
                     </label>
@@ -175,7 +175,7 @@ export default function SignIn() {
                         type="password"
                         value={password}
                         onChange={(event) => setPassword(event.target.value)}
-                        placeholder="Create demo password"
+                        placeholder="Create password"
                         className="mt-2 h-11 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                       />
                     </label>
@@ -227,7 +227,7 @@ export default function SignIn() {
                         type="password"
                         value={password}
                         onChange={(event) => setPassword(event.target.value)}
-                        placeholder="Demo password"
+                        placeholder="Password"
                         className="mt-2 h-11 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                       />
                     </label>
@@ -243,7 +243,7 @@ export default function SignIn() {
                   )
                 )}
 
-                <p className="pt-2 text-center text-xs text-slate-500">Demo mode uses bundled scientific datasets.</p>
+                <p className="pt-2 text-center text-xs text-slate-500">Uses bundled scientific datasets.</p>
               </CardContent>
             </Card>
           </div>
