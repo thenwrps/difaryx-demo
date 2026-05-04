@@ -10,6 +10,7 @@ import HistoryPage from "./pages/History";
 import SettingsPage from "./pages/Settings";
 import SignIn from "./pages/SignIn";
 import XPSWorkspace from "./pages/XPSWorkspace";
+import FTIRWorkspace from "./pages/FTIRWorkspace";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 
@@ -35,6 +36,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <XPSWorkspace />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/workspace/ftir"
+            element={
+              <ProtectedRoute>
+                <FTIRWorkspace />
               </ProtectedRoute>
             }
           />
