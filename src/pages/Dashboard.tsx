@@ -80,8 +80,8 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-lg font-bold text-cyan">{project.confidence}%</div>
-                  <div className="text-[10px] text-text-muted uppercase tracking-wider">confidence</div>
+                  <div className="text-sm font-bold text-emerald-600">Supported</div>
+                  <div className="text-[10px] text-text-muted uppercase tracking-wider">Status</div>
                 </div>
               </div>
               <div className="flex-1 p-4 flex flex-col">

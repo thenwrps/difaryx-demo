@@ -87,6 +87,9 @@ export interface ConfidenceResult {
 
 // ── Insight ──────────────────────────────────────────────────────────
 
+/**
+ * @deprecated This type is deprecated. Use FusionResult from fusionEngine instead.
+ */
 export interface ScientificInsight {
   primaryResult: string;
   confidenceScore: number;

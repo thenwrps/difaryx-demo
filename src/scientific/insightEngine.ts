@@ -1,3 +1,7 @@
+/**
+ * @deprecated This module is deprecated. Use fusionEngine instead.
+ */
+
 import type {
   PhaseMatchResult,
   ConfidenceResult,

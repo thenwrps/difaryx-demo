@@ -15,7 +15,7 @@ import {
   getWorkspaceRoute,
 } from '../data/demoProjects';
 import { formatChemicalFormula } from '../utils';
-import { evaluate as evaluateFusionEngine, type EvidenceNode, type FusionResult } from '../engines/fusionEngine';
+import { evaluate as evaluateFusionEngine, createEvidenceNodes, type EvidenceNode, type FusionResult, type EvidenceCategory, type PeakInput } from '../engines/fusionEngine';
 
 // Cross-tech evidence types
 interface CrossTechEvidence {
@@ -609,7 +609,7 @@ export default function MultiTechWorkspace() {
   const [hoveredEvidenceId, setHoveredEvidenceId] = useState<string | null>(null);
   const [selectedClaimId, setSelectedClaimId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'conclusion' | 'justification' | 'evidence' | 'interpretation'>('conclusion');
-  const [reviewOutput, setReviewOutput] = useState<FusionReasoningOutput | null>(null);
+  const [reviewOutput, setReviewOutput] = useState<FusionResult | null>(null);
   const [isTechniqueDropdownOpen, setIsTechniqueDropdownOpen] = useState(false);
 
   // Compute graph highlights for a technique
@@ -755,54 +755,45 @@ export default function MultiTechWorkspace() {
     });
   };
 
-  // Map demo evidence to fusionEngine EvidenceNode format
-  const mapToEvidenceNodes = (): EvidenceNode[] => {
-    return demoEvidenceItems
-      .filter((e) => activeTechniques.has(e.technique))
-      .map((e) => {
-        // Handle array xValue by taking first value
-        const xValue = Array.isArray(e.xValue) ? e.xValue[0] : e.xValue;
-        
-        return {
-          id: e.id,
-          technique: e.technique,
-          x: xValue || 0,
-          unit: e.xUnit || '',
-          label: e.highlightLabel || e.description,
-        };
-      })
-      .filter((e) => e.x > 0); // Only include evidence with valid x values
-  };
-
   const handleRunReview = () => {
-    // Call fusionEngine with mapped evidence
-    const evidenceNodes = mapToEvidenceNodes();
-    const fusionResult: FusionResult = evaluateFusionEngine({ evidence: evidenceNodes });
+    // Convert demoEvidenceItems to PeakInput format and call fusionEngine
+    const peakInputsByTechnique = new Map<Technique, PeakInput[]>();
     
-    // Convert FusionResult to FusionReasoningOutput format for compatibility
-    const output: FusionReasoningOutput = {
-      scope: 'project',
-      title: `Cross-Tech Review: ${project.name}`,
-      conclusion: fusionResult.conclusion,
-      reasoningTrace: {
-        claim: 'Multi-technique structural characterization',
-        observed: fusionResult.basis,
-        linked: fusionResult.highlightedEvidenceIds.length > 1 
-          ? [`${fusionResult.highlightedEvidenceIds.length} evidence items provide convergent support`]
-          : [],
-        crossCheck: [fusionResult.crossTech],
-        limitation: fusionResult.limitations,
-        decision: fusionResult.decision,
-      },
-      basis: fusionResult.basis,
-      limitations: fusionResult.limitations,
-      decision: fusionResult.decision,
-      recommendedValidation: [],
-      notebookDraft: generateNotebookFromFusionResult(fusionResult, project.name),
-      highlightedEvidenceIds: fusionResult.highlightedEvidenceIds,
-    };
+    // Group evidence by technique
+    demoEvidenceItems
+      .filter((e) => activeTechniques.has(e.technique))
+      .forEach((e) => {
+        if (!peakInputsByTechnique.has(e.technique)) {
+          peakInputsByTechnique.set(e.technique, []);
+        }
+        
+        // Handle array xValue by creating multiple peaks
+        const xValues = Array.isArray(e.xValue) ? e.xValue : [e.xValue];
+        
+        xValues.forEach((xVal, index) => {
+          if (xVal && xVal > 0) {
+            peakInputsByTechnique.get(e.technique)!.push({
+              id: Array.isArray(e.xValue) ? `${e.id}-${index}` : e.id,
+              position: xVal,
+              intensity: 100, // Default intensity
+              label: e.highlightLabel || e.description,
+            });
+          }
+        });
+      });
     
-    setReviewOutput(output);
+    // Create evidence nodes for each technique using central function
+    const allEvidenceNodes: EvidenceNode[] = [];
+    peakInputsByTechnique.forEach((peaks, technique) => {
+      const nodes = createEvidenceNodes({ technique, peaks });
+      allEvidenceNodes.push(...nodes);
+    });
+    
+    // Call fusionEngine with evidence nodes - single source of truth
+    const fusionResult: FusionResult = evaluateFusionEngine({ evidence: allEvidenceNodes });
+    
+    // Use FusionResult directly - no wrapper conversion
+    setReviewOutput(fusionResult);
   };
 
   // Generate notebook draft from FusionResult
@@ -964,10 +955,10 @@ ${result.decision}
                                 className={`cursor-pointer rounded-md border p-1.5 text-[10px] transition-all ${
                                   isSelected
                                     ? 'border-primary bg-primary/10 text-primary font-semibold shadow-md'
-                                    : isHighlighted
-                                    ? 'border-cyan bg-cyan/10 text-cyan'
                                     : isLinkedToClaim
                                     ? 'border-cyan/60 bg-cyan/5 text-cyan'
+                                    : isHighlighted
+                                    ? 'border-primary/30 bg-primary/5 text-text-main'
                                     : 'border-border bg-background text-text-muted hover:border-primary/40'
                                 }`}
                               >
@@ -1027,14 +1018,25 @@ ${result.decision}
                 <div>
                   <div className="text-[9px] font-semibold uppercase tracking-wider text-primary">Limitation</div>
                   <ul className="mt-1 space-y-0.5 text-[9px] text-text-muted">
-                    <li className="flex gap-1">
-                      <span className="text-primary">•</span>
-                      <span>XRD bulk-averaged; surface may differ</span>
-                    </li>
-                    <li className="flex gap-1">
-                      <span className="text-primary">•</span>
-                      <span>Cation distribution not resolved</span>
-                    </li>
+                    {reviewOutput ? (
+                      reviewOutput.limitations.slice(0, 2).map((item, idx) => (
+                        <li key={idx} className="flex gap-1">
+                          <span className="text-primary">•</span>
+                          <span>{item}</span>
+                        </li>
+                      ))
+                    ) : (
+                      <>
+                        <li className="flex gap-1">
+                          <span className="text-primary">•</span>
+                          <span>XRD bulk-averaged; surface may differ</span>
+                        </li>
+                        <li className="flex gap-1">
+                          <span className="text-primary">•</span>
+                          <span>Cation distribution not resolved</span>
+                        </li>
+                      </>
+                    )}
                   </ul>
                 </div>
                 <div>

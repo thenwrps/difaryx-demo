@@ -312,6 +312,19 @@ export default function XRDWorkspace() {
   }, [autoMode, parameters, agentResult.detectedPeaks.length, agentResult.candidates.length]);
   
   const primaryCandidate = agentResult.conflicts.primaryCandidate;
+  
+  // Use FusionResult if available, otherwise fall back to interpretation
+  const useFusionResult = agentResult.fusionResult !== undefined;
+  const decisionStatus = useFusionResult 
+    ? agentResult.fusionResult.decision 
+    : agentResult.interpretation.primaryPhase;
+  const evidenceBasis = useFusionResult
+    ? agentResult.fusionResult.basis
+    : agentResult.interpretation.evidence;
+  const limitations = useFusionResult
+    ? agentResult.fusionResult.limitations
+    : agentResult.interpretation.caveats;
+  
   const graphPeakMarkers = agentResult.detectedPeaks.map((peak) => {
     // Find HKL assignment from primary candidate
     const match = primaryCandidate?.matches.find(m => m.observedPeak.id === peak.id);
@@ -590,8 +603,16 @@ export default function XRDWorkspace() {
                             </div>
                             <div className="pt-2 border-t border-border/30">
                               <div className="flex items-center justify-between">
-                                <span className="text-[10px] uppercase tracking-wide text-text-muted">CONFIDENCE</span>
-                                <span className={`text-sm font-semibold tabular-nums ${confidenceClass(agentResult.interpretation.confidenceLevel)}`}>{agentResult.interpretation.confidenceScore.toFixed(1)}%</span>
+                                <span className="text-[10px] uppercase tracking-wide text-text-muted">STATUS</span>
+                                <span className={`text-sm font-semibold tabular-nums ${
+                                  agentResult.interpretation.confidenceLevel === 'high' ? 'text-emerald-600' : 
+                                  agentResult.interpretation.confidenceLevel === 'medium' ? 'text-amber-600' : 
+                                  'text-red-600'
+                                }`}>
+                                  {agentResult.interpretation.confidenceLevel === 'high' ? 'Supported' : 
+                                   agentResult.interpretation.confidenceLevel === 'medium' ? 'Working hypothesis' : 
+                                   'Requires validation'}
+                                </span>
                               </div>
                             </div>
                           </div>
@@ -657,14 +678,14 @@ export default function XRDWorkspace() {
                     {/* Phase Identification */}
                     <div>
                       <p className="text-[9px] font-semibold uppercase tracking-wide text-text-muted mb-0.5">Phase</p>
-                      <p className="text-xs font-bold text-text-main">{agentResult.interpretation.primaryPhase}</p>
+                      <p className="text-xs font-bold text-text-main">{decisionStatus}</p>
                     </div>
 
                     {/* Key Findings */}
                     <div>
                       <p className="text-[9px] font-semibold uppercase tracking-wide text-text-muted mb-0.5">Findings</p>
                       <div className="space-y-0.5">
-                        {agentResult.interpretation.evidence.slice(0, 2).map((item) => (
+                        {evidenceBasis.slice(0, 2).map((item) => (
                           <div key={item} className="flex gap-1 text-[10px] leading-tight text-text-main">
                             <span className="text-primary mt-0.5">•</span>
                             <span>{item}</span>
@@ -746,14 +767,14 @@ export default function XRDWorkspace() {
                   </div>
                 </div>
 
-                {/* CAVEATS (SUBTLE) */}
+                {/* LIMITATIONS (SUBTLE) */}
                 <div className="border border-border/40 bg-surface/50 px-2 py-1.5">
                   <div className="flex items-center gap-1.5 mb-1">
                     <AlertTriangle size={11} className="text-amber-600" />
-                    <h3 className="text-[10px] font-semibold uppercase tracking-wide">Caveats</h3>
+                    <h3 className="text-[10px] font-semibold uppercase tracking-wide">Limitations</h3>
                   </div>
                   <div className="space-y-0.5">
-                    {agentResult.interpretation.caveats.map((item) => (
+                    {limitations.map((item) => (
                       <div key={item} className="flex gap-1.5 text-[10px] leading-tight text-text-muted">
                         <span className="mt-0.5">•</span>
                         <span>{item}</span>

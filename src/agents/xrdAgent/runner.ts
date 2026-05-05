@@ -685,6 +685,28 @@ export function runXrdPhaseIdentificationAgent(input: XrdAgentInput, params?: Xr
     summary: `Parameters: baseline radius=${params.baselineRadius ?? 42}, smoothing radius=${params.smoothingRadius ?? 2}, min prominence=${params.minProminence?.toFixed(1) ?? 'auto'}, min distance=${params.minDistance ?? 0.44}°`,
   } : undefined;
 
+  // Generate FusionResult from XrdInterpretation for fusionEngine compatibility
+  const fusionResult: import('../../engines/fusionEngine/types').FusionResult = {
+    conclusion: interpretation.decision,
+    basis: interpretation.evidence,
+    crossTech: 'Single-technique XRD analysis. Complementary techniques (XPS for oxidation states, FTIR/Raman for vibrational modes) recommended for comprehensive characterization.',
+    limitations: interpretation.caveats,
+    decision: interpretation.primaryPhase,
+    reasoningTrace: [{
+      claimId: 'xrd-phase-claim',
+      status: interpretation.confidenceLevel === 'high' ? 'active' : interpretation.confidenceLevel === 'medium' ? 'partial' : 'unsupported',
+      evidenceIds: detectedPeaks.filter(peak => conflicts.primaryCandidate?.explainedObservedPeakIds.includes(peak.id)).map(peak => peak.id),
+      contradictingEvidenceIds: conflicts.unexplainedPeaks.map(peak => peak.id),
+      group: 'structure',
+      isExclusiveConflict: false,
+      categoryConflict: false,
+      conceptMatch: true,
+      conceptConflict: false,
+      isDominant: true,
+    }],
+    highlightedEvidenceIds: conflicts.primaryCandidate?.explainedObservedPeakIds ?? [],
+  };
+
   return {
     input,
     validation,
@@ -696,5 +718,6 @@ export function runXrdPhaseIdentificationAgent(input: XrdAgentInput, params?: Xr
     interpretation,
     executionLog,
     parameterImpact,
+    fusionResult,
   };
 }

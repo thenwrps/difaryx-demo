@@ -809,7 +809,7 @@ export function RightPanel({
                   : 'text-slate-500 hover:text-slate-300'
               }`}
             >
-              {tab === 'thinking' ? 'Agent Thinking' : tab}
+              {tab === 'thinking' ? 'Scientific Reasoning' : tab}
               {activeTab === tab && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400" />
               )}
@@ -1231,7 +1231,7 @@ export function RightPanel({
                           </div>
                           <div className="pt-2 border-t border-blue-400/20">
                             <div className="text-[10px] text-blue-300">
-                              💡 This evidence item is also referenced in the <span className="font-semibold">Agent Thinking → Scientific Determination</span> section.
+                              💡 This evidence item is also referenced in the <span className="font-semibold">Scientific Reasoning → Scientific Determination</span> section.
                             </div>
                           </div>
                         </div>

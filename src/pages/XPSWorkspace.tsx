@@ -18,6 +18,8 @@ import type { XpsParameters } from '../types/parameters';
 import { getWorkspaceEntryMode, getSampleDatasetName } from '../utils/workspaceEntry';
 import { DatasetInfoBar } from '../components/workspace/DatasetInfoBar';
 import { EmptyWorkspaceState } from '../components/workspace/EmptyWorkspaceState';
+import { evaluate as evaluateFusionEngine, createEvidenceNodes } from '../engines/fusionEngine';
+import type { EvidenceNode, FusionResult, PeakInput } from '../engines/fusionEngine/types';
 
 export default function XPSWorkspace() {
   const [searchParams] = useSearchParams();
@@ -100,6 +102,28 @@ export default function XPSWorkspace() {
     }
   }, [selectedDataset, autoMode, parameters]);
   
+  // Convert XPS peaks to EvidenceNode format and call fusionEngine
+  const fusionResult = useMemo<FusionResult | null>(() => {
+    if (processingResult.peaks.length === 0) return null;
+    
+    // Convert peaks to PeakInput format
+    const peakInputs: PeakInput[] = processingResult.peaks.map((peak) => ({
+      id: peak.id,
+      position: peak.bindingEnergy,
+      intensity: peak.intensity,
+      assignment: peak.assignment || undefined,
+    }));
+    
+    // Use central createEvidenceNodes function
+    const evidenceNodes = createEvidenceNodes({
+      technique: 'XPS',
+      peaks: peakInputs,
+    });
+    
+    // Call fusionEngine
+    return evaluateFusionEngine({ evidence: evidenceNodes });
+  }, [processingResult.peaks]);
+  
   // Convert processed XPS data to graph format (x, y points)
   const graphData = processingResult.signal.bindingEnergy.map((be, i) => ({
     x: be,
@@ -137,8 +161,14 @@ export default function XPSWorkspace() {
   
   const primaryElement = primaryMatch?.element || 'Cu';
   
-  // Use scientific summary from processing result
-  const chemicalStateInterpretation = processingResult.scientificSummary;
+  // Use FusionResult if available, otherwise fall back to scientificSummary
+  const chemicalStateInterpretation = fusionResult?.conclusion || processingResult.scientificSummary;
+  const evidenceBasis = fusionResult?.basis || [];
+  const limitations = fusionResult?.limitations || [
+    'Surface sensitivity (5-10 nm depth)',
+    'Charging effects may shift binding energies',
+    'Peak overlap requires careful deconvolution',
+  ];
   
   // Determine confidence badge
   const confidenceBadge = processingResult.confidence === 'high' ? 'high' 
@@ -658,25 +688,19 @@ export default function XPSWorkspace() {
               </div>
             </div>
 
-            {/* CAVEATS */}
+            {/* LIMITATIONS */}
             <div className="border border-border/40 bg-surface/50 px-2 py-1.5">
               <div className="flex items-center gap-1.5 mb-1">
                 <AlertTriangle size={11} className="text-amber-600" />
-                <h3 className="text-[10px] font-semibold uppercase tracking-wide">Caveats</h3>
+                <h3 className="text-[10px] font-semibold uppercase tracking-wide">Limitations</h3>
               </div>
               <div className="space-y-0.5">
-                <div className="flex gap-1.5 text-[10px] leading-tight text-text-muted">
-                  <span className="mt-0.5">•</span>
-                  <span>Surface sensitivity (5-10 nm depth)</span>
-                </div>
-                <div className="flex gap-1.5 text-[10px] leading-tight text-text-muted">
-                  <span className="mt-0.5">•</span>
-                  <span>Charging effects may shift binding energies</span>
-                </div>
-                <div className="flex gap-1.5 text-[10px] leading-tight text-text-muted">
-                  <span className="mt-0.5">•</span>
-                  <span>Peak overlap requires careful deconvolution</span>
-                </div>
+                {limitations.map((item, index) => (
+                  <div key={index} className="flex gap-1.5 text-[10px] leading-tight text-text-muted">
+                    <span className="mt-0.5">•</span>
+                    <span>{item}</span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>

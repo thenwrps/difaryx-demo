@@ -76,7 +76,7 @@ export default function NotebookLab() {
     if (!workspaceRun) return base;
 
     const confidence = workspaceRun.matchResult?.confidence ?? project.confidence;
-    const confidenceLabel = confidence >= 90 ? 'High confidence' : confidence >= 80 ? 'Moderate confidence' : 'Evidence-linked confidence';
+    const confidenceLabel = confidence >= 90 ? 'Supported' : confidence >= 80 ? 'Working hypothesis' : 'Requires validation';
 
     return {
       ...base,
@@ -140,7 +140,7 @@ export default function NotebookLab() {
       title: `${notebook.title} Report`,
       sections: [
         { heading: 'Summary', lines: [notebook.summary] },
-        { heading: 'Decision', lines: [notebook.decision, `${notebook.confidenceLabel} (${notebook.confidence}%)`] },
+        { heading: 'Decision', lines: [notebook.decision, notebook.confidenceLabel] },
         { heading: 'Pipeline', lines: notebook.processingPipeline },
         { heading: 'Evidence', lines: notebook.evidence },
         { heading: 'Observations', lines: observations.length > 0 ? observations : ['No added observations.'] },
@@ -513,13 +513,13 @@ export default function NotebookLab() {
             </section>
 
             <section className="space-y-3">
-              <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted border-b border-border pb-2">Generated Decision</h3>
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted border-b border-border pb-2">Scientific Decision</h3>
               <div className="bg-surface p-4 rounded-md border border-border flex items-center justify-between gap-4">
                 <div>
                   <div className="text-lg font-bold">{notebook.decision}</div>
                   <div className="text-xs text-text-muted mt-1">{notebook.confidenceLabel}</div>
                 </div>
-                <div className="text-2xl font-bold text-primary">{notebook.confidence}%</div>
+                <div className="text-sm font-bold text-emerald-600">{notebook.confidenceLabel}</div>
               </div>
               {notebook.warnings.length > 0 && (
                 <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-900">
@@ -672,7 +672,7 @@ export default function NotebookLab() {
                 </div>
               </div>
             </Card>
-            <div className="mb-4 text-xs font-semibold text-text-muted uppercase tracking-wider">AI Insight</div>
+            <div className="mb-4 text-xs font-semibold text-text-muted uppercase tracking-wider">Scientific Reasoning Summary</div>
             <AIInsightPanel result={getProjectInsight(project)} />
           </div>
         </div>

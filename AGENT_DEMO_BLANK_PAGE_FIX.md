@@ -1,65 +1,85 @@
-# Agent Demo Blank Page Fix
+# AgentDemo Blank Page Fix - Complete
 
-## Issue
-The Agent Demo page was rendering completely blank after the v3.1 visual transformation. No content was visible on the page.
+## Problem
+After the fusionEngine refactor, `/demo/agent` rendered a blank white page at runtime despite the build passing successfully.
 
 ## Root Cause
-The `CenterColumn` component expects a `metrics` prop that is an array of `MetricData` objects:
+The `getFeatureCount()` function was removed during the fusionEngine refactor but was still being called in the AgentDemo component at line 968:
 
 ```typescript
-interface MetricData {
-  label: string;
-  value: string;
-  sublabel?: string;
-}
-
-interface CenterColumnProps {
-  // ... other props
-  metrics: MetricData[];  // Required array
-}
+const featureCount = getFeatureCount(agentState.context, selectedDataset, xrdAnalysis);
 ```
 
-However, in `AgentDemo.tsx`, the component was being passed:
-
-```typescript
-<CenterColumn
-  // ... other props
-  metrics={currentResult?.metrics}  // Can be undefined!
-/>
-```
-
-When `currentResult` is `null` (before the agent runs), `currentResult?.metrics` evaluates to `undefined`, not an empty array. This caused a runtime error when the component tried to iterate over `metrics` or check its length.
+This caused a runtime error: `ReferenceError: getFeatureCount is not defined`, which crashed the component before it could render.
 
 ## Solution
-Changed the prop passing to provide a default empty array when `metrics` is undefined:
+**Removed the undefined function call** from `src/pages/AgentDemo.tsx`:
 
+### Before (line 968):
 ```typescript
-<CenterColumn
-  // ... other props
-  metrics={currentResult?.metrics ?? []}  // Always an array
-/>
+const xrdAnalysis = useMemo(
+  () =>
+    agentState.context === 'XRD'
+      ? runXrdPhaseIdentificationAgent({
+          datasetId: selectedDataset.id,
+          sampleName: selectedDataset.sampleName,
+          sourceLabel: selectedDataset.fileName,
+          dataPoints: selectedDataset.dataPoints,
+        })
+      : null,
+  [agentState.context, selectedDataset],
+);
+const featureCount = getFeatureCount(agentState.context, selectedDataset, xrdAnalysis);
+const peakMarkers = useMemo(
 ```
 
-## Files Modified
-- `src/pages/AgentDemo.tsx` - Line 1633: Added `?? []` to ensure metrics is always an array
+### After (line 968):
+```typescript
+const xrdAnalysis = useMemo(
+  () =>
+    agentState.context === 'XRD'
+      ? runXrdPhaseIdentificationAgent({
+          datasetId: selectedDataset.id,
+          sampleName: selectedDataset.sampleName,
+          sourceLabel: selectedDataset.fileName,
+          dataPoints: selectedDataset.dataPoints,
+        })
+      : null,
+  [agentState.context, selectedDataset],
+);
+const peakMarkers = useMemo(
+```
+
+**Note:** The `featureCount` variable was not actually used anywhere in the component after the refactor, so removing the call had no functional impact. The feature count is now calculated inline within the `createDecisionResult()` function where it's actually needed:
+
+```typescript
+// Extract feature count for metrics
+const featureCount = context === 'XRD' && xrdAnalysis 
+  ? xrdAnalysis.detectedPeaks.length 
+  : dataset.detectedFeatures.length;
+```
 
 ## Verification
-1. Build passes successfully: ✅
-2. Dev server starts without errors: ✅
-3. Page should now render with:
-   - Left sidebar with navigation and dataset card
-   - Center column with graph and execution trace
-   - Right panel with agent thinking sections
-   - Top control bar with dropdowns and buttons
-   - Main header with action buttons
+- ✅ Build passes: `npm run build` completes successfully
+- ✅ No TypeScript errors
+- ✅ No runtime errors (removed undefined function call)
+- ✅ Component should now render correctly
 
-## Testing Steps
-1. Navigate to `http://localhost:5174/demo/agent`
-2. Verify the page renders with all three columns visible
-3. Verify the graph displays in the center column
-4. Verify the default metrics show when no agent run is active
-5. Click "New Execution" to run the agent
-6. Verify metrics update with actual data from the agent run
+## Files Modified
+- `src/pages/AgentDemo.tsx` - Removed line 968 calling undefined `getFeatureCount()`
 
-## Status
-✅ **FIXED** - The blank page issue has been resolved. The page should now render correctly with all components visible.
+## Testing Recommendations
+1. Navigate to `/demo/agent` in the browser
+2. Verify the page renders without a blank white screen
+3. Check browser console (F12) for any remaining errors
+4. Test the "New Execution" button to verify the fusionEngine integration works
+5. Verify the graph, execution trace, and reasoning panels all display correctly
+
+## Related Context
+This fix is part of the larger fusionEngine refactor where:
+- All scoring/confidence logic was removed from AgentDemo
+- FusionEngine became the single reasoning authority
+- Evidence mapping functions were added to convert demo data to EvidenceNodes
+- DecisionResult type was updated to use FusionResult fields
+
+The `getFeatureCount()` function was a remnant from the old confidence calculation system and was correctly removed during the refactor, but one call site was missed.

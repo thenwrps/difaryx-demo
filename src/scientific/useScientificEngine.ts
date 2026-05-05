@@ -1,3 +1,7 @@
+/**
+ * @deprecated This hook is deprecated. Use fusionEngine directly.
+ */
+
 import { useMemo } from 'react';
 import type { ProcessingConfig, EngineState } from './types';
 import { getCuFe2O4Dataset } from './demoDatasets';

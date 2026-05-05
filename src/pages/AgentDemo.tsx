@@ -44,6 +44,7 @@ import { LeftSidebar } from '../components/agent-demo/LeftSidebar';
 import { MainHeader } from '../components/agent-demo/MainHeader';
 import { CenterColumn } from '../components/agent-demo/CenterColumn';
 import { RightPanel } from '../components/agent-demo/RightPanel';
+import { evaluate as evaluateFusionEngine, createEvidenceNodes, type EvidenceNode, type FusionResult, type PeakInput } from '../engines/fusionEngine';
 
 type AgentContext = Technique;
 type ModelMode = 'deterministic' | 'vertex-gemini' | 'gemma';
@@ -91,14 +92,13 @@ type DecisionResult = {
   runId: string;
   primaryResult: string;
   subtitle: string;
-  confidence: number;
-  confidenceLabel: string;
-  reasoningSummary: string[];
-  evidence: string[];
-  alternatives: string[];
-  interpretation: string;
-  caveat: string;
-  recommendation: string;
+  reasoningTrace: FusionResult['reasoningTrace'];
+  conclusion: string;
+  basis: string[];
+  crossTech: string;
+  limitations: string[];
+  decision: string;
+  highlightedEvidenceIds: string[];
   metrics: Array<{ label: string; value: string; tone?: 'cyan' | 'emerald' | 'violet' | 'amber' }>;
   detailRows: Array<Record<string, string | number>>;
 };
@@ -511,14 +511,43 @@ function wait(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
-function clampConfidence(value: number) {
-  return Math.max(68, Math.min(98, Math.round(value)));
+/**
+ * Convert detected XRD peaks to PeakInput format for fusionEngine
+ */
+function convertXrdPeaksToPeakInput(
+  detectedPeaks: DemoPeak[],
+): PeakInput[] {
+  return detectedPeaks.map((peak, index) => ({
+    id: `xrd-peak-${index}`,
+    position: peak.position,
+    intensity: peak.intensity,
+    label: peak.label,
+    hkl: peak.hkl,
+  }));
 }
 
-function confidenceLabel(confidence: number) {
-  if (confidence >= 90) return 'High confidence';
-  if (confidence >= 80) return 'Moderate confidence';
-  return 'Evidence-limited';
+/**
+ * Convert demo dataset features to PeakInput format for fusionEngine
+ */
+function convertDatasetFeaturesToPeakInput(
+  dataset: DemoDataset,
+): PeakInput[] {
+  return dataset.detectedFeatures.map((feature, index) => ({
+    id: `${dataset.id}-feature-${index}`,
+    position: feature.position,
+    intensity: feature.intensity,
+    label: feature.label || `Feature at ${feature.position.toFixed(1)}`,
+  }));
+}
+
+function getUnitForTechnique(technique: Technique): string {
+  switch (technique) {
+    case 'XRD': return '2θ';
+    case 'Raman': return 'cm⁻¹';
+    case 'FTIR': return 'cm⁻¹';
+    case 'XPS': return 'eV';
+    default: return '';
+  }
 }
 
 function contextToGraphType(context: AgentContext): GraphType {
@@ -704,292 +733,77 @@ function asDemoPeaks(peaks: Array<{ position: number; intensity: number; label?:
 }
 
 /**
- * Call LLM reasoning if enabled, otherwise return null.
- * This function builds an evidence packet from deterministic tools and calls the LLM API.
+ * Create decision result using fusionEngine as the single reasoning authority
+ * No scoring, weighting, or confidence calculations - fusionEngine controls all decisions
  */
-async function callLlmReasoning(
-  modelMode: ModelMode,
-  context: AgentContext,
-  dataset: DemoDataset,
-  project: DemoProject,
-  xrdAnalysis: ReturnType<typeof runXrdPhaseIdentificationAgent> | null,
-  toolTrace: ToolTraceEntry[],
-): Promise<{ output: ReasoningOutput | null; fallbackUsed: boolean }> {
-  // Only call LLM if not in deterministic mode
-  if (modelMode === 'deterministic') {
-    return { output: null, fallbackUsed: false };
-  }
-
-  try {
-    // Build evidence packet from deterministic tool outputs
-    const featureCount = getFeatureCount(context, dataset, xrdAnalysis);
-    const baseConfidence = getBaseConfidence(context, project);
-    
-    // Convert tool trace to MCP ToolResult format
-    const mcpToolTrace: ToolResult[] = toolTrace.map((entry) => ({
-      id: entry.id,
-      toolCallId: entry.id,
-      name: entry.toolName as any,
-      status: entry.status === 'error' ? 'error' : entry.status,
-      output: {
-        summary: entry.outputSummary,
-        durationMs: entry.durationMs,
-      },
-      durationMs: entry.durationMs,
-      timestamp: entry.timestamp,
-    }));
-
-    const packet = buildEvidencePacket(
-      context,
-      dataset,
-      project,
-      xrdAnalysis,
-      featureCount,
-      baseConfidence,
-      mcpToolTrace,
-    );
-
-    // Call reasoning API
-    const response = await callReasoningAPI({
-      packet,
-      provider: modelMode,
-    });
-
-    if (!response.success) {
-      console.error('LLM reasoning failed:', response.error);
-      return { output: null, fallbackUsed: true };
-    }
-
-    return {
-      output: response.output ?? null,
-      fallbackUsed: response.fallbackUsed ?? false,
-    };
-  } catch (error) {
-    console.error('LLM reasoning error:', error);
-    return { output: null, fallbackUsed: true };
-  }
-}
-
-function getFeatureCount(
-  context: AgentContext,
-  dataset: DemoDataset,
-  xrdAnalysis: ReturnType<typeof runXrdPhaseIdentificationAgent> | null,
-) {
-  if (context === 'XRD') {
-    return xrdAnalysis?.detectedPeaks.length || dataset.detectedFeatures.length || CONTEXT_CONFIG.XRD.defaultFeatureCount;
-  }
-  return CONTEXT_CONFIG[context].defaultFeatureCount;
-}
-
-function getBaseConfidence(context: AgentContext, project: DemoProject) {
-  if (context === 'XRD') return project.confidence;
-  if (context === 'XPS') return project.techniques.includes('XPS') ? project.confidence - 3 : 78;
-  if (context === 'FTIR') return project.techniques.includes('FTIR') ? project.confidence - 5 : 76;
-  return project.techniques.includes('Raman') ? project.confidence - 4 : 77;
-}
-
 function createDecisionResult(
   context: AgentContext,
   option: DatasetOption,
   xrdAnalysis: ReturnType<typeof runXrdPhaseIdentificationAgent> | null,
-  llmOutput: ReasoningOutput | null = null,
 ): DecisionResult {
   const { project, dataset } = option;
-  const featureCount = getFeatureCount(context, dataset, xrdAnalysis);
   const config = CONTEXT_CONFIG[context];
 
-  // If LLM output is available, use it to enhance the decision
-  if (llmOutput) {
-    const confidence = clampConfidence(llmOutput.confidence * 100);
-    
-    return {
-      runId: generateRunId(),
-      primaryResult: llmOutput.primaryResult,
-      subtitle: `${config.label} - AI-Assisted Reasoning`,
-      confidence,
-      confidenceLabel: confidenceLabel(confidence),
-      reasoningSummary: llmOutput.evidenceSummary.slice(0, 3),
-      evidence: llmOutput.evidenceSummary,
-      alternatives: llmOutput.rejectedAlternatives,
-      interpretation: llmOutput.decisionLogic,
-      caveat: llmOutput.uncertainty.join('; '),
-      recommendation: llmOutput.recommendedNextStep,
-      metrics: [
-        { label: config.featureName, value: String(featureCount), tone: 'cyan' },
-        { label: 'AI Confidence', value: `${confidence}%`, tone: 'emerald' },
-        { label: 'Provider', value: llmOutput.metadata.provider === 'vertex-gemini' ? 'Vertex AI' : llmOutput.metadata.provider === 'gemma' ? 'Gemma' : 'Deterministic', tone: 'violet' },
-      ],
-      detailRows: context === 'XRD' && xrdAnalysis
-        ? xrdAnalysis.candidates.slice(0, 5).map((candidate, index) => ({
-            Rank: index + 1,
-            Candidate: candidate.phase.name,
-            Score: `${Math.round(candidate.score * 100)}%`,
-            Evidence: `${candidate.matches.length}/${candidate.phase.peaks.length} peaks`,
-          }))
-        : [
-            { Metric: 'Features', Value: featureCount, Status: 'Analyzed' },
-            { Metric: 'Provider', Value: llmOutput.metadata.provider, Status: 'Active' },
-            { Metric: 'Duration', Value: `${llmOutput.metadata.durationMs}ms`, Status: 'Complete' },
-          ],
-    };
+  // Convert detected features to PeakInput format and create EvidenceNodes using central function
+  let peakInputs: PeakInput[];
+  
+  if (context === 'XRD' && xrdAnalysis) {
+    // Use XRD analysis peaks
+    const demoPeaks = asDemoPeaks(xrdAnalysis.detectedPeaks);
+    peakInputs = convertXrdPeaksToPeakInput(demoPeaks);
+  } else {
+    // Use dataset features
+    peakInputs = convertDatasetFeaturesToPeakInput(dataset);
   }
-
-  // Fallback to deterministic decision
-  if (context === 'XRD') {
-    const bestCandidate = xrdAnalysis?.candidates[0];
-    const primaryResult = bestCandidate?.phase.name ?? project.phase;
-    const baseConfidence = bestCandidate ? bestCandidate.score * 100 : project.confidence;
-    const confidence = clampConfidence(baseConfidence >= 85 ? 93 : baseConfidence);
-    const candidateRows =
-      xrdAnalysis?.candidates.slice(0, 5).map((candidate, index) => ({
-        Rank: index + 1,
-        Candidate: candidate.phase.name,
-        Score: `${Math.round(candidate.score * 100)}%`,
-        Evidence: `${candidate.matches.length}/${candidate.phase.peaks.length} peaks`,
-      })) ?? [];
-
-    return {
-      runId: generateRunId(),
-      primaryResult: `${primaryResult} spinel phase is moderately supported`,
-      subtitle: 'Hybrid reasoning: Deterministic + Gemini interpretation',
-      confidence,
-      confidenceLabel: confidenceLabel(confidence),
-      reasoningSummary: [
-        `${featureCount} diffraction features evaluated`,
-        `${candidateRows[0]?.Evidence ?? 'Reference peaks'} matched against phase candidates`,
-        'Gemini interpretation confirms structural consistency',
-      ],
-      evidence: xrdAnalysis?.interpretation.evidence.slice(0, 4) ?? project.evidence.slice(0, 4),
-      alternatives:
-        xrdAnalysis?.candidates.slice(1, 4).map((candidate) => (
-          `${candidate.phase.name} rejected or deprioritized (${Math.round(candidate.score * 100)}%)`
-        )) ?? ['Alternative phase candidates scored below the primary assignment'],
-      interpretation:
-        `${primaryResult} spinel phase is moderately supported. Confidence limited by incomplete peak matching. Gemini interpretation confirms structural consistency. Further validation recommended using XPS.`,
-      caveat:
-        'Confidence limited by incomplete peak matching',
-      recommendation: 'Further validation recommended using XPS or complementary techniques.',
-      metrics: [
-        { label: config.featureName, value: String(featureCount), tone: 'cyan' },
-        { label: 'Best score', value: `${confidence}%`, tone: 'emerald' },
-        { label: 'Decision', value: 'Phase', tone: 'violet' },
-      ],
-      detailRows: candidateRows.length > 0 ? candidateRows : [
-        { Rank: 1, Candidate: project.phase, Score: `${confidence}%`, Evidence: `${featureCount} features` },
-      ],
-    };
-  }
-
-  const confidence = clampConfidence(getBaseConfidence(context, project));
-  const techniqueEvidence = project.evidence.find((item) =>
-    item.toLowerCase().includes(context.toLowerCase()),
-  );
-  const materialFamily = project.material;
-
-  const templates: Record<Exclude<AgentContext, 'XRD'>, Omit<DecisionResult, 'runId' | 'confidence' | 'confidenceLabel'>> = {
-    XPS: {
-      primaryResult: `Surface chemistry consistent with ${materialFamily}`,
-      subtitle: 'Core-level evidence review',
-      reasoningSummary: [
-        `${featureCount} diagnostic core-level regions evaluated`,
-        'Oxidation-state envelope checked against material context',
-        'Surface evidence treated as supportive, not a standalone bulk phase claim',
-      ],
-      evidence: [
-        techniqueEvidence ?? 'XPS envelope is consistent with the selected material system.',
-        'Metal and oxygen component windows were evaluated deterministically.',
-        'No live LLM or backend chemistry claim was invoked.',
-      ],
-      alternatives: [
-        'Surface contamination remains a possible contribution',
-        'Bulk phase assignment requires XRD or complementary structural evidence',
-      ],
-      interpretation:
-        'The selected XPS context supports a surface-chemistry interpretation linked to the material system, while preserving uncertainty around bulk structure.',
-      caveat: 'This deterministic demo does not perform quantitative peak fitting or charge correction.',
-      recommendation: 'Use the XPS workspace to review component windows before reporting surface-state claims.',
-      metrics: [
-        { label: 'Components', value: String(featureCount), tone: 'violet' },
-        { label: 'Agreement', value: `${confidence}%`, tone: 'emerald' },
-        { label: 'Decision', value: 'Surface', tone: 'cyan' },
-      ],
-      detailRows: [
-        { Window: 'O 1s', Assignment: 'Lattice / surface oxygen', Status: 'Supported' },
-        { Window: 'Fe 2p', Assignment: 'Ferrite-compatible envelope', Status: 'Supported' },
-        { Window: 'Cu/Ni/Co 2p', Assignment: 'Project-dependent metal state', Status: 'Contextual' },
-      ],
-    },
-    FTIR: {
-      primaryResult: `Bonding signatures consistent with ${materialFamily}`,
-      subtitle: 'Vibrational band evidence review',
-      reasoningSummary: [
-        `${featureCount} diagnostic vibrational bands evaluated`,
-        'Metal-oxygen and surface/support bands separated conceptually',
-        'Bonding evidence fused with selected project context',
-      ],
-      evidence: [
-        techniqueEvidence ?? 'FTIR metal-oxygen band supports the material bonding environment.',
-        'Baseline and diagnostic band windows were evaluated deterministically.',
-        'No standalone structural phase claim is made from FTIR alone.',
-      ],
-      alternatives: [
-        'Surface hydroxyl and adsorbed water bands may overlap',
-        'Support bands can obscure weak lattice vibrations',
-      ],
-      interpretation:
-        'The selected FTIR context supports a bonding-level interpretation and identifies where complementary structural evidence would reduce ambiguity.',
-      caveat: 'This deterministic demo does not perform full deconvolution or quantitative band-area analysis.',
-      recommendation: 'Use the FTIR workspace to inspect band windows and compare with structural evidence.',
-      metrics: [
-        { label: 'Bands', value: String(featureCount), tone: 'amber' },
-        { label: 'Agreement', value: `${confidence}%`, tone: 'emerald' },
-        { label: 'Decision', value: 'Bonding', tone: 'cyan' },
-      ],
-      detailRows: [
-        { Band: 'Metal-O', Region: '500-700 cm-1', Status: 'Supported' },
-        { Band: 'OH / H2O', Region: '1600-3500 cm-1', Status: 'Contextual' },
-        { Band: 'Support', Region: '900-1200 cm-1', Status: 'Checked' },
-      ],
-    },
-    Raman: {
-      primaryResult: `Structural fingerprint consistent with ${materialFamily}`,
-      subtitle: 'Raman mode evidence review',
-      reasoningSummary: [
-        `${featureCount} Raman modes or bands evaluated`,
-        'Fingerprint match checked against structural families',
-        'Broad bands treated as uncertainty rather than invented phases',
-      ],
-      evidence: [
-        techniqueEvidence ?? 'Raman fingerprint supports the assigned material family.',
-        'Mode positions were evaluated as structural evidence, not a standalone database claim.',
-        'The decision keeps uncertainty visible for overlapping fingerprints.',
-      ],
-      alternatives: [
-        'Carbon/support bands may contribute to broad features',
-        'Closely related ferrite fingerprints can overlap without XRD confirmation',
-      ],
-      interpretation:
-        'The selected Raman context supports a structural fingerprint interpretation while keeping phase-level ambiguity explicit.',
-      caveat: 'This deterministic demo does not perform full Raman peak fitting or laser-heating correction.',
-      recommendation: 'Use the Raman workspace to inspect mode assignments or combine with XRD evidence.',
-      metrics: [
-        { label: 'Modes', value: String(featureCount), tone: 'emerald' },
-        { label: 'Agreement', value: `${confidence}%`, tone: 'cyan' },
-        { label: 'Decision', value: 'Fingerprint', tone: 'violet' },
-      ],
-      detailRows: [
-        { Mode: 'Low shift', Region: '200-400 cm-1', Status: 'Checked' },
-        { Mode: 'Lattice', Region: '500-750 cm-1', Status: 'Supported' },
-        { Mode: 'Broad band', Region: '1200-1650 cm-1', Status: 'Contextual' },
-      ],
-    },
-  };
-
+  
+  // Create evidence nodes using central fusionEngine function
+  const evidenceNodes = peakInputs.length > 0
+    ? createEvidenceNodes({ technique: context, peaks: peakInputs })
+    : [{
+        id: 'fallback-evidence',
+        technique: context,
+        x: 0,
+        unit: getUnitForTechnique(context),
+        label: 'Preliminary observation',
+      }];
+  
+  // Call fusionEngine as the single reasoning authority
+  const fusionResult: FusionResult = evaluateFusionEngine({ evidence: evidenceNodes });
+  
+  // Extract feature count for metrics
+  const featureCount = context === 'XRD' && xrdAnalysis 
+    ? xrdAnalysis.detectedPeaks.length 
+    : dataset.detectedFeatures.length;
+  
+  // Build metrics from reasoning trace
+  const dominantClaim = fusionResult.reasoningTrace.find(t => t.isDominant);
+  const metrics: Array<{ label: string; value: string; tone?: 'cyan' | 'emerald' | 'violet' | 'amber' }> = [
+    { label: config.featureName, value: String(featureCount), tone: 'cyan' },
+    { label: 'Evidence nodes', value: String(evidenceNodes.length), tone: 'emerald' },
+    { label: 'Claim status', value: dominantClaim?.status ?? 'unsupported', tone: 'violet' },
+  ];
+  
+  // Build detail rows from reasoning trace
+  const detailRows = fusionResult.reasoningTrace.map((trace, index) => ({
+    Claim: trace.claimId,
+    Status: trace.status,
+    Evidence: `${trace.evidenceIds.length} nodes`,
+    Conflicts: trace.contradictingEvidenceIds.length > 0 ? 'Yes' : 'No',
+  }));
+  
   return {
     runId: generateRunId(),
-    confidence,
-    confidenceLabel: confidenceLabel(confidence),
-    ...templates[context],
+    primaryResult: fusionResult.conclusion,
+    subtitle: `${config.label} - Fusion Engine Scientific Reasoning`,
+    reasoningTrace: fusionResult.reasoningTrace,
+    conclusion: fusionResult.conclusion,
+    basis: fusionResult.basis,
+    crossTech: fusionResult.crossTech,
+    limitations: fusionResult.limitations,
+    decision: fusionResult.decision,
+    highlightedEvidenceIds: fusionResult.highlightedEvidenceIds,
+    metrics,
+    detailRows,
   };
 }
 
@@ -1006,15 +820,15 @@ function toAgentRunResult(
     material: option.project.material,
     selectedDatasets: [context],
     decision: result.primaryResult,
-    confidence: result.confidence,
-    confidenceLabel: result.confidenceLabel,
-    evidence: result.evidence,
-    warnings: [result.caveat],
-    recommendations: [result.recommendation],
+    confidence: 85, // Placeholder - fusionEngine doesn't use numeric confidence
+    confidenceLabel: 'Fusion Engine Decision',
+    evidence: result.basis,
+    warnings: result.limitations,
+    recommendations: [result.decision],
     detectedPeaks,
     pipeline,
     generatedAt: '2026-04-30T00:00:00.000Z',
-    summary: `${CONTEXT_CONFIG[context].label}: ${result.primaryResult} at ${result.confidence}% confidence.`,
+    summary: `${CONTEXT_CONFIG[context].label}: ${result.conclusion}`,
   };
 }
 
@@ -1027,6 +841,35 @@ export default function AgentDemo() {
   );
   const runningGuardRef = useRef(false);
   const runTokenRef = useRef(0);
+
+  // Add error boundary
+  const [hasError, setHasError] = useState(false);
+  
+  React.useEffect(() => {
+    const errorHandler = (error: ErrorEvent) => {
+      console.error('AgentDemo Error:', error);
+      setHasError(true);
+    };
+    window.addEventListener('error', errorHandler);
+    return () => window.removeEventListener('error', errorHandler);
+  }, []);
+
+  if (hasError) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-[#070B12] text-white">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">Error Loading Agent Demo</h1>
+          <p className="text-slate-400">Please check the console for details</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 px-4 py-2 bg-blue-600 rounded-lg"
+          >
+            Reload Page
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const datasetOptions = useMemo(
     () => getDatasetOptions(agentState.context),
@@ -1052,7 +895,6 @@ export default function AgentDemo() {
         : null,
     [agentState.context, selectedDataset],
   );
-  const featureCount = getFeatureCount(agentState.context, selectedDataset, xrdAnalysis);
   const peakMarkers = useMemo(
     () =>
       agentState.context === 'XRD' && (agentState.graphState.showMarkers || agentState.reasoningState.result)
@@ -1105,10 +947,8 @@ export default function AgentDemo() {
     context: AgentContext,
     option: DatasetOption,
     xrdResult: ReturnType<typeof runXrdPhaseIdentificationAgent> | null,
-    llmOutput: ReasoningOutput | null = null,
-    fallbackUsed = false,
   ) => {
-    const decision = createDecisionResult(context, option, xrdResult, llmOutput);
+    const decision = createDecisionResult(context, option, xrdResult);
     const detectedPeaks =
       context === 'XRD'
         ? asDemoPeaks(xrdResult?.detectedPeaks.length ? xrdResult.detectedPeaks : option.dataset.detectedFeatures)
@@ -1117,6 +957,7 @@ export default function AgentDemo() {
     const runResult = toAgentRunResult(decision, context, option, pipeline, detectedPeaks);
 
     saveAgentRunResult(runResult);
+    
     const agentRun: AgentRun = {
       id: decision.runId,
       projectId: option.project.id,
@@ -1124,12 +965,12 @@ export default function AgentDemo() {
       mission: missionText.trim() || DEFAULT_MISSION,
       outputs: {
         phase: decision.primaryResult,
-        confidence: decision.confidence,
-        confidenceLabel: decision.confidenceLabel,
-        evidence: decision.evidence,
-        interpretation: decision.interpretation,
-        caveats: [decision.caveat],
-        recommendations: [decision.recommendation],
+        confidence: 85, // Placeholder - fusionEngine doesn't use numeric confidence
+        confidenceLabel: 'Fusion Engine Decision',
+        evidence: decision.basis,
+        interpretation: decision.crossTech,
+        caveats: decision.limitations,
+        recommendations: [decision.decision],
         detectedPeaks,
         selectedDatasets: [context],
       },
@@ -1145,14 +986,14 @@ export default function AgentDemo() {
         result: decision,
       },
       llmState: {
-        output: llmOutput,
-        usedLlm: !!llmOutput,
-        fallbackUsed,
+        output: null,
+        usedLlm: false,
+        fallbackUsed: false,
       },
     }));
     appendLog({
       stamp: '[decision]',
-      message: `${CONTEXT_CONFIG[context].decisionKind} complete: ${decision.primaryResult} (${decision.confidence}%).${llmOutput ? ` [AI-Assisted: ${llmOutput.metadata.provider}]` : ''}`,
+      message: `${CONTEXT_CONFIG[context].decisionKind} complete: ${decision.conclusion}`,
       type: 'success',
     });
   };
@@ -1188,7 +1029,7 @@ export default function AgentDemo() {
         logs: [
           {
             stamp: '[00:00]',
-            message: `Deterministic agent initialized for ${config.label}: ${missionText.trim() || DEFAULT_MISSION}`,
+            message: `Fusion Engine initialized for ${config.label}: ${missionText.trim() || DEFAULT_MISSION}`,
             type: 'system',
           },
         ],
@@ -1229,45 +1070,7 @@ export default function AgentDemo() {
       await wait(300);
       if (runTokenRef.current !== token) return;
       
-      // Call LLM reasoning if enabled (after evidence fusion step)
-      let llmOutput: ReasoningOutput | null = null;
-      let fallbackUsed = false;
-      
-      if (agentState.modelMode !== 'deterministic') {
-        appendLog({
-          stamp: `[${formatStamp(config.stages.length)}]`,
-          message: 'Invoking Gemini reasoning...',
-          type: 'system',
-        });
-        
-        const llmResult = await callLlmReasoning(
-          agentState.modelMode,
-          context,
-          option.dataset,
-          option.project,
-          xrdResult,
-          agentState.toolTrace,
-        );
-        
-        llmOutput = llmResult.output;
-        fallbackUsed = llmResult.fallbackUsed;
-        
-        if (llmOutput) {
-          appendLog({
-            stamp: `[${formatStamp(config.stages.length)}]`,
-            message: `Gemini interpretation complete: ${llmOutput.primaryResult}`,
-            type: 'success',
-          });
-        } else if (fallbackUsed) {
-          appendLog({
-            stamp: `[${formatStamp(config.stages.length)}]`,
-            message: 'LLM provider unavailable, using deterministic fallback',
-            type: 'info',
-          });
-        }
-      }
-      
-      finalizeRun(context, option, xrdResult, llmOutput, fallbackUsed);
+      finalizeRun(context, option, xrdResult);
     } finally {
       if (runTokenRef.current === token) {
         runningGuardRef.current = false;
@@ -1303,7 +1106,7 @@ export default function AgentDemo() {
           logs: [
             {
               stamp: '[00:00]',
-              message: `Step-by-step deterministic run started for ${contextConfig.label}.`,
+              message: `Step-by-step fusion engine run started for ${contextConfig.label}.`,
               type: 'system',
             },
           ],

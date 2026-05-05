@@ -142,4 +142,5 @@ export interface XrdAgentResult {
     noiseLevel: { estimated: number; description: string };
     summary: string;
   };
+  fusionResult?: import('../../engines/fusionEngine/types').FusionResult;
 }

@@ -1,8 +1,8 @@
 import React from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from './Card';
-import { AlertCircle, CheckCircle2, ChevronRight, Zap } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ChevronRight, Microscope } from 'lucide-react';
 
-interface AIInsightProps {
+interface ScientificReasoningPanelProps {
   result: {
     primaryResult: string;
     confidenceScore: number;
@@ -16,19 +16,30 @@ interface AIInsightProps {
   className?: string;
 }
 
-export function AIInsightPanel({ result, className }: AIInsightProps) {
+export function ScientificReasoningPanel({ result, className }: ScientificReasoningPanelProps) {
+  // Map confidence level to research-grade status
+  const getDecisionStatus = (level: string) => {
+    if (level === 'high') return 'Supported';
+    if (level === 'medium') return 'Working hypothesis';
+    return 'Requires validation';
+  };
+  
+  const status = getDecisionStatus(result.confidenceLevel);
+  const statusColor = result.confidenceLevel === 'high' ? 'text-emerald-600' : 
+                      result.confidenceLevel === 'medium' ? 'text-cyan-600' : 'text-amber-600';
+  
   return (
     <Card className={className}>
       <CardHeader className="pb-4 border-b border-border bg-surface-hover/50">
         <div className="flex items-center gap-2 text-accent">
-          <Zap size={18} />
-          <span className="text-xs font-semibold tracking-wider uppercase">AI Insight Agent</span>
+          <Microscope size={18} />
+          <span className="text-xs font-semibold tracking-wider uppercase">Scientific Reasoning Summary</span>
         </div>
         <CardTitle className="text-xl mt-2 flex justify-between items-start">
           <span>{result.primaryResult}</span>
           <div className="flex flex-col items-end">
-            <span className="text-2xl font-bold text-cyan">{result.confidenceScore}%</span>
-            <span className="text-xs text-text-muted font-normal">{result.confidenceLevel} Match</span>
+            <span className={`text-sm font-bold ${statusColor}`}>{status}</span>
+            <span className="text-xs text-text-muted font-normal">Decision status</span>
           </div>
         </CardTitle>
       </CardHeader>
@@ -41,7 +52,7 @@ export function AIInsightPanel({ result, className }: AIInsightProps) {
         </div>
 
         <div>
-          <h4 className="text-xs font-semibold text-text-main uppercase tracking-wider mb-3">Key Evidence</h4>
+          <h4 className="text-xs font-semibold text-text-main uppercase tracking-wider mb-3">Evidence Basis</h4>
           <ul className="space-y-2">
             {result.keyEvidence.map((evidence, i) => (
               <li key={i} className="text-sm text-text-muted flex items-start gap-2">
@@ -55,7 +66,7 @@ export function AIInsightPanel({ result, className }: AIInsightProps) {
         {result.warnings.length > 0 && (
           <div className="p-3 bg-red-950/20 border border-red-900/50 rounded-lg">
             <h4 className="text-xs font-semibold text-red-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-              <AlertCircle size={14} /> Warnings
+              <AlertCircle size={14} /> Limitations
             </h4>
             <ul className="space-y-1">
               {result.warnings.map((warn, i) => (
@@ -82,3 +93,6 @@ export function AIInsightPanel({ result, className }: AIInsightProps) {
     </Card>
   );
 }
+
+// Keep old export for backward compatibility
+export { ScientificReasoningPanel as AIInsightPanel };
