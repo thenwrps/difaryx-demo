@@ -11,7 +11,7 @@ export interface Evidence {
   datasetId: string;
   technique: string;
   claim: string;
-  confidence?: number;
+  evidenceRole?: 'primary' | 'supporting' | 'context';
   support?: string;
   limitations?: string;
 }
@@ -35,7 +35,8 @@ export interface AgentRun {
   steps: AgentStep[];
   evidence: Evidence[];
   decision?: string;
-  confidence?: number;
+  claimStatus?: 'strongly_supported' | 'supported' | 'partial' | 'inconclusive' | 'contradicted';
+  validationState?: 'complete' | 'partial' | 'requires_validation';
   reportStatus?: 'not_started' | 'draft' | 'ready' | 'exported';
   createdAt: string;
   updatedAt?: string;

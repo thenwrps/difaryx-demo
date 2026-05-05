@@ -49,12 +49,17 @@ export function generateNotebookSummary(
     summaryParts.push('No reference phase matched the observed pattern.');
   }
 
-  // Next steps derived from confidence
+  // Next steps derived from evidence quality (reasoning-based, not thresholds)
   const suggestedNextSteps: string[] = [];
-  if (confidence.score >= 85) {
+  
+  // Use reasoning: Strong evidence = proceed, moderate = refine, weak = re-acquire
+  const hasStrongEvidence = bestMatch && bestMatch.matchedCount >= 5 && peaks.length >= 8;
+  const hasModerateEvidence = bestMatch && bestMatch.matchedCount >= 3;
+  
+  if (hasStrongEvidence) {
     suggestedNextSteps.push('Proceed to complementary characterization (XPS, Raman)');
     suggestedNextSteps.push('Document results in publication draft');
-  } else if (confidence.score >= 70) {
+  } else if (hasModerateEvidence) {
     suggestedNextSteps.push('Run Rietveld refinement for lattice parameter determination');
     suggestedNextSteps.push('Cross-validate with FTIR');
   } else {

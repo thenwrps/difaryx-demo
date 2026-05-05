@@ -157,7 +157,7 @@ function localTimeStamp() {
   return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
-function makeEvidence(projectId: string, datasetId: string, technique: Technique, features: DemoPeak[], confidence: number): Evidence[] {
+function makeEvidence(projectId: string, datasetId: string, technique: Technique, features: DemoPeak[], evidenceRole: 'primary' | 'supporting' | 'context'): Evidence[] {
   const mainFeature = features[0]?.label ?? 'selected spectrum feature';
   return [
     {
@@ -168,7 +168,7 @@ function makeEvidence(projectId: string, datasetId: string, technique: Technique
         technique === 'XRD'
           ? `${features.length} diffraction peaks support the assigned ferrite phase.`
           : `${mainFeature} supports the ${technique} interpretation for ${projectId}.`,
-      confidence,
+      evidenceRole,
       support: features.map((feature) => `${feature.label} at ${feature.position}`).join('; '),
       limitations:
         technique === 'XRD'
@@ -273,9 +273,10 @@ export default function TechniqueWorkspace() {
   const savedEvidence = getSavedEvidence(project.id, activeTechnique);
   const featuresAvailable = detectedFeatures.length > 0;
   const processingCount = [baseline, xpsBackground, smoothing, normalize, ftirOffset !== 0, ftirSlope !== 0].filter(Boolean).length;
-  const phaseConfidence = matched
-    ? Math.min(98, project.confidence + (activeTechnique === 'XRD' ? 0 : 2) + Math.min(processingCount, 3))
-    : Number(Math.min(project.confidence - 1, project.confidence - 7 + processingCount * 1.5).toFixed(1));
+  
+  // Determine evidence role based on technique
+  const evidenceRole: 'primary' | 'supporting' | 'context' = activeTechnique === 'XRD' ? 'primary' : 'supporting';
+  
   const workspaceStatus = matched
     ? activeTechnique === 'XRD' ? 'Phase matched' : 'Assignments saved'
     : featuresAvailable
@@ -325,7 +326,8 @@ export default function TechniqueWorkspace() {
   const insight = {
     ...getProjectInsight(project),
     primaryResult: matched ? project.phase : `${activeTechnique} evidence workspace`,
-    confidenceScore: Number(phaseConfidence.toFixed(1)),
+    claimStatus: project.claimStatus,
+    validationState: project.validationState,
     interpretation: `${TECHNIQUE_COPY[activeTechnique].noun} is active for ${project.name}. Dataset, processing state, detected features, and saved evidence are preserved in the shared demo workspace.`,
     keyEvidence: [
       ...(featuresAvailable
@@ -342,13 +344,13 @@ export default function TechniqueWorkspace() {
     ? [
         ['Detected peaks', '9 diffraction peaks'],
         ['Candidate phase', 'CuFe2O4 spinel'],
-        ['Confidence contribution', 'High'],
+        ['Evidence role', 'Primary'],
         ['Caveat', 'Requires surface validation (XPS)'],
       ]
     : [
         ['Tool output', `${activeTechnique} evidence packet`],
         ['Agent status', 'Ready for fusion'],
-        ['Confidence contribution', featuresAvailable ? 'Medium' : 'Pending'],
+        ['Evidence role', featuresAvailable ? 'Supporting' : 'Pending'],
         ['Caveat', 'Review alongside XRD and multi-tech context'],
       ];
 
@@ -413,7 +415,7 @@ export default function TechniqueWorkspace() {
   const handleSaveEvidence = () => {
     const datasetId = selectedDataset?.id ?? `${project.id}-${activeTechnique.toLowerCase()}-demo`;
     const features = detectedFeatures.length > 0 ? detectedFeatures : getTechniqueFeatures(project.xrdPeaks, activeTechnique);
-    makeEvidence(project.id, datasetId, activeTechnique, features, Number(phaseConfidence.toFixed(1))).forEach((item) => saveEvidence(item));
+    makeEvidence(project.id, datasetId, activeTechnique, features, evidenceRole).forEach((item) => saveEvidence(item));
     setRefreshKey((key) => key + 1);
     appendLog('evidence saved');
     showToast('Evidence saved');
@@ -455,14 +457,14 @@ export default function TechniqueWorkspace() {
       csvRows: processedData.slice(0, 240).map((point) => ({ x: point.x, y: point.y, technique: activeTechnique })),
     });
     const message = workspaceExportMessage(format);
-    appendLog(`${message} Project: ${project.name}; technique: ${activeTechnique}; dataset: ${selectedDataset?.fileName ?? 'demo dataset'}; confidence: ${phaseConfidence.toFixed(1)}%; provenance: ${selectedDataset?.id ?? project.id}.`);
+    appendLog(`${message} Project: ${project.name}; technique: ${activeTechnique}; dataset: ${selectedDataset?.fileName ?? 'demo dataset'}; claim status: ${project.claimStatus}; provenance: ${selectedDataset?.id ?? project.id}.`);
     showToast(message);
   };
 
   const createRun = (extraLog?: string): ProcessingRun => {
     const datasetId = selectedDataset?.id ?? `${project.id}-${activeTechnique.toLowerCase()}-demo`;
     const features = detectedFeatures.length > 0 ? detectedFeatures : getTechniqueFeatures(project.xrdPeaks, activeTechnique);
-    const evidence = makeEvidence(project.id, datasetId, activeTechnique, features, Number(phaseConfidence.toFixed(1)));
+    const evidence = makeEvidence(project.id, datasetId, activeTechnique, features, evidenceRole);
     evidence.forEach((item) => saveEvidence(item));
 
     const run = saveProcessingRun({
@@ -486,9 +488,9 @@ export default function TechniqueWorkspace() {
       evidence,
       matchResult: {
         phase: project.phase,
-        confidence: Number(phaseConfidence.toFixed(1)),
+        claimStatus: project.claimStatus,
         matchedPeaks: features.length,
-        missingPeaks: activeTechnique === 'XRD' && project.confidence < 90 ? ['weak high-angle shoulder'] : [],
+        missingPeaks: activeTechnique === 'XRD' && project.claimStatus !== 'strongly_supported' ? ['weak high-angle shoulder'] : [],
         unexplainedPeaks: activeTechnique === 'XRD' ? ['minor baseline ripple near 40 deg'] : [],
         caveat:
           activeTechnique === 'XRD'
@@ -851,8 +853,17 @@ export default function TechniqueWorkspace() {
                     <div className="flex items-center gap-2 mb-2">
                       <Sparkles size={16} className="text-cyan shrink-0" />
                       <h3 className="text-sm font-bold text-text-main">Agent Run Result</h3>
-                      <span className="rounded-full border border-cyan/30 bg-cyan/10 px-2 py-0.5 text-[10px] font-bold text-cyan">
-                        {agentRun.outputs.confidenceLabel}
+                      <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${
+                        agentRun.outputs.claimStatus === 'strongly_supported' ? 'border-emerald-600/30 bg-emerald-600/10 text-emerald-600' :
+                        agentRun.outputs.claimStatus === 'supported' ? 'border-cyan/30 bg-cyan/10 text-cyan' :
+                        agentRun.outputs.claimStatus === 'partial' ? 'border-amber-500/30 bg-amber-500/10 text-amber-500' :
+                        'border-text-muted/30 bg-text-muted/10 text-text-muted'
+                      }`}>
+                        {agentRun.outputs.claimStatus === 'strongly_supported' ? 'Strongly Supported' :
+                         agentRun.outputs.claimStatus === 'supported' ? 'Supported' :
+                         agentRun.outputs.claimStatus === 'partial' ? 'Partial' :
+                         agentRun.outputs.claimStatus === 'inconclusive' ? 'Inconclusive' :
+                         'Contradicted'}
                       </span>
                     </div>
                     <div className="space-y-2">
@@ -861,8 +872,19 @@ export default function TechniqueWorkspace() {
                         <p className="text-sm font-semibold text-text-main">{agentRun.outputs.phase}</p>
                       </div>
                       <div>
-                        <p className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">Confidence</p>
-                        <p className="text-lg font-bold text-cyan">{agentRun.outputs.confidence}%</p>
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">Claim Status</p>
+                        <p className={`text-lg font-bold ${
+                          agentRun.outputs.claimStatus === 'strongly_supported' ? 'text-emerald-600' :
+                          agentRun.outputs.claimStatus === 'supported' ? 'text-cyan' :
+                          agentRun.outputs.claimStatus === 'partial' ? 'text-amber-500' :
+                          'text-text-muted'
+                        }`}>
+                          {agentRun.outputs.claimStatus === 'strongly_supported' ? 'Strongly Supported' :
+                           agentRun.outputs.claimStatus === 'supported' ? 'Supported' :
+                           agentRun.outputs.claimStatus === 'partial' ? 'Partial' :
+                           agentRun.outputs.claimStatus === 'inconclusive' ? 'Inconclusive' :
+                           'Contradicted'}
+                        </p>
                       </div>
                       <div>
                         <p className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">Evidence Summary</p>
@@ -1171,8 +1193,17 @@ export default function TechniqueWorkspace() {
                       <Sparkles size={16} className="text-primary" />
                       <h3 className="text-sm font-semibold">Evidence & Insight</h3>
                     </div>
-                    <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
-                      {phaseConfidence.toFixed(1)}%
+                    <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
+                      project.claimStatus === 'strongly_supported' ? 'border-emerald-600/20 bg-emerald-600/10 text-emerald-600' :
+                      project.claimStatus === 'supported' ? 'border-primary/20 bg-primary/10 text-primary' :
+                      project.claimStatus === 'partial' ? 'border-amber-500/20 bg-amber-500/10 text-amber-500' :
+                      'border-text-muted/20 bg-text-muted/10 text-text-muted'
+                    }`}>
+                      {project.claimStatus === 'strongly_supported' ? 'Strongly Supported' :
+                       project.claimStatus === 'supported' ? 'Supported' :
+                       project.claimStatus === 'partial' ? 'Partial' :
+                       project.claimStatus === 'inconclusive' ? 'Inconclusive' :
+                       'Contradicted'}
                     </span>
                   </div>
                   <p className="mt-2 text-xs text-text-muted">
@@ -1207,7 +1238,7 @@ export default function TechniqueWorkspace() {
                             <div className="text-text-muted">matched</div>
                           </div>
                           <div className="rounded-md border border-border bg-surface p-2">
-                            <div className="font-bold text-text-main">{project.confidence < 90 ? 1 : 0}</div>
+                            <div className="font-bold text-text-main">{project.claimStatus !== 'strongly_supported' ? 1 : 0}</div>
                             <div className="text-text-muted">missing</div>
                           </div>
                           <div className="rounded-md border border-border bg-surface p-2">
@@ -1218,7 +1249,7 @@ export default function TechniqueWorkspace() {
                       </div>
                     ) : (
                       <p className="text-sm text-text-muted">
-                        Run {TECHNIQUE_COPY[activeTechnique].assignLabel.toLowerCase()} to populate confidence, matched features, limitations, and evidence.
+                        Run {TECHNIQUE_COPY[activeTechnique].assignLabel.toLowerCase()} to populate claim status, matched features, limitations, and evidence.
                       </p>
                     )}
                   </div>

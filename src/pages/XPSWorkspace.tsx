@@ -146,13 +146,15 @@ export default function XPSWorkspace() {
   // Calculate summary statistics from processed results
   const totalPeaks = processingResult.peaks.length;
   const matchedPeaks = processingResult.matches.length;
-  const avgSupport = matchedPeaks > 0 
-    ? processingResult.matches.reduce((sum, m) => sum + m.confidence, 0) / matchedPeaks 
-    : 0;
-  const supportLevel = avgSupport >= 0.9 ? 'Strongly Supported' 
-    : avgSupport >= 0.8 ? 'Supported' 
-    : avgSupport >= 0.7 ? 'Partially Supported' 
-    : 'Requires Validation';
+  
+  // Determine claim status based on evidence relationships
+  // Use reasoning: Do we have strong evidence from multiple matched peaks?
+  const hasStrongEvidence = matchedPeaks >= 3 && processingResult.peaks.length > 0;
+  const hasModerateEvidence = matchedPeaks >= 2;
+  const claimStatus = hasStrongEvidence ? 'strongly_supported' 
+    : hasModerateEvidence ? 'supported' 
+    : matchedPeaks > 0 ? 'partial' 
+    : 'inconclusive';
   
   // Determine primary chemical state (most intense matched peak)
   const primaryMatch = processingResult.matches
@@ -546,7 +548,12 @@ export default function XPSWorkspace() {
                           </div>
                           <div className="space-y-1">
                             <span className="text-[10px] uppercase tracking-wide text-text-muted block">EVIDENCE STRENGTH</span>
-                            <span className="text-lg font-semibold text-emerald-600 tabular-nums block">{supportLevel}</span>
+                            <span className="text-lg font-semibold text-emerald-600 tabular-nums block">
+                              {claimStatus === 'strongly_supported' ? 'Strongly Supported' : 
+                               claimStatus === 'supported' ? 'Supported' : 
+                               claimStatus === 'partial' ? 'Partial' : 
+                               'Inconclusive'}
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -580,7 +587,10 @@ export default function XPSWorkspace() {
                                 <td className="px-3 py-2 font-mono text-right text-text-main text-sm font-medium tabular-nums">{match.deltaBE.toFixed(2)}</td>
                                 <td className="px-3 py-2 font-mono text-right text-primary text-sm font-medium">{match.assignment}</td>
                                 <td className="px-3 py-2 font-mono text-right text-emerald-600 text-sm font-medium tabular-nums">
-                                  {match.confidence >= 0.9 ? 'Strong' : match.confidence >= 0.8 ? 'Good' : match.confidence >= 0.7 ? 'Moderate' : 'Weak'}
+                                  {/* Use reasoning: Strong match if ΔBE is very small, Good if reasonable, Moderate if larger */}
+                                  {Math.abs(match.deltaBE) < 0.2 ? 'Strong' : 
+                                   Math.abs(match.deltaBE) < 0.4 ? 'Good' : 
+                                   Math.abs(match.deltaBE) < 0.6 ? 'Moderate' : 'Weak'}
                                 </td>
                               </tr>
                             ))}

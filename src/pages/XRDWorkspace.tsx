@@ -31,9 +31,10 @@ function statusClass(status: 'complete' | 'warning' | 'error') {
   return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700';
 }
 
-function supportLevelClass(level: string) {
-  if (level === 'high') return 'text-emerald-600';
-  if (level === 'medium') return 'text-amber-600';
+function claimStatusClass(status: string) {
+  if (status === 'strongly_supported') return 'text-emerald-600';
+  if (status === 'supported') return 'text-amber-600';
+  if (status === 'partial') return 'text-orange-600';
   return 'text-red-600';
 }
 

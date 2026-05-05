@@ -101,7 +101,7 @@ export function buildXPSEvidencePacket(
   dataset: DemoDataset,
   project: DemoProject,
   featureCount: number,
-  baseSupportLevel: number,
+  baseClaimStatus: string,
 ): AgentEvidencePacket {
   const uncertaintyFlags: string[] = [
     'XPS provides surface chemistry only, not bulk phase information',
@@ -131,6 +131,11 @@ export function buildXPSEvidencePacket(
   
   features.push({ position: 531.4, intensity: 74, assignment: 'O 1s (lattice oxygen)' });
 
+  // Map claim status to score for compatibility
+  const fusedScore = baseClaimStatus === 'strongly_supported' ? 0.92 :
+                     baseClaimStatus === 'supported' ? 0.82 :
+                     baseClaimStatus === 'partial' ? 0.65 : 0.45;
+
   return {
     context: 'xps',
     datasetId: dataset.id,
@@ -144,7 +149,7 @@ export function buildXPSEvidencePacket(
     candidates: [
       {
         label: `Surface chemistry consistent with ${project.material}`,
-        score: baseSupportLevel / 100,
+        score: fusedScore,
         matchedFeatures: featureCount,
         totalFeatures: featureCount,
         missingFeatures: [],
@@ -159,7 +164,7 @@ export function buildXPSEvidencePacket(
         unexplainedFeatures: ['Possible C 1s contamination'],
       },
     ],
-    fusedScore: baseSupportLevel / 100,
+    fusedScore,
     uncertaintyFlags,
     processingNotes: [
       'Deterministic component detection in core-level regions',
@@ -176,7 +181,7 @@ export function buildFTIREvidencePacket(
   dataset: DemoDataset,
   project: DemoProject,
   featureCount: number,
-  baseSupportLevel: number,
+  baseClaimStatus: string,
 ): AgentEvidencePacket {
   const uncertaintyFlags: string[] = [
     'FTIR provides bonding information, not crystalline phase',
@@ -194,6 +199,11 @@ export function buildFTIREvidencePacket(
     { position: 3420, intensity: 42, assignment: 'Surface hydroxyl' },
   ];
 
+  // Map claim status to score for compatibility
+  const fusedScore = baseClaimStatus === 'strongly_supported' ? 0.92 :
+                     baseClaimStatus === 'supported' ? 0.82 :
+                     baseClaimStatus === 'partial' ? 0.65 : 0.45;
+
   return {
     context: 'ftir',
     datasetId: dataset.id,
@@ -207,7 +217,7 @@ export function buildFTIREvidencePacket(
     candidates: [
       {
         label: `Bonding signatures consistent with ${project.material}`,
-        score: baseSupportLevel / 100,
+        score: fusedScore,
         matchedFeatures: featureCount,
         totalFeatures: featureCount,
         missingFeatures: [],
@@ -222,7 +232,7 @@ export function buildFTIREvidencePacket(
         unexplainedFeatures: ['Strong support interference'],
       },
     ],
-    fusedScore: baseSupportLevel / 100,
+    fusedScore,
     uncertaintyFlags,
     processingNotes: [
       'Deterministic band detection in diagnostic windows',
@@ -239,7 +249,7 @@ export function buildRamanEvidencePacket(
   dataset: DemoDataset,
   project: DemoProject,
   featureCount: number,
-  baseSupportLevel: number,
+  baseClaimStatus: string,
 ): AgentEvidencePacket {
   const uncertaintyFlags: string[] = [
     'Raman provides structural fingerprint, not quantitative phase analysis',
@@ -259,6 +269,11 @@ export function buildRamanEvidencePacket(
     { position: 960, intensity: 38, assignment: 'Ferrite shoulder' },
   ];
 
+  // Map claim status to score for compatibility
+  const fusedScore = baseClaimStatus === 'strongly_supported' ? 0.92 :
+                     baseClaimStatus === 'supported' ? 0.82 :
+                     baseClaimStatus === 'partial' ? 0.65 : 0.45;
+
   return {
     context: 'raman',
     datasetId: dataset.id,
@@ -272,7 +287,7 @@ export function buildRamanEvidencePacket(
     candidates: [
       {
         label: `Structural fingerprint consistent with ${project.material}`,
-        score: baseSupportLevel / 100,
+        score: fusedScore,
         matchedFeatures: featureCount,
         totalFeatures: featureCount,
         missingFeatures: [],
@@ -287,7 +302,7 @@ export function buildRamanEvidencePacket(
         unexplainedFeatures: [],
       },
     ],
-    fusedScore: baseSupportLevel / 100,
+    fusedScore,
     uncertaintyFlags,
     processingNotes: [
       'Deterministic mode detection via peak finding',
@@ -307,22 +322,22 @@ export function buildEvidencePacket(
   project: DemoProject,
   xrdAnalysis: any | null,
   featureCount: number,
-  baseSupportLevel: number,
+  baseClaimStatus: string,
 ): AgentEvidencePacket {
   if (context === 'XRD' && xrdAnalysis) {
     return buildXRDEvidencePacket(dataset, project, xrdAnalysis);
   }
   
   if (context === 'XPS') {
-    return buildXPSEvidencePacket(dataset, project, featureCount, baseSupportLevel);
+    return buildXPSEvidencePacket(dataset, project, featureCount, baseClaimStatus);
   }
   
   if (context === 'FTIR') {
-    return buildFTIREvidencePacket(dataset, project, featureCount, baseSupportLevel);
+    return buildFTIREvidencePacket(dataset, project, featureCount, baseClaimStatus);
   }
   
   if (context === 'Raman') {
-    return buildRamanEvidencePacket(dataset, project, featureCount, baseSupportLevel);
+    return buildRamanEvidencePacket(dataset, project, featureCount, baseClaimStatus);
   }
   
   throw new Error(`Unsupported context: ${context}`);

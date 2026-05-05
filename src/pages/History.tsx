@@ -6,6 +6,17 @@ import { Card } from '../components/ui/Card';
 import { getAllHistoryEntries } from '../data/demoProjects';
 import { formatChemicalFormula } from '../utils';
 
+function formatClaimStatus(status: string): string {
+  switch (status) {
+    case 'strongly_supported': return 'Strongly Supported';
+    case 'supported': return 'Supported';
+    case 'partial': return 'Partial';
+    case 'inconclusive': return 'Inconclusive';
+    case 'contradicted': return 'Contradicted';
+    default: return status;
+  }
+}
+
 const agentRuns = [
   {
     id: 'AG-RUN-CF-042',
@@ -13,7 +24,7 @@ const agentRuns = [
     project: 'CuFe2O4 Spinel Formation',
     goal: 'Determine ferrite spinel formation and catalytic activation evidence',
     mode: 'Deep Analysis',
-    confidence: 'High / Medium',
+    claimStatus: 'supported',
     decision: 'Spinel formation supported; catalytic activation requires XPS validation',
     status: 'Report-ready',
     date: '2026-04-29',
@@ -25,7 +36,7 @@ const agentRuns = [
     project: 'CuFe2O4/SBA-15 Multi-Tech Correlation',
     goal: 'Fuse XRD, Raman, FTIR, and XPS evidence for supported ferrite catalyst',
     mode: 'Autonomous Workflow',
-    confidence: 'High',
+    claimStatus: 'strongly_supported',
     decision: 'Multi-tech evidence supports dispersed CuFe2O4/SBA-15 structure',
     status: 'Evidence-linked',
     date: '2026-04-29',
@@ -37,7 +48,7 @@ const agentRuns = [
     project: 'NiFe2O4 Control Sample',
     goal: 'Compare control ferrite phase against CuFe2O4 reference workflow',
     mode: 'Quick Insight',
-    confidence: 'Medium',
+    claimStatus: 'partial',
     decision: 'Phase evidence acceptable; requires replicate confirmation',
     status: 'Draft',
     date: '2026-04-28',
@@ -45,7 +56,7 @@ const agentRuns = [
   },
 ];
 
-const filters = ['Project', 'Technique', 'Confidence', 'Mode', 'Status'];
+const filters = ['Project', 'Technique', 'Claim Status', 'Mode', 'Status'];
 
 function actionLabel(action: string) {
   if (action === 'notebook') return 'Open Notebook';
@@ -159,8 +170,13 @@ export default function HistoryPage() {
                   <div className="w-full shrink-0 space-y-3 lg:w-52">
                     <div className="grid grid-cols-2 gap-2 text-xs">
                       <div className="rounded-lg border border-border bg-background p-3">
-                        <p className="text-text-muted">Confidence</p>
-                        <p className="mt-1 font-semibold text-cyan">{run.confidence}</p>
+                        <p className="text-text-muted">Claim Status</p>
+                        <p className={`mt-1 font-semibold ${
+                          run.claimStatus === 'strongly_supported' ? 'text-emerald-600' :
+                          run.claimStatus === 'supported' ? 'text-cyan' :
+                          run.claimStatus === 'partial' ? 'text-amber-500' :
+                          'text-text-muted'
+                        }`}>{formatClaimStatus(run.claimStatus)}</p>
                       </div>
                       <div className="rounded-lg border border-border bg-background p-3">
                         <p className="text-text-muted">Date</p>
@@ -206,7 +222,7 @@ export default function HistoryPage() {
                 ['Report-ready runs', '1'],
                 ['Evidence-linked runs', '2'],
                 ['Techniques covered', 'XRD, Raman, FTIR, XPS'],
-                ['Most recent decision', 'Spinel formation supported with high confidence'],
+                ['Most recent decision', 'Spinel formation supported by evidence'],
               ].map(([label, value]) => (
                 <div key={label} className="rounded-lg border border-border bg-background p-3">
                   <p className="text-xs text-text-muted">{label}</p>
@@ -230,7 +246,7 @@ export default function HistoryPage() {
             <div>Analysis run</div>
             <div>Project</div>
             <div>Technique</div>
-            <div>Confidence</div>
+            <div>Claim Status</div>
             <div>Status</div>
             <div>Date</div>
             <div>Action</div>
@@ -246,7 +262,12 @@ export default function HistoryPage() {
               </div>
               <div className="text-text-muted">{entry.projectName}</div>
               <div className="text-text-muted">{entry.technique}</div>
-              <div className="font-semibold text-cyan">{entry.confidence}</div>
+              <div className={`font-semibold ${
+                entry.claimStatus === 'strongly_supported' ? 'text-emerald-600' :
+                entry.claimStatus === 'supported' ? 'text-cyan' :
+                entry.claimStatus === 'partial' ? 'text-amber-500' :
+                'text-text-muted'
+              }`}>{formatClaimStatus(entry.claimStatus)}</div>
               <div>
                 <span className="rounded-full border border-border bg-background px-2 py-1 text-xs text-text-muted">
                   {entry.status}

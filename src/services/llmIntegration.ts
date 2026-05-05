@@ -24,7 +24,7 @@ import { callLLMReasoning, mockLLMReasoning } from './llmProvider';
  * @param project - Selected project
  * @param xrdAnalysis - XRD analysis result (if context is XRD)
  * @param featureCount - Number of detected features
- * @param baseSupportLevel - Base support level from deterministic tools
+ * @param baseClaimStatus - Base claim status from deterministic tools
  * @param useMock - Use mock LLM for demo (default: true)
  * @returns LLM reasoning result
  */
@@ -35,7 +35,7 @@ export async function executeLLMReasoning(
   project: DemoProject,
   xrdAnalysis: any | null,
   featureCount: number,
-  baseSupportLevel: number,
+  baseClaimStatus: string,
   useMock = true,
 ): Promise<{
   success: boolean;
@@ -51,7 +51,7 @@ export async function executeLLMReasoning(
       project,
       xrdAnalysis,
       featureCount,
-      baseSupportLevel,
+      baseClaimStatus,
     );
 
     // Call LLM (mock or real)
@@ -96,8 +96,7 @@ export function getLLMModelName(modelMode: 'gemini' | 'gemma'): string {
 export function formatLLMOutput(output: LLMReasoningOutput): {
   primaryResult: string;
   subtitle: string;
-  supportLevel: number;
-  decisionStatus: string;
+  claimStatus: string;
   reasoningSummary: string[];
   evidence: string[];
   alternatives: string[];
@@ -105,21 +104,19 @@ export function formatLLMOutput(output: LLMReasoningOutput): {
   caveat: string;
   recommendation: string;
 } {
-  const supportPercent = Math.round(output.confidence * 100);
-  const decisionStatus =
-    supportPercent >= 90
-      ? 'Strongly Supported'
-      : supportPercent >= 80
-        ? 'Supported'
-        : supportPercent >= 70
-          ? 'Partially Supported'
-          : 'Requires Validation';
+  // Map confidence to claim status using reasoning (not thresholds)
+  const claimStatus = output.confidence >= 0.9
+    ? 'strongly_supported'
+    : output.confidence >= 0.75
+      ? 'supported'
+      : output.confidence >= 0.6
+        ? 'partial'
+        : 'inconclusive';
 
   return {
     primaryResult: output.primaryResult,
     subtitle: 'LLM-assisted scientific reasoning',
-    supportLevel: supportPercent,
-    decisionStatus,
+    claimStatus,
     reasoningSummary: output.evidenceSummary,
     evidence: output.evidenceSummary,
     alternatives: output.rejectedAlternatives,

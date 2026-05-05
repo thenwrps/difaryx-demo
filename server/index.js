@@ -45,7 +45,8 @@ function fallbackDecision(reasoningMode = "fallback") {
   return {
     final_decision:
       "Spinel ferrite phase is likely present based on the provided XRD peak evidence.",
-    supportLevel: 85,
+    claimStatus: "supported",
+    validationState: "complete",
     evidence: [
       "Key diffraction peaks align with a spinel ferrite reference pattern.",
       "No dominant impurity phase is indicated in the provided peak list.",
@@ -75,12 +76,14 @@ Task:
 Return ONLY valid JSON with this exact structure:
 {
   "final_decision": "one concise scientific conclusion",
-  "confidence": 0,
+  "claimStatus": "strongly_supported | supported | partial | inconclusive",
+  "validationState": "complete | partial | requires_validation",
   "evidence": ["evidence point 1", "evidence point 2", "evidence point 3"]
 }
 
 Rules:
-- confidence must be an integer from 0 to 100
+- claimStatus must be one of: strongly_supported, supported, partial, inconclusive
+- validationState must be one of: complete, partial, requires_validation
 - evidence must contain exactly 3 items
 - do not include markdown
 - do not include explanations outside JSON
@@ -178,10 +181,8 @@ app.post("/run-agent", async (req, res) => {
       success: true,
       data: {
         final_decision: data.final_decision || fallbackDecision().final_decision,
-        supportLevel:
-          typeof data.supportLevel === "number"
-            ? data.supportLevel
-            : fallbackDecision().supportLevel,
+        claimStatus: data.claimStatus || fallbackDecision().claimStatus,
+        validationState: data.validationState || fallbackDecision().validationState,
         evidence: Array.isArray(data.evidence)
           ? data.evidence.slice(0, 3)
           : fallbackDecision().evidence,
@@ -212,7 +213,8 @@ ${input || "Analyze XRD peaks at 30.2, 35.5, 43.3, 57.2 degrees."}
 Return ONLY valid JSON:
 {
   "final_decision": "concise scientific conclusion",
-  "confidence": 0,
+  "claimStatus": "strongly_supported | supported | partial | inconclusive",
+  "validationState": "complete | partial | requires_validation",
   "evidence": ["point 1", "point 2", "point 3"]
 }
 `;

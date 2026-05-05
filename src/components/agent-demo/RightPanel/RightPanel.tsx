@@ -102,7 +102,7 @@ function getScientificSummary(technique: string) {
             content: 'Sharp, well-resolved peaks indicate high crystallinity (crystallite size ~35 nm from Scherrer analysis). Absence of secondary oxide phases (Fe₂O₃, CuO) above 2% detection limit.',
           },
         ],
-        supportLevel: 'Strongly Supported',
+        claimStatus: 'strongly_supported',
       };
     case 'FTIR':
       return {
@@ -121,7 +121,7 @@ function getScientificSummary(technique: string) {
             content: 'Cation distribution Cu₀.₂Fe₀.₈[Cu₀.₈Fe₁.₂]O₄ supported by vibrational analysis. Surface hydroxyl groups (3400 cm⁻¹) suggest active catalytic sites. Support interaction preserved.',
           },
         ],
-        supportLevel: 'Supported',
+        claimStatus: 'supported',
       };
     case 'Raman':
       return {
@@ -140,7 +140,7 @@ function getScientificSummary(technique: string) {
             content: 'Sharp linewidths (FWHM < 25 cm⁻¹) indicate long-range structural order. Absence of D-band (1350 cm⁻¹) rules out carbon contamination. Lattice dynamics support inverse spinel assignment.',
           },
         ],
-        supportLevel: 'Strongly Supported',
+        claimStatus: 'strongly_supported',
       };
     case 'XPS':
       return {
@@ -159,7 +159,7 @@ function getScientificSummary(technique: string) {
             content: 'Surface composition Cu₁.₃Fe₁.₇O₄ vs. bulk CuFe₂O₄ suggests reconstruction. Absence of metallic Cu (932.5 eV) confirms oxide stability. Hydroxyl coverage θ_OH = 0.4 ML indicates hydrated surface for catalysis.',
           },
         ],
-        supportLevel: 'Supported',
+        claimStatus: 'supported',
       };
     default:
       return {
@@ -174,7 +174,7 @@ function getScientificSummary(technique: string) {
             content: 'No major conflicting signals detected',
           },
         ],
-        supportLevel: 'Supported',
+        claimStatus: 'supported',
       };
   }
 }
@@ -966,7 +966,12 @@ export function RightPanel({
               <div className="mt-3 pt-3 border-t border-slate-700">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-semibold text-slate-400">Decision Status:</span>
-                  <span className="text-xs text-emerald-400 font-semibold">{getScientificSummary(technique).supportLevel}</span>
+                  <span className="text-xs text-emerald-400 font-semibold">
+                    {getScientificSummary(technique).claimStatus === 'strongly_supported' ? 'Strongly Supported' :
+                     getScientificSummary(technique).claimStatus === 'supported' ? 'Supported' :
+                     getScientificSummary(technique).claimStatus === 'partial' ? 'Partial' :
+                     'Inconclusive'}
+                  </span>
                 </div>
               </div>
             </Section>

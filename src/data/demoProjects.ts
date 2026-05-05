@@ -6,11 +6,15 @@ export interface DemoPeak {
   label: string;
 }
 
+export type ClaimStatus = 'strongly_supported' | 'supported' | 'partial' | 'inconclusive' | 'contradicted';
+export type ValidationState = 'complete' | 'partial' | 'requires_validation';
+export type EvidenceRole = 'primary' | 'supporting' | 'context';
+
 export interface DemoHistoryEntry {
   id: string;
   run: string;
   technique: string;
-  supportLevel: string;
+  claimStatus: ClaimStatus;
   status: string;
   date: string;
   action: 'workspace' | 'notebook' | 'agent';
@@ -22,8 +26,8 @@ export interface DemoProject {
   material: string;
   techniques: Technique[];
   status: string;
-  supportLevel: number;
-  decisionStatus: string;
+  claimStatus: ClaimStatus;
+  validationState: ValidationState;
   phase: string;
   lastUpdated: string;
   createdDate: string;
@@ -47,8 +51,8 @@ export interface AgentRunResult {
   material: string;
   selectedDatasets: Technique[];
   decision: string;
-  supportLevel: number;
-  decisionStatus: string;
+  claimStatus: ClaimStatus;
+  validationState: ValidationState;
   evidence: string[];
   warnings: string[];
   recommendations: string[];
@@ -77,7 +81,7 @@ export interface Evidence {
   technique: Technique;
   datasetId: string;
   claim: string;
-  supportLevel: number;
+  evidenceRole: EvidenceRole;
   support: string;
   limitations?: string;
 }
@@ -131,7 +135,7 @@ export interface ProcessingRun {
   evidence: Evidence[];
   matchResult?: {
     phase: string;
-    supportLevel: number;
+    claimStatus: ClaimStatus;
     matchedPeaks: number;
     missingPeaks: string[];
     unexplainedPeaks: string[];
@@ -154,8 +158,8 @@ export const demoProjects: DemoProject[] = [
     material: 'Copper ferrite spinel',
     techniques: ['XRD', 'Raman'],
     status: 'Report Ready',
-    supportLevel: 93.3,
-    decisionStatus: 'Strongly Supported',
+    claimStatus: 'strongly_supported',
+    validationState: 'complete',
     phase: 'CuFe2O4 copper ferrite phase',
     lastUpdated: '2 hours ago',
     createdDate: '2026-04-29',
@@ -199,7 +203,7 @@ export const demoProjects: DemoProject[] = [
         id: 'hist-cu-xrd',
         run: 'XRD phase identification',
         technique: 'XRD',
-        supportLevel: 'Strongly Supported',
+        claimStatus: 'strongly_supported',
         status: 'Report Ready',
         date: '2026-04-29 07:25',
         action: 'workspace',
@@ -208,7 +212,7 @@ export const demoProjects: DemoProject[] = [
         id: 'hist-cu-agent',
         run: 'Agent decision run',
         technique: 'Agent Mode',
-        supportLevel: 'Strongly Supported',
+        claimStatus: 'strongly_supported',
         status: 'Complete',
         date: '2026-04-29 07:36',
         action: 'agent',
@@ -217,7 +221,7 @@ export const demoProjects: DemoProject[] = [
         id: 'hist-cu-report',
         run: 'Notebook report generated',
         technique: 'Notebook',
-        supportLevel: 'Complete',
+        claimStatus: 'strongly_supported',
         status: 'Export Ready',
         date: '2026-04-29 07:42',
         action: 'notebook',
@@ -231,8 +235,8 @@ export const demoProjects: DemoProject[] = [
     material: 'Copper ferrite on mesoporous silica',
     techniques: ['XRD', 'XPS', 'FTIR', 'Raman'],
     status: 'In Progress',
-    supportLevel: 88,
-    decisionStatus: 'Supported',
+    claimStatus: 'supported',
+    validationState: 'partial',
     phase: 'CuFe2O4 dispersed on mesoporous SBA-15',
     lastUpdated: '5 hours ago',
     createdDate: '2026-04-28',
@@ -272,7 +276,7 @@ export const demoProjects: DemoProject[] = [
         id: 'hist-sba-multi',
         run: 'Multi-tech correlation',
         technique: 'XRD + XPS + FTIR',
-        supportLevel: 'Supported',
+        claimStatus: 'supported',
         status: 'In Progress',
         date: '2026-04-28 16:18',
         action: 'workspace',
@@ -286,8 +290,8 @@ export const demoProjects: DemoProject[] = [
     material: 'Nickel ferrite spinel',
     techniques: ['XRD'],
     status: 'Report Ready',
-    supportLevel: 89,
-    decisionStatus: 'Supported',
+    claimStatus: 'supported',
+    validationState: 'complete',
     phase: 'Spinel nickel ferrite',
     lastUpdated: '1 day ago',
     createdDate: '2026-04-27',
@@ -320,7 +324,7 @@ export const demoProjects: DemoProject[] = [
         id: 'hist-ni-xrd',
         run: 'XRD phase identification',
         technique: 'XRD',
-        supportLevel: 'Supported',
+        claimStatus: 'supported',
         status: 'Report Ready',
         date: '2026-04-27 14:05',
         action: 'workspace',
@@ -334,8 +338,8 @@ export const demoProjects: DemoProject[] = [
     material: 'Cobalt ferrite spinel',
     techniques: ['XRD', 'XPS'],
     status: 'Report Ready',
-    supportLevel: 91,
-    decisionStatus: 'Strongly Supported',
+    claimStatus: 'strongly_supported',
+    validationState: 'complete',
     phase: 'Cobalt ferrite spinel phase',
     lastUpdated: '2 days ago',
     createdDate: '2026-04-26',
@@ -368,7 +372,7 @@ export const demoProjects: DemoProject[] = [
         id: 'hist-co-xrd',
         run: 'XRD + XPS review',
         technique: 'XRD + XPS',
-        supportLevel: 'Strongly Supported',
+        claimStatus: 'strongly_supported',
         status: 'Report Ready',
         date: '2026-04-26 11:20',
         action: 'workspace',
@@ -382,8 +386,8 @@ export const demoProjects: DemoProject[] = [
     material: 'Iron oxide nanoparticles',
     techniques: ['FTIR', 'Raman'],
     status: 'In Progress',
-    supportLevel: 84,
-    decisionStatus: 'Partially Supported',
+    claimStatus: 'partial',
+    validationState: 'requires_validation',
     phase: 'Iron oxide nanoparticle signatures',
     lastUpdated: '1 week ago',
     createdDate: '2026-04-22',
@@ -418,7 +422,7 @@ export const demoProjects: DemoProject[] = [
         id: 'hist-fe-ftir',
         run: 'FTIR/Raman evidence review',
         technique: 'FTIR + Raman',
-        supportLevel: 'Partially Supported',
+        claimStatus: 'partial',
         status: 'In Progress',
         date: '2026-04-22 09:15',
         action: 'workspace',
@@ -504,12 +508,11 @@ export function getAgentPath(project: DemoProject) {
 export function getProjectInsight(project: DemoProject) {
   return {
     primaryResult: project.phase,
-    supportScore: project.supportLevel,
-    decisionStatus: project.decisionStatus,
+    claimStatus: project.claimStatus,
+    validationState: project.validationState,
     interpretation: project.summary,
     keyEvidence: project.evidence,
     warnings: project.status === 'In Progress' ? ['This demo project still has pending review items.'] : [],
-    uncertainty: project.supportLevel >= 90 ? 'Low' : 'Moderate',
     recommendedNextStep: project.recommendations,
   };
 }
@@ -552,25 +555,94 @@ export function getTechniqueEvidence(project: DemoProject, selectedDatasets: Tec
   return evidence;
 }
 
-export function calculateDemoSupportLevel(project: DemoProject, selectedDatasets: Technique[]) {
-  if (selectedDatasets.length === 0) return Math.max(35, project.supportLevel - 35);
+/**
+ * Derive claim status based on evidence relationships (NO NUMERIC THRESHOLDS)
+ */
+export function deriveClaimStatus(
+  project: DemoProject,
+  selectedDatasets: Technique[]
+): ClaimStatus {
+  if (selectedDatasets.length === 0) {
+    return 'inconclusive';
+  }
 
-  let supportLevel = project.supportLevel;
   const selected = new Set(selectedDatasets);
+  const primaryEvidence: Technique[] = [];
+  const supportingEvidence: Technique[] = [];
 
-  if (selected.has('XRD') && selectedDatasets.length === 1) supportLevel -= 6;
-  if (selected.has('XRD') && selected.has('Raman')) supportLevel += 2.4;
-  if (project.id === 'cufe2o4-sba15' && selected.has('XPS') && selected.has('FTIR')) supportLevel += 3;
-  if (!selected.has('XRD') && project.techniques.includes('XRD')) supportLevel -= 8;
+  // Classify evidence by role
+  selectedDatasets.forEach((technique) => {
+    if (technique === 'XRD') {
+      primaryEvidence.push(technique);
+    } else if (technique === 'XPS' || technique === 'FTIR' || technique === 'Raman') {
+      supportingEvidence.push(technique);
+    }
+  });
 
-  const missingCoreTechniques = project.techniques.filter((technique) => !selected.has(technique));
-  supportLevel -= missingCoreTechniques.length * 2.5;
+  // Reasoning rules based on evidence relationships
+  // Rule 1: Multiple primary + supporting evidence = strongly supported
+  if (primaryEvidence.length >= 1 && supportingEvidence.length >= 2) {
+    return 'strongly_supported';
+  }
 
-  return Number(Math.max(45, Math.min(98, supportLevel)).toFixed(1));
+  // Rule 2: Primary evidence with at least one supporting = supported
+  if (primaryEvidence.length >= 1 && supportingEvidence.length >= 1) {
+    return 'supported';
+  }
+
+  // Rule 3: Primary evidence alone = supported (but note missing techniques)
+  if (primaryEvidence.length >= 1) {
+    const missingCoreTechniques = project.techniques.filter((t) => !selected.has(t));
+    if (missingCoreTechniques.length > 0) {
+      return 'supported';
+    }
+    return 'supported';
+  }
+
+  // Rule 4: Only supporting evidence (no primary) = partial
+  if (supportingEvidence.length >= 2) {
+    return 'partial';
+  }
+
+  // Rule 5: Single supporting technique = inconclusive
+  if (supportingEvidence.length === 1) {
+    return 'inconclusive';
+  }
+
+  return 'inconclusive';
+}
+
+/**
+ * Derive validation state based on evidence completeness
+ */
+export function deriveValidationState(
+  project: DemoProject,
+  selectedDatasets: Technique[]
+): ValidationState {
+  if (selectedDatasets.length === 0) {
+    return 'requires_validation';
+  }
+
+  const selected = new Set(selectedDatasets);
+  const missingCoreTechniques = project.techniques.filter((t) => !selected.has(t));
+
+  // Complete: all project techniques included
+  if (missingCoreTechniques.length === 0) {
+    return 'complete';
+  }
+
+  // Partial: some techniques included but not all
+  if (selectedDatasets.length >= 2) {
+    return 'partial';
+  }
+
+  // Requires validation: only one technique or missing critical evidence
+  return 'requires_validation';
 }
 
 export function buildAgentRun(project: DemoProject, selectedDatasets: Technique[]): AgentRunResult {
-  const supportLevel = calculateDemoSupportLevel(project, selectedDatasets);
+  const claimStatus = deriveClaimStatus(project, selectedDatasets);
+  const validationState = deriveValidationState(project, selectedDatasets);
   const evidence = getTechniqueEvidence(project, selectedDatasets);
   const warnings: string[] = [];
   const missingCoreTechniques = project.techniques.filter((technique) => !selectedDatasets.includes(technique));
@@ -591,7 +663,6 @@ export function buildAgentRun(project: DemoProject, selectedDatasets: Technique[
     warnings.push('CuFe2O4/SBA-15 benefits from XPS and FTIR correlation before final reporting.');
   }
 
-  const decisionStatus = supportLevel >= 90 ? 'Strongly Supported' : supportLevel >= 80 ? 'Supported' : supportLevel >= 70 ? 'Partially Supported' : 'Requires Validation';
   const datasetPhrase = selectedDatasets.length > 0 ? selectedDatasets.join(' + ') : 'no selected datasets';
 
   return {
@@ -600,8 +671,8 @@ export function buildAgentRun(project: DemoProject, selectedDatasets: Technique[
     material: project.material,
     selectedDatasets,
     decision: `${project.phase} confirmed from ${datasetPhrase}`,
-    supportLevel,
-    decisionStatus,
+    claimStatus,
+    validationState,
     evidence,
     warnings,
     recommendations: project.recommendations,
@@ -613,10 +684,10 @@ export function buildAgentRun(project: DemoProject, selectedDatasets: Technique[
         ? `Detected ${project.xrdPeaks.length} diffraction peaks and matched the reference phase.`
         : 'Skipped XRD peak matching because XRD was not selected.',
       'Fused selected technique evidence into a traceable decision.',
-      `Evidence strength: ${decisionStatus}.`,
+      `Evidence assessment: ${claimStatus}.`,
     ],
     generatedAt: new Date().toISOString(),
-    summary: `${project.summary} Agent run used ${datasetPhrase} and produced ${decisionStatus} decision status.`,
+    summary: `${project.summary} Agent run used ${datasetPhrase} and produced ${claimStatus} claim status.`,
   };
 }
 
@@ -627,8 +698,8 @@ export function generateNotebookSections(project: DemoProject, runResult?: Agent
     title: project.notebook.title,
     summary: result.summary,
     decision: result.decision,
-    supportLevel: result.supportLevel,
-    decisionStatus: result.decisionStatus,
+    claimStatus: result.claimStatus,
+    validationState: result.validationState,
     evidence: result.evidence,
     warnings: result.warnings,
     recommendations: result.recommendations,
@@ -637,7 +708,7 @@ export function generateNotebookSections(project: DemoProject, runResult?: Agent
       result.detectedPeaks.length > 0
         ? `${result.detectedPeaks.length} diffraction peaks used in the generated run.`
         : project.notebook.peakDetection,
-    phaseInterpretation: `${project.phase}. ${result.decisionStatus} from ${result.selectedDatasets.join(' + ') || 'no selected datasets'}.`,
+    phaseInterpretation: `${project.phase}. ${result.claimStatus} from ${result.selectedDatasets.join(' + ') || 'no selected datasets'}.`,
   };
 }
 

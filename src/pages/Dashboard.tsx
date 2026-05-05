@@ -21,7 +21,6 @@ import { formatChemicalFormula } from '../utils';
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const [isInitializing, setIsInitializing] = useState(true);
   const [feedback, setFeedback] = useState('');
   const [localExperiments, setLocalExperiments] = useState<DemoExperiment[]>([]);
   const [experimentModalOpen, setExperimentModalOpen] = useState(false);
@@ -29,9 +28,7 @@ export default function Dashboard() {
   const [selectedTechniques, setSelectedTechniques] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setIsInitializing(false), 1400);
     setLocalExperiments(getLocalExperiments());
-    return () => window.clearTimeout(timer);
   }, []);
 
   return (
@@ -80,8 +77,19 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-sm font-bold text-emerald-600">Strongly Supported</div>
-                  <div className="text-[10px] text-text-muted uppercase tracking-wider">Decision Status</div>
+                  <div className={`text-sm font-bold ${
+                    project.claimStatus === 'strongly_supported' ? 'text-emerald-600' :
+                    project.claimStatus === 'supported' ? 'text-cyan' :
+                    project.claimStatus === 'partial' ? 'text-amber-500' :
+                    'text-text-muted'
+                  }`}>
+                    {project.claimStatus === 'strongly_supported' ? 'Strongly Supported' :
+                     project.claimStatus === 'supported' ? 'Supported' :
+                     project.claimStatus === 'partial' ? 'Partial' :
+                     project.claimStatus === 'inconclusive' ? 'Inconclusive' :
+                     'Contradicted'}
+                  </div>
+                  <div className="text-[10px] text-text-muted uppercase tracking-wider">Claim Status</div>
                 </div>
               </div>
               <div className="flex-1 p-4 flex flex-col">
@@ -244,22 +252,6 @@ export default function Dashboard() {
       </div>
     </DashboardLayout>
 
-    <div
-      className={`fixed inset-0 z-[100] flex items-center justify-center bg-[#070B12] transition-opacity duration-500 ${
-        isInitializing ? 'opacity-100' : 'pointer-events-none opacity-0'
-      }`}
-      aria-hidden={!isInitializing}
-    >
-      <div className="flex flex-col items-center text-center">
-        <h2 className="text-2xl font-semibold tracking-[0.18em] text-white">DIFARYX</h2>
-        <p className="mt-3 text-sm text-slate-400">Initializing workspace</p>
-        <div className="mt-6 flex items-center gap-2" aria-hidden="true">
-          <span className="h-1.5 w-1.5 rounded-full bg-blue-400/80 animate-pulse" />
-          <span className="h-1.5 w-1.5 rounded-full bg-cyan-400/80 animate-pulse [animation-delay:160ms]" />
-          <span className="h-1.5 w-1.5 rounded-full bg-indigo-400/80 animate-pulse [animation-delay:320ms]" />
-        </div>
-      </div>
-    </div>
     <ExperimentModal
       open={experimentModalOpen}
       defaultProjectId={experimentProjectId}

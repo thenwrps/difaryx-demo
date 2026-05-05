@@ -24,6 +24,17 @@ import {
 import { DemoExportFormat, exportDemoArtifact } from '../utils/demoExport';
 import { getRun, type AgentRun } from '../data/runModel';
 
+function formatClaimStatus(status: string): string {
+  switch (status) {
+    case 'strongly_supported': return 'Strongly Supported';
+    case 'supported': return 'Supported';
+    case 'partial': return 'Partial';
+    case 'inconclusive': return 'Inconclusive';
+    case 'contradicted': return 'Contradicted';
+    default: return status;
+  }
+}
+
 export default function NotebookLab() {
   const [searchParams] = useSearchParams();
   const project = getProject(searchParams.get('project'));
@@ -56,8 +67,8 @@ export default function NotebookLab() {
         title: `Agent Run: ${project.name}`,
         summary: agentRun.outputs.interpretation,
         decision: agentRun.outputs.phase,
-        supportLevel: agentRun.outputs.confidence,
-        decisionStatus: agentRun.outputs.confidenceLabel,
+        claimStatus: agentRun.outputs.claimStatus || 'supported',
+        validationState: agentRun.outputs.validationState || 'complete',
         evidence: agentRun.outputs.evidence,
         warnings: agentRun.outputs.caveats,
         recommendations: agentRun.outputs.recommendations,
@@ -68,22 +79,21 @@ export default function NotebookLab() {
           'Generated autonomous decision with evidence chain',
         ],
         peakDetection: `${agentRun.outputs.detectedPeaks?.length ?? 0} peaks detected by agent`,
-        phaseInterpretation: `${agentRun.outputs.phase} - ${agentRun.outputs.confidenceLabel}`,
+        phaseInterpretation: `${agentRun.outputs.phase} - ${agentRun.outputs.claimStatus || 'supported'}`,
       };
     }
     
     const base = generateNotebookSections(project, runResult);
     if (!workspaceRun) return base;
 
-    const supportLevel = workspaceRun.matchResult?.supportLevel ?? project.supportLevel;
-    const decisionStatus = supportLevel >= 90 ? 'Strongly Supported' : supportLevel >= 80 ? 'Supported' : supportLevel >= 70 ? 'Partially Supported' : 'Requires Validation';
+    const claimStatus = workspaceRun.matchResult?.claimStatus ?? project.claimStatus;
 
     return {
       ...base,
       summary: `${workspaceRun.technique} workspace run generated from ${workspaceDataset?.fileName ?? 'selected dataset'} with ${workspaceRun.detectedFeatures.length} detected features and traceable processing parameters.`,
       decision: workspaceRun.matchResult?.phase ?? `${workspaceRun.technique} evidence saved for ${project.name}`,
-      supportLevel,
-      decisionStatus,
+      claimStatus,
+      validationState: project.validationState,
       evidence: workspaceRun.evidence.map((item) => item.claim),
       warnings: workspaceRun.matchResult?.missingPeaks.length
         ? [`Missing or weak references: ${workspaceRun.matchResult.missingPeaks.join(', ')}.`]
@@ -140,7 +150,7 @@ export default function NotebookLab() {
       title: `${notebook.title} Report`,
       sections: [
         { heading: 'Summary', lines: [notebook.summary] },
-        { heading: 'Decision', lines: [notebook.decision, notebook.decisionStatus] },
+        { heading: 'Decision', lines: [notebook.decision, formatClaimStatus(notebook.claimStatus)] },
         { heading: 'Pipeline', lines: notebook.processingPipeline },
         { heading: 'Evidence', lines: notebook.evidence },
         { heading: 'Observations', lines: observations.length > 0 ? observations : ['No added observations.'] },
@@ -155,7 +165,7 @@ export default function NotebookLab() {
         project: project.name,
         row: index + 1,
         evidence: item,
-        status: notebook.decisionStatus,
+        status: formatClaimStatus(notebook.claimStatus),
       })),
     });
     setExportMenuOpen(false);
@@ -315,7 +325,7 @@ export default function NotebookLab() {
                       >
                         <span className="font-semibold text-text-main">{run.technique} run - {dataset?.fileName ?? run.datasetId}</span>
                         <span className="mt-1 block text-xs text-text-muted">
-                          {new Date(run.timestamp).toLocaleString()} / {run.detectedFeatures.length} features / {run.matchResult?.supportLevel >= 90 ? 'Strongly Supported' : run.matchResult?.supportLevel >= 80 ? 'Supported' : run.matchResult?.supportLevel >= 70 ? 'Partially Supported' : 'Requires Validation'}
+                          {new Date(run.timestamp).toLocaleString()} / {run.detectedFeatures.length} features / {formatClaimStatus(run.matchResult?.claimStatus || 'supported')}
                         </span>
                       </button>
                     );
@@ -330,23 +340,6 @@ export default function NotebookLab() {
 
           <div className="p-6 max-w-5xl w-full mx-auto space-y-8">
             <section className="grid grid-cols-1 gap-4 xl:grid-cols-2 2xl:hidden">
-              <Card className="p-4">
-                <div className="text-xs font-semibold uppercase tracking-wider text-text-muted">Judge View Summary</div>
-                <div className="mt-3 grid gap-3 text-sm sm:grid-cols-3 xl:grid-cols-1">
-                  <div>
-                    <div className="text-xs font-semibold uppercase tracking-wider text-primary">Problem</div>
-                    <p className="mt-1 text-text-muted">Fragmented characterization workflows</p>
-                  </div>
-                  <div>
-                    <div className="text-xs font-semibold uppercase tracking-wider text-primary">Agent action</div>
-                    <p className="mt-1 text-text-muted">Planned, executed, and fused multi-tech evidence</p>
-                  </div>
-                  <div>
-                    <div className="text-xs font-semibold uppercase tracking-wider text-primary">Output</div>
-                    <p className="mt-1 text-text-muted">Traceable scientific decision with caveats and next experiment</p>
-                  </div>
-                </div>
-              </Card>
               <AIInsightPanel result={getProjectInsight(project)} />
             </section>
 
@@ -517,9 +510,14 @@ export default function NotebookLab() {
               <div className="bg-surface p-4 rounded-md border border-border flex items-center justify-between gap-4">
                 <div>
                   <div className="text-lg font-bold">{notebook.decision}</div>
-                  <div className="text-xs text-text-muted mt-1">{notebook.decisionStatus}</div>
+                  <div className="text-xs text-text-muted mt-1">{formatClaimStatus(notebook.claimStatus)}</div>
                 </div>
-                <div className="text-sm font-bold text-emerald-600">{notebook.decisionStatus}</div>
+                <div className={`text-sm font-bold ${
+                  notebook.claimStatus === 'strongly_supported' ? 'text-emerald-600' :
+                  notebook.claimStatus === 'supported' ? 'text-cyan' :
+                  notebook.claimStatus === 'partial' ? 'text-amber-500' :
+                  'text-text-muted'
+                }`}>{formatClaimStatus(notebook.claimStatus)}</div>
               </div>
               {notebook.warnings.length > 0 && (
                 <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-900">
@@ -566,7 +564,7 @@ export default function NotebookLab() {
                     </div>
                     <div className="mt-1">
                       {attachedRunRecord
-                        ? `${new Date(attachedRunRecord.timestamp).toLocaleString()} - ${attachedRunRecord.detectedFeatures.length} features - ${attachedRunRecord.matchResult?.supportLevel >= 90 ? 'Strongly Supported' : attachedRunRecord.matchResult?.supportLevel >= 80 ? 'Supported' : attachedRunRecord.matchResult?.supportLevel >= 70 ? 'Partially Supported' : 'Requires Validation'}`
+                        ? `${new Date(attachedRunRecord.timestamp).toLocaleString()} - ${attachedRunRecord.detectedFeatures.length} features - ${formatClaimStatus(attachedRunRecord.matchResult?.claimStatus || 'supported')}`
                         : attachedRun}
                     </div>
                   </div>
@@ -618,7 +616,12 @@ export default function NotebookLab() {
                   <div className="text-lg font-bold">{project.phase}</div>
                   <div className="text-xs text-text-muted mt-1">{notebook.phaseInterpretation}</div>
                 </div>
-                <div className="text-lg font-bold text-primary">{notebook.decisionStatus}</div>
+                <div className={`text-lg font-bold ${
+                  notebook.claimStatus === 'strongly_supported' ? 'text-emerald-600' :
+                  notebook.claimStatus === 'supported' ? 'text-cyan' :
+                  notebook.claimStatus === 'partial' ? 'text-amber-500' :
+                  'text-text-muted'
+                }`}>{formatClaimStatus(notebook.claimStatus)}</div>
               </div>
             </section>
 
@@ -655,23 +658,6 @@ export default function NotebookLab() {
 
         <div className="hidden w-[340px] border-l border-border bg-background 2xl:flex flex-col shrink-0 overflow-y-auto">
           <div className="p-6">
-            <Card className="mb-6 p-5">
-              <div className="text-xs font-semibold uppercase tracking-wider text-text-muted">Judge View Summary</div>
-              <div className="mt-4 space-y-3 text-sm">
-                <div>
-                  <div className="text-xs font-semibold uppercase tracking-wider text-primary">Problem</div>
-                  <p className="mt-1 text-text-muted">Fragmented characterization workflows</p>
-                </div>
-                <div>
-                  <div className="text-xs font-semibold uppercase tracking-wider text-primary">Agent action</div>
-                  <p className="mt-1 text-text-muted">Planned, executed, and fused multi-tech evidence</p>
-                </div>
-                <div>
-                  <div className="text-xs font-semibold uppercase tracking-wider text-primary">Output</div>
-                  <p className="mt-1 text-text-muted">Traceable scientific decision with caveats and next experiment</p>
-                </div>
-              </div>
-            </Card>
             <div className="mb-4 text-xs font-semibold text-text-muted uppercase tracking-wider">Scientific Reasoning Summary</div>
             <AIInsightPanel result={getProjectInsight(project)} />
           </div>
