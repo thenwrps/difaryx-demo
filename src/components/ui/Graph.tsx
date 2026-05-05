@@ -24,6 +24,7 @@ interface PeakMarker {
   position: number;
   intensity: number;
   label?: string;
+  role?: 'selected' | 'linked';
 }
 
 // ── Component props ──────────────────────────────────────────────────
@@ -451,27 +452,32 @@ export function Graph({
             )}
 
             {/* Reference peak sticks (ultra subtle, publication-ready) */}
-            {markers.map((m, i) => (
-              <ReferenceLine
-                key={`peak-stick-${i}`}
-                x={m.position}
-                stroke="#a0a0a0"
-                strokeWidth={1}
-                strokeOpacity={0.18}
-                label={
-                  m.label && i % 2 === 0
-                    ? {
-                        value: m.label,
-                        position: 'top',
-                        fill: '#9ca3af',
-                        fontSize: 8,
-                        fontWeight: 400,
-                        offset: 10,
-                      }
-                    : undefined
-                }
-              />
-            ))}
+            {markers.map((m, i) => {
+              const isSelected = m.role === 'selected';
+              const isLinked = m.role === 'linked';
+              
+              return (
+                <ReferenceLine
+                  key={`peak-stick-${i}`}
+                  x={m.position}
+                  stroke={isSelected ? '#3b82f6' : isLinked ? '#06b6d4' : '#a0a0a0'}
+                  strokeWidth={isSelected ? 2.5 : isLinked ? 2 : 1}
+                  strokeOpacity={isSelected ? 0.85 : isLinked ? 0.6 : 0.18}
+                  label={
+                    m.label && isSelected
+                      ? {
+                          value: m.label,
+                          position: 'top',
+                          fill: '#3b82f6',
+                          fontSize: 9,
+                          fontWeight: 600,
+                          offset: 12,
+                        }
+                      : undefined
+                  }
+                />
+              );
+            })}
 
             {/* Baseline - ultra faint */}
             {showBackground && baselineData && (

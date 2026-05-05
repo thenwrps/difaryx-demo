@@ -1,68 +1,115 @@
 # Design Document: Cross-Tech Evidence Fusion Workspace
 
-## 1. Architecture Overview
+## Overview
 
-### 1.1 System Components
+The Cross-Tech Evidence Fusion Workspace is a deterministic frontend component that combines analytical evidence from three complementary spectroscopic techniques (XPS, FTIR, and Raman) to generate structured scientific conclusions about materials. The system implements technique-specific authority hierarchies, compatibility scoring, contradiction detection, and structured confidence calculation to produce scientifically rigorous multi-technique decisions.
+
+### Key Design Principles
+
+1. **Technique Authority Hierarchy**: Each analytical technique has decision authority in its domain (XPS for oxidation states, Raman for vibrational structure, FTIR for functional groups)
+2. **Structured Confidence**: Confidence is calculated from evidence agreement using weighted formulas, not naive averaging
+3. **Deterministic Operation**: All fusion logic runs client-side with no backend calls
+4. **Scientific Rigor**: Enforces strict conclusion standards (no "confirmed" without multi-technique agreement)
+5. **Existing Pattern Compliance**: Follows DIFARYX workspace patterns (DashboardLayout, three-panel structure, demo data)
+
+## Architecture
+
+### System Components
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    FusionWorkspace.tsx                       │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
-│  │ Left Panel   │  │ Center Panel │  │ Right Panel  │     │
-│  │ - Project    │  │ - 5 Tabs     │  │ - Summary    │     │
-│  │ - Techniques │  │ - Decision   │  │ - Confidence │     │
-│  │ - Run Button │  │ - Matrix     │  │ - Evidence   │     │
-│  └──────────────┘  └──────────────┘  └──────────────┘     │
+│                    FusionWorkspace (UI)                      │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
+│  │  Left Panel  │  │Center Panel  │  │ Right Panel  │      │
+│  │  - Project   │  │  - 5 Tabs    │  │  - Summary   │      │
+│  │  - Techniques│  │  - Decision  │  │  - Confidence│      │
+│  │  - Rules     │  │  - Matrix    │  │  - Evidence  │      │
+│  │  - Run Btn   │  │  - Claims    │  │  - Validation│      │
+│  └──────────────┘  └──────────────┘  └──────────────┘      │
 └─────────────────────────────────────────────────────────────┘
                             │
                             ▼
 ┌─────────────────────────────────────────────────────────────┐
-│              fusionAgent/runner.ts                           │
+│              Fusion Agent Runner (Logic)                     │
 │  ┌──────────────────────────────────────────────────────┐  │
-│  │ runFusionAnalysis()                                   │  │
-│  │  1. Import technique outputs                          │  │
-│  │  2. Extract evidence items                            │  │
-│  │  3. Evaluate claims (5 claim evaluators)              │  │
-│  │  4. Build evidence matrix                             │  │
-│  │  5. Detect contradictions                             │  │
-│  │  6. Generate final decision                           │  │
-│  │  7. Return FusionResult                               │  │
+│  │  Evidence Extraction                                  │  │
+│  │  - extractXpsEvidence()                              │  │
+│  │  - extractFtirEvidence()                             │  │
+│  │  - extractRamanEvidence()                            │  │
+│  └──────────────────────────────────────────────────────┘  │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │  Claim Evaluation (5 evaluators)                     │  │
+│  │  - evaluateSpinelStructureClaim()                    │  │
+│  │  - evaluateOxidationStateClaim()                     │  │
+│  │  - evaluateSurfaceSpeciesClaim()                     │  │
+│  │  - evaluateCarbonaceousResidueClaim()                │  │
+│  │  - evaluateCarbonateSurfaceClaim()                   │  │
+│  └──────────────────────────────────────────────────────┘  │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │  Evidence Matrix & Contradiction Detection            │  │
+│  │  - buildEvidenceMatrix()                             │  │
+│  │  - detectContradictions()                            │  │
+│  └──────────────────────────────────────────────────────┘  │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │  Decision Generation                                  │  │
+│  │  - generateFinalDecision()                           │  │
+│  │  - calculateClaimConfidence()                        │  │
+│  │  - generateCaveats()                                 │  │
+│  │  - generateRecommendations()                         │  │
+│  │  - generateReport()                                  │  │
 │  └──────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
                             │
                             ▼
 ┌─────────────────────────────────────────────────────────────┐
-│         Technique Agents (Read-Only)                         │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
-│  │ xpsAgent     │  │ ftirAgent    │  │ ramanAgent   │     │
-│  │ - Cu²⁺ state │  │ - OH bands   │  │ - A1g mode   │     │
-│  │ - Satellites │  │ - M-O bands  │  │ - Eg modes   │     │
-│  │ - Confidence │  │ - Carbonate  │  │ - D/G bands  │     │
-│  └──────────────┘  └──────────────┘  └──────────────┘     │
+│              Technique Agents (Data Sources)                 │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
+│  │  XPS Agent   │  │  FTIR Agent  │  │ Raman Agent  │      │
+│  │  (read-only) │  │  (read-only) │  │ (read-only)  │      │
+│  └──────────────┘  └──────────────┘  └──────────────┘      │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 1.2 Data Flow
+### Data Flow
 
-1. **User clicks "Run Fusion"** → FusionWorkspace calls `runFusionAnalysis()`
-2. **Runner imports** → Loads processed outputs from XPS/FTIR/Raman agents
-3. **Evidence extraction** → Converts technique outputs to standardized evidence items
-4. **Claim evaluation** → Runs 5 claim evaluators (spinel structure, oxidation states, surface species, carbon, carbonate)
-5. **Matrix building** → Populates evidence matrix (claims × techniques)
-6. **Contradiction detection** → Applies contradiction rules
-7. **Decision generation** → Synthesizes final conclusion from claim results
-8. **UI rendering** → FusionWorkspace displays results in tabs
+1. **Input**: FusionWorkspace calls `runFusionAnalysis()` with processed results from XPS, FTIR, and Raman agents
+2. **Evidence Extraction**: Extract evidence items from each technique's processing result
+3. **Claim Evaluation**: Evaluate 5 scientific claims using technique-specific authority weights
+4. **Matrix Building**: Construct claims × techniques evidence matrix
+5. **Contradiction Detection**: Apply contradiction rules to detect conflicts
+6. **Decision Generation**: Synthesize final decision with structured confidence
+7. **Output**: Return `FusionResult` containing decision, claims, matrix, contradictions, caveats, and report
 
----
+## Components and Interfaces
 
-## 2. Core Data Structures
+### Type Definitions (`src/agents/fusionAgent/types.ts`)
 
-### 2.1 Claim Schema with Hierarchy
+#### Core Evidence Types
 
 ```typescript
-// src/agents/fusionAgent/types.ts
-
+export type TechniqueType = 'XPS' | 'FTIR' | 'Raman';
+export type SupportType = 'supports' | 'contradicts' | 'neutral' | 'ambiguous';
+export type ConfidenceLevel = 'high' | 'medium' | 'low';
 export type ClaimHierarchy = 'primary' | 'supporting' | 'context';
+export type ClaimStatus = 'supported' | 'unresolved' | 'contradicted';
+export type ContradictionSeverity = 'none' | 'low' | 'medium' | 'high';
+
+export interface EvidenceItem {
+  technique: TechniqueType;
+  type: string;                        // e.g., "oxidation-state", "functional-group"
+  value: string | number;              // e.g., "Cu²⁺", "A1g spinel ferrite"
+  confidence: number;                  // 0-1 from original technique
+  weight: number;                      // 0-1 evidence-specific weight
+  label: string;                       // Human-readable description
+}
+
+export interface TechniqueSupport {
+  technique: TechniqueType;
+  support: SupportType;
+  evidenceItems: EvidenceItem[];
+  evidenceWeight: number;              // 0-1 technique authority weight
+  reasoning: string;                   // Why this technique supports/contradicts
+}
 
 export interface Claim {
   id: string;                          // e.g., "spinel-structure"
@@ -70,71 +117,39 @@ export interface Claim {
   description: string;                 // What this claim asserts
   hierarchy: ClaimHierarchy;           // Claim importance level
   supportingTechniques: TechniqueSupport[];
-  confidence: 'high' | 'medium' | 'low';
-  confidenceScore: number;             // 0-1 (calculated via formula)
-  status: 'supported' | 'unresolved' | 'contradicted';
+  confidence: ConfidenceLevel;
+  confidenceScore: number;             // 0-1 calculated via formula
+  status: ClaimStatus;
   caveats: string[];
-}
-
-export interface TechniqueSupport {
-  technique: 'XPS' | 'FTIR' | 'Raman';
-  support: 'supports' | 'contradicts' | 'neutral' | 'ambiguous';
-  evidenceItems: EvidenceItem[];
-  evidenceWeight: number;              // 0-1 (technique-specific weight)
-  reasoning: string;                   // Why this technique supports/contradicts
-}
-
-export interface EvidenceItem {
-  technique: 'XPS' | 'FTIR' | 'Raman';
-  type: string;                        // e.g., "peak", "oxidation-state", "band"
-  value: string | number;              // e.g., "690 cm⁻¹", "Cu²⁺"
-  confidence: number;                  // 0-1 from original technique
-  weight: number;                      // 0-1 (evidence-specific weight)
-  label: string;                       // Human-readable description
 }
 ```
 
-**Claim Hierarchy Definitions:**
-
-| Hierarchy | Definition | Examples | Impact on Final Decision |
-|-----------|------------|----------|-------------------------|
-| **Primary** | Core scientific assertions about material identity | Spinel structure, Oxidation states | Required for HIGH confidence; drives primary conclusion |
-| **Supporting** | Corroborating evidence that strengthens primary claims | Surface species consistency | Increases confidence in primary claims |
-| **Context** | Environmental or surface phenomena that don't affect bulk identity | Carbonaceous residue, Carbonate surface | Provides caveats; does not reduce primary claim confidence |
-
-**Claim Hierarchy Assignments:**
-- `spinel-structure`: **PRIMARY**
-- `oxidation-states`: **PRIMARY**
-- `surface-species`: **SUPPORTING**
-- `carbonaceous-residue`: **CONTEXT**
-- `carbonate-surface`: **CONTEXT**
-
-### 2.2 Evidence Matrix Model
+#### Evidence Matrix Types
 
 ```typescript
-export interface EvidenceMatrix {
-  claims: Claim[];
-  techniques: ('XPS' | 'FTIR' | 'Raman')[];
-  cells: MatrixCell[][];               // [claimIndex][techniqueIndex]
-}
-
 export interface MatrixCell {
   claimId: string;
-  technique: 'XPS' | 'FTIR' | 'Raman';
-  support: 'supports' | 'contradicts' | 'neutral' | 'ambiguous';
+  technique: TechniqueType;
+  support: SupportType;
   evidenceText: string;                // Short summary for display
   evidenceItems: EvidenceItem[];
 }
+
+export interface EvidenceMatrix {
+  claims: Claim[];
+  techniques: TechniqueType[];
+  cells: MatrixCell[][];               // [claimIndex][techniqueIndex]
+}
 ```
 
-### 2.3 Contradiction Schema with Scoring
+#### Contradiction Types
 
 ```typescript
 export interface Contradiction {
   id: string;
-  severity: 'none' | 'low' | 'medium' | 'high';
-  score: number;                       // 0-1 (contradiction strength)
-  techniques: ('XPS' | 'FTIR' | 'Raman')[];
+  severity: ContradictionSeverity;
+  score: number;                       // 0-1 contradiction strength
+  techniques: TechniqueType[];
   claimId: string;
   explanation: string;
   confidenceImpact: number;            // Penalty to apply (0-0.3)
@@ -142,44 +157,17 @@ export interface Contradiction {
 }
 ```
 
-**Contradiction Scoring System:**
-
-| Severity | Score Range | Confidence Impact | Conditions |
-|----------|-------------|-------------------|------------|
-| **HIGH** | 0.7 - 1.0 | -0.25 to -0.30 | Primary claims directly contradict (e.g., Raman says spinel, XPS says no metal oxides) |
-| **MEDIUM** | 0.4 - 0.69 | -0.10 to -0.15 | Primary claim lacks corroboration from authority technique (e.g., Raman spinel without XPS oxidation states) |
-| **LOW** | 0.1 - 0.39 | -0.03 to -0.05 | Context claims indicate complexity (e.g., surface carbonate, D/G bands) |
-| **NONE** | 0.0 | 0.00 | No contradictions detected |
-
-**Contradiction Scoring Formula:**
-```
-contradictionScore = (evidenceStrength × disagreementMagnitude × claimImportance)
-
-Where:
-- evidenceStrength = average confidence of conflicting evidence items (0-1)
-- disagreementMagnitude = 1.0 (full contradiction) or 0.5 (partial/ambiguous)
-- claimImportance = 1.0 (primary), 0.7 (supporting), 0.3 (context)
-```
-
-**Confidence Impact Calculation:**
-```
-confidenceImpact = contradictionScore × severityMultiplier
-
-Where severityMultiplier:
-- HIGH: 0.30
-- MEDIUM: 0.15
-- LOW: 0.05
-```
-
-### 2.4 Fusion Result Schema
+#### Fusion Result Types
 
 ```typescript
+export interface FusionDecision {
+  primaryConclusion: string;
+  confidence: ConfidenceLevel;
+  confidenceScore: number;             // 0-1
+}
+
 export interface FusionResult {
-  decision: {
-    primaryConclusion: string;
-    confidence: 'high' | 'medium' | 'low';
-    confidenceScore: number;           // 0-1
-  };
+  decision: FusionDecision;
   claims: Claim[];
   evidenceMatrix: EvidenceMatrix;
   contradictions: Contradiction[];
@@ -191,792 +179,423 @@ export interface FusionResult {
 }
 ```
 
----
+### Fusion Agent Runner (`src/agents/fusionAgent/runner.ts`)
 
-## 3. Fusion Agent Runner Architecture
+#### Evidence Extraction Functions
 
-### 3.1 Main Function
+**`extractXpsEvidence(result: XpsProcessingResult): EvidenceItem[]`**
+- Extracts oxidation states from XPS state aggregations
+- Extracts satellite features when present
+- Assigns confidence based on original technique confidence level
+- Assigns weights: primary oxidation state (1.0), satellite (0.8)
 
+**`extractFtirEvidence(result: FtirProcessingResult): EvidenceItem[]`**
+- Extracts functional groups from FTIR functional group candidates
+- Assigns confidence from original technique score
+- Assigns weights: diagnostic (1.0), ambiguous (0.6)
+
+**`extractRamanEvidence(result: RamanProcessingResult): EvidenceItem[]`**
+- Extracts vibrational modes from Raman mode candidates
+- Assigns weights based on mode type:
+  - A1g primary: 1.0
+  - Eg/T2g supporting: 0.8
+  - Lower ferrite: 0.6
+  - D/G carbon bands: 0.5
+
+#### Claim Evaluators
+
+**`evaluateSpinelStructureClaim()`**
+- **Authority**: Raman (structure), XPS (corroboration), FTIR (context)
+- **Logic**:
+  - Raman: Supports if A1g + (Eg OR lower ferrite) detected
+  - XPS: Supports if Cu²⁺ OR Fe³⁺ detected
+  - FTIR: Neutral (M-O band supports metal oxide but not spinel specifically)
+- **Confidence**: HIGH if Raman + XPS both support, MEDIUM if Raman supports with partial XPS, LOW otherwise
+
+**`evaluateOxidationStateClaim()`**
+- **Authority**: XPS (oxidation states), Raman (context), FTIR (irrelevant)
+- **Logic**:
+  - XPS: Supports if oxidation states detected
+  - Raman: Supports if ferrite modes suggest expected oxidation states
+  - FTIR: Neutral (does not provide oxidation state information)
+- **Confidence**: Based on XPS evidence quality
+
+**`evaluateSurfaceSpeciesClaim()`**
+- **Authority**: FTIR (functional groups), XPS (corroboration), Raman (context)
+- **Logic**:
+  - FTIR: Supports if surface hydroxyl OR adsorbed water detected
+  - XPS: Neutral (surface composition not in demo)
+  - Raman: Neutral (does not probe surface species)
+- **Confidence**: Based on FTIR evidence
+
+**`evaluateCarbonaceousResidueClaim()`**
+- **Authority**: Raman (D/G bands), FTIR (corroboration), XPS (context)
+- **Logic**:
+  - Raman: Supports if D band OR G band detected
+  - FTIR: Neutral (C-H bands not in demo)
+  - XPS: Neutral (C 1s analysis not in demo)
+- **Confidence**: Based on Raman D/G band evidence
+- **Caveat**: D/G bands do not confirm ferrite phase
+
+**`evaluateCarbonateSurfaceClaim()`**
+- **Authority**: FTIR (carbonate/carboxylate), XPS (context), Raman (irrelevant)
+- **Logic**:
+  - FTIR: Supports if carbonate/carboxylate overlap detected
+  - XPS: Neutral (C 1s analysis not in demo)
+  - Raman: Neutral (does not probe carbonate surface species)
+- **Confidence**: Based on FTIR evidence
+- **Caveat**: FTIR alone cannot distinguish carbonate from carboxylate
+
+#### Confidence Calculation
+
+**`calculateClaimConfidence()`**
+- **Formula**: `baseConfidence * (1 - contradictionPenalty) * hierarchyMultiplier`
+- **Base Confidence**: Weighted average of technique scores using authority weights
+- **Contradiction Penalty**: 0-0.3 based on contradiction severity
+- **Hierarchy Multiplier**: primary (1.0), supporting (0.9), context (0.8)
+
+**Authority Weights** (from `types.ts`):
 ```typescript
-// src/agents/fusionAgent/runner.ts
-
-export function runFusionAnalysis(
-  xpsResult: XpsProcessingResult,
-  ftirResult: FtirProcessingResult,
-  ramanResult: RamanProcessingResult
-): FusionResult {
-  
-  // Step 1: Extract evidence items from each technique
-  const xpsEvidence = extractXpsEvidence(xpsResult);
-  const ftirEvidence = extractFtirEvidence(ftirResult);
-  const ramanEvidence = extractRamanEvidence(ramanResult);
-  
-  // Step 2: Evaluate each claim
-  const claims: Claim[] = [
-    evaluateSpinelStructureClaim(xpsEvidence, ftirEvidence, ramanEvidence),
-    evaluateOxidationStateClaim(xpsEvidence, ftirEvidence, ramanEvidence),
-    evaluateSurfaceSpeciesClaim(xpsEvidence, ftirEvidence, ramanEvidence),
-    evaluateCarbonaceousResidueClaim(xpsEvidence, ftirEvidence, ramanEvidence),
-    evaluateCarbonateSurfaceClaim(xpsEvidence, ftirEvidence, ramanEvidence),
-  ];
-  
-  // Step 3: Build evidence matrix
-  const evidenceMatrix = buildEvidenceMatrix(claims);
-  
-  // Step 4: Detect contradictions
-  const contradictions = detectContradictions(claims, xpsEvidence, ftirEvidence, ramanEvidence);
-  
-  // Step 5: Generate final decision
-  const decision = generateFinalDecision(claims, contradictions);
-  
-  // Step 6: Categorize claims
-  const supportedClaims = claims.filter(c => c.status === 'supported').map(c => c.id);
-  const unresolvedClaims = claims.filter(c => c.status === 'unresolved').map(c => c.id);
-  
-  // Step 7: Generate caveats and recommendations
-  const caveats = generateCaveats(claims, contradictions);
-  const recommendedValidation = generateRecommendations(claims, contradictions);
-  
-  // Step 8: Generate report
-  const report = generateReport(decision, claims, evidenceMatrix, contradictions);
-  
-  return {
-    decision,
-    claims,
-    evidenceMatrix,
-    contradictions,
-    supportedClaims,
-    unresolvedClaims,
-    caveats,
-    recommendedValidation,
-    report,
-  };
-}
+'spinel-structure': { xps: 0.6, ftir: 0.2, raman: 1.0 }
+'oxidation-states': { xps: 1.0, ftir: 0.1, raman: 0.3 }
+'surface-species': { xps: 0.5, ftir: 1.0, raman: 0.2 }
+'carbonaceous-residue': { xps: 0.3, ftir: 0.5, raman: 1.0 }
+'carbonate-surface': { xps: 0.2, ftir: 1.0, raman: 0.1 }
 ```
 
-### 3.2 Evidence Extraction Functions
+#### Evidence Matrix Building
 
-```typescript
-function extractXpsEvidence(result: XpsProcessingResult): EvidenceItem[] {
-  const evidence: EvidenceItem[] = [];
-  
-  // Extract oxidation states
-  for (const state of result.chemicalStates) {
-    evidence.push({
-      technique: 'XPS',
-      type: 'oxidation-state',
-      value: state.element + state.oxidationState,
-      confidence: state.confidence,
-      label: `${state.element} ${state.oxidationState} at ${state.bindingEnergy.toFixed(1)} eV`,
-    });
-  }
-  
-  // Extract satellite features
-  if (result.hasSatellite) {
-    evidence.push({
-      technique: 'XPS',
-      type: 'satellite',
-      value: 'Cu²⁺ satellite',
-      confidence: 0.8,
-      label: 'Cu²⁺ satellite peak detected',
-    });
-  }
-  
-  return evidence;
-}
+**`buildEvidenceMatrix(claims: Claim[]): EvidenceMatrix`**
+- Constructs claims × techniques matrix
+- For each claim-technique pair, creates MatrixCell with:
+  - Support status (supports/contradicts/neutral/ambiguous)
+  - Evidence text (first evidence item label or reasoning)
+  - Evidence items array
 
-function extractFtirEvidence(result: FtirProcessingResult): EvidenceItem[] {
-  const evidence: EvidenceItem[] = [];
-  
-  // Extract functional groups
-  for (const group of result.functionalGroupCandidates) {
-    evidence.push({
-      technique: 'FTIR',
-      type: 'functional-group',
-      value: group.functionalGroup,
-      confidence: group.score,
-      label: `${group.functionalGroup} at ${group.matches[0]?.observedBand.wavenumber.toFixed(0)} cm⁻¹`,
-    });
-  }
-  
-  return evidence;
-}
+#### Contradiction Detection
 
-function extractRamanEvidence(result: RamanProcessingResult): EvidenceItem[] {
-  const evidence: EvidenceItem[] = [];
-  
-  // Extract vibrational modes
-  for (const mode of result.modeCandidate) {
-    evidence.push({
-      technique: 'Raman',
-      type: 'vibrational-mode',
-      value: mode.modeName,
-      confidence: mode.score,
-      label: `${mode.modeName} at ${mode.matches[0]?.observedPeak.ramanShift.toFixed(0)} cm⁻¹`,
-    });
-  }
-  
-  return evidence;
-}
+**`detectContradictions()`**
+- **Rule 1**: Raman suggests spinel but XPS lacks expected oxidation states
+  - Severity: MEDIUM
+  - Impact: Reduces confidence to MEDIUM
+- **Rule 2**: Strong carbonate/carboxylate surface species
+  - Severity: LOW
+  - Impact: Indicates surface complexity
+- **Rule 3**: Raman D/G bands indicate carbon contribution
+  - Severity: LOW
+  - Impact: Indicates additional carbon-based species
+
+**Contradiction Score Formula**:
+```
+score = evidenceStrength * disagreementMagnitude * claimImportance
+confidenceImpact = score * CONTRADICTION_SEVERITY_MULTIPLIERS[severity]
 ```
 
-### 3.3 Claim Evaluator: Spinel Structure
+#### Decision Generation
 
-```typescript
-function evaluateSpinelStructureClaim(
-  xpsEvidence: EvidenceItem[],
-  ftirEvidence: EvidenceItem[],
-  ramanEvidence: EvidenceItem[]
-): Claim {
-  
-  const supportingTechniques: TechniqueSupport[] = [];
-  
-  // Raman has authority for spinel structure
-  const hasA1g = ramanEvidence.some(e => e.value === 'A1g spinel ferrite');
-  const hasEg = ramanEvidence.some(e => e.value === 'Eg ferrite mode');
-  const hasLowerFerrite = ramanEvidence.some(e => e.value === 'Lower ferrite mode');
-  
-  let ramanSupport: 'supports' | 'neutral' = 'neutral';
-  let ramanReasoning = '';
-  const ramanEvidenceItems: EvidenceItem[] = [];
-  
-  if (hasA1g && (hasEg || hasLowerFerrite)) {
-    ramanSupport = 'supports';
-    ramanReasoning = 'A1g mode with supporting Eg/T2g modes consistent with spinel structure';
-    ramanEvidenceItems.push(...ramanEvidence.filter(e => 
-      e.value === 'A1g spinel ferrite' || e.value === 'Eg ferrite mode' || e.value === 'Lower ferrite mode'
-    ));
-  } else if (hasA1g) {
-    ramanSupport = 'supports';
-    ramanReasoning = 'A1g mode suggests spinel structure (limited supporting evidence)';
-    ramanEvidenceItems.push(...ramanEvidence.filter(e => e.value === 'A1g spinel ferrite'));
-  }
-  
-  supportingTechniques.push({
-    technique: 'Raman',
-    support: ramanSupport,
-    evidenceItems: ramanEvidenceItems,
-    reasoning: ramanReasoning,
-  });
-  
-  // XPS provides corroborating evidence for oxidation states
-  const hasCu2 = xpsEvidence.some(e => e.type === 'oxidation-state' && e.value.includes('Cu²⁺'));
-  const hasFe3 = xpsEvidence.some(e => e.type === 'oxidation-state' && e.value.includes('Fe³⁺'));
-  
-  let xpsSupport: 'supports' | 'neutral' | 'ambiguous' = 'neutral';
-  let xpsReasoning = '';
-  const xpsEvidenceItems: EvidenceItem[] = [];
-  
-  if (hasCu2 || hasFe3) {
-    xpsSupport = 'supports';
-    xpsReasoning = 'Oxidation states consistent with ferrite chemistry';
-    xpsEvidenceItems.push(...xpsEvidence.filter(e => 
-      e.type === 'oxidation-state' && (e.value.includes('Cu²⁺') || e.value.includes('Fe³⁺'))
-    ));
-  }
-  
-  supportingTechniques.push({
-    technique: 'XPS',
-    support: xpsSupport,
-    evidenceItems: xpsEvidenceItems,
-    reasoning: xpsReasoning,
-  });
-  
-  // FTIR provides neutral evidence (M-O band supports metal oxide but not spinel specifically)
-  const hasMO = ftirEvidence.some(e => e.value === 'Metal-oxygen');
-  
-  let ftirSupport: 'supports' | 'neutral' = 'neutral';
-  let ftirReasoning = 'FTIR M-O band supports metal oxide framework but does not confirm spinel structure';
-  const ftirEvidenceItems: EvidenceItem[] = [];
-  
-  if (hasMO) {
-    ftirEvidenceItems.push(...ftirEvidence.filter(e => e.value === 'Metal-oxygen'));
-  }
-  
-  supportingTechniques.push({
-    technique: 'FTIR',
-    support: ftirSupport,
-    evidenceItems: ftirEvidenceItems,
-    reasoning: ftirReasoning,
-  });
-  
-  // Determine overall claim status and confidence
-  let status: 'supported' | 'unresolved' | 'contradicted' = 'unresolved';
-  let confidence: 'high' | 'medium' | 'low' = 'low';
-  let confidenceScore = 0.3;
-  
-  if (ramanSupport === 'supports' && xpsSupport === 'supports') {
-    status = 'supported';
-    confidence = 'high';
-    confidenceScore = 0.75;
-  } else if (ramanSupport === 'supports') {
-    status = 'supported';
-    confidence = 'medium';
-    confidenceScore = 0.60;
-  }
-  
-  const caveats: string[] = [];
-  if (!hasEg && !hasLowerFerrite && hasA1g) {
-    caveats.push('A1g mode observed without corroborating Eg or T2g modes');
-  }
-  if (!hasCu2 && !hasFe3) {
-    caveats.push('XPS oxidation state evidence not available for corroboration');
-  }
-  
-  return {
-    id: 'spinel-structure',
-    title: 'Spinel-like ferrite structure',
-    description: 'Material exhibits vibrational modes and oxidation states consistent with spinel ferrite structure',
-    supportingTechniques,
-    confidence,
-    confidenceScore,
-    status,
-    caveats,
-  };
-}
-```
+**`generateFinalDecision()`**
+- Synthesizes primary conclusion from supported claims
+- Calculates final confidence as minimum of primary claim confidences
+- Applies contradiction penalties
+- Classifies confidence: HIGH (≥0.70), MEDIUM (≥0.50), LOW (<0.50)
+- Adds XPS caveat if oxidation state evidence is weak
 
-### 3.4 Contradiction Detection
+**`generateCaveats()`**
+- Collects caveats from all claims
+- Adds contradiction-specific caveats for medium/high severity
+- Removes duplicates
 
-```typescript
-function detectContradictions(
-  claims: Claim[],
-  xpsEvidence: EvidenceItem[],
-  ftirEvidence: EvidenceItem[],
-  ramanEvidence: EvidenceItem[]
-): Contradiction[] {
-  
-  const contradictions: Contradiction[] = [];
-  
-  // Rule 1: Raman suggests spinel but XPS lacks expected oxidation states
-  const spinelClaim = claims.find(c => c.id === 'spinel-structure');
-  const ramanSupportsSpinel = spinelClaim?.supportingTechniques.find(t => t.technique === 'Raman')?.support === 'supports';
-  const xpsSupportsSpinel = spinelClaim?.supportingTechniques.find(t => t.technique === 'XPS')?.support === 'supports';
-  
-  if (ramanSupportsSpinel && !xpsSupportsSpinel) {
-    contradictions.push({
-      id: 'spinel-xps-mismatch',
-      severity: 'medium',
-      techniques: ['Raman', 'XPS'],
-      claimId: 'spinel-structure',
-      explanation: 'Raman vibrational modes suggest spinel structure, but XPS does not provide corroborating oxidation state evidence',
-      effectOnConfidence: 'Reduces overall confidence to MEDIUM; spinel assignment remains tentative',
-    });
-  }
-  
-  // Rule 2: Strong carbonate/carboxylate surface species
-  const carbonateClaim = claims.find(c => c.id === 'carbonate-surface');
-  const ftirSupportsCarbonate = carbonateClaim?.supportingTechniques.find(t => t.technique === 'FTIR')?.support === 'supports';
-  
-  if (ftirSupportsCarbonate) {
-    contradictions.push({
-      id: 'surface-complexity',
-      severity: 'low',
-      techniques: ['FTIR'],
-      claimId: 'carbonate-surface',
-      explanation: 'Strong carbonate/carboxylate surface species may complicate surface interpretation',
-      effectOnConfidence: 'Does not affect bulk phase identification but indicates surface complexity',
-    });
-  }
-  
-  // Rule 3: Raman D/G bands indicate carbon contribution
-  const carbonClaim = claims.find(c => c.id === 'carbonaceous-residue');
-  const ramanSupportsCarbon = carbonClaim?.supportingTechniques.find(t => t.technique === 'Raman')?.support === 'supports';
-  
-  if (ramanSupportsCarbon) {
-    contradictions.push({
-      id: 'carbon-contribution',
-      severity: 'low',
-      techniques: ['Raman'],
-      claimId: 'carbonaceous-residue',
-      explanation: 'Raman D and G bands indicate carbonaceous residue or support contribution',
-      effectOnConfidence: 'Does not contradict ferrite phase but indicates additional carbon-based species',
-    });
-  }
-  
-  return contradictions;
-}
-```
+**`generateRecommendations()`**
+- XPS depth profiling if oxidation states unresolved
+- TEM and XRD if spinel structure not high confidence
+- TPD if carbonate surface species detected
+- CHN elemental analysis if carbon contribution detected
 
-### 3.5 Final Decision Logic
-
-```typescript
-function generateFinalDecision(
-  claims: Claim[],
-  contradictions: Contradiction[]
-): { primaryConclusion: string; confidence: 'high' | 'medium' | 'low'; confidenceScore: number } {
-  
-  const spinelClaim = claims.find(c => c.id === 'spinel-structure');
-  const surfaceClaim = claims.find(c => c.id === 'surface-species');
-  const carbonClaim = claims.find(c => c.id === 'carbonaceous-residue');
-  
-  let conclusion = '';
-  let confidence: 'high' | 'medium' | 'low' = 'low';
-  let confidenceScore = 0.3;
-  
-  // Build conclusion from supported claims
-  const conclusionParts: string[] = [];
-  
-  if (spinelClaim?.status === 'supported') {
-    if (spinelClaim.confidence === 'high') {
-      conclusionParts.push('Multi-technique evidence supports a spinel-like ferrite material');
-    } else {
-      conclusionParts.push('Evidence suggests a spinel-like ferrite material');
-    }
-  }
-  
-  if (surfaceClaim?.status === 'supported') {
-    conclusionParts.push('with surface hydroxyl/water species');
-  }
-  
-  if (carbonClaim?.status === 'supported') {
-    conclusionParts.push('and possible carbonaceous residue');
-  }
-  
-  conclusion = conclusionParts.join(' ');
-  
-  // Add XPS caveat if oxidation state evidence is weak
-  const xpsSupport = spinelClaim?.supportingTechniques.find(t => t.technique === 'XPS')?.support;
-  if (xpsSupport !== 'supports') {
-    conclusion += '. Oxidation-state confirmation remains dependent on XPS evidence quality';
-  }
-  
-  // Determine overall confidence
-  const highConfidenceClaims = claims.filter(c => c.confidence === 'high' && c.status === 'supported').length;
-  const mediumConfidenceClaims = claims.filter(c => c.confidence === 'medium' && c.status === 'supported').length;
-  const majorContradictions = contradictions.filter(c => c.severity === 'high' || c.severity === 'medium').length;
-  
-  if (highConfidenceClaims >= 1 && majorContradictions === 0) {
-    confidence = 'high';
-    confidenceScore = 0.75;
-  } else if (mediumConfidenceClaims >= 1 || (highConfidenceClaims >= 1 && majorContradictions > 0)) {
-    confidence = 'medium';
-    confidenceScore = 0.60;
-  } else {
-    confidence = 'low';
-    confidenceScore = 0.40;
-  }
-  
-  // Apply contradiction penalty
-  if (majorContradictions > 0) {
-    confidenceScore -= 0.10 * majorContradictions;
-    confidenceScore = Math.max(0.3, confidenceScore);
-  }
-  
-  return {
-    primaryConclusion: conclusion,
-    confidence,
-    confidenceScore,
-  };
-}
-```
-
----
-
-## 4. FusionWorkspace UI Architecture
-
-### 4.1 Component Hierarchy
-
-```
-FusionWorkspace
-├── DashboardLayout
-│   ├── LeftPanel
-│   │   ├── ProjectInfo
-│   │   ├── TechniqueList
-│   │   ├── FusionRulesCard
-│   │   └── RunFusionButton
-│   ├── CenterPanel
-│   │   ├── TabBar (5 tabs)
-│   │   ├── FusionDecisionTab
-│   │   ├── EvidenceMatrixTab
-│   │   ├── ClaimCardsTab
-│   │   ├── ContradictionsTab
-│   │   └── ReportTab
-│   └── RightPanel
-│       ├── ScientificSummary
-│       ├── ConfidenceReliability
-│       ├── TopEvidence
-│       └── RecommendedValidation
-```
-
-### 4.2 State Management
-
-```typescript
-// FusionWorkspace.tsx
-
-const [activeTab, setActiveTab] = useState<'decision' | 'matrix' | 'claims' | 'contradictions' | 'report'>('decision');
-const [fusionResult, setFusionResult] = useState<FusionResult | null>(null);
-
-const handleRunFusion = () => {
-  // Import processed results from demo data
-  const xpsResult = runXpsProcessing(xpsDemoData);
-  const ftirResult = runFtirProcessing(ftirDemoData);
-  const ramanResult = runRamanProcessing(ramanDemoData);
-  
-  // Run fusion analysis
-  const result = runFusionAnalysis(xpsResult, ftirResult, ramanResult);
-  setFusionResult(result);
-};
-```
-
-### 4.3 Tab Content Mapping
-
-**Fusion Decision Tab:**
-- Display `fusionResult.decision.primaryConclusion`
-- Display `fusionResult.decision.confidence` badge
-- List `fusionResult.supportedClaims` (map to claim titles)
-- List `fusionResult.unresolvedClaims` (map to claim titles)
-- List `fusionResult.caveats`
-
-**Evidence Matrix Tab:**
-- Render table with `fusionResult.evidenceMatrix`
-- Rows: `fusionResult.claims` (claim titles)
-- Columns: ['XPS', 'FTIR', 'Raman']
-- Cells: `fusionResult.evidenceMatrix.cells[claimIndex][techniqueIndex]`
-- Cell content: support status + evidenceText
-
-**Claim Cards Tab:**
-- Map over `fusionResult.claims`
-- For each claim, render card with:
-  - Title
-  - Confidence badge
-  - Supporting techniques list
-  - Evidence items
+**`generateReport()`**
+- Generates reviewer-style markdown report with:
+  - Final decision summary
+  - Evidence organized by technique
+  - Claim-level reasoning
+  - Contradictions
   - Caveats
 
-**Contradictions Tab:**
-- Map over `fusionResult.contradictions`
-- For each contradiction, render card with:
-  - Severity badge
+### FusionWorkspace UI Component (`src/pages/FusionWorkspace.tsx`)
+
+#### Component Structure
+
+```typescript
+export default function FusionWorkspace() {
+  const [activeTab, setActiveTab] = useState<'decision' | 'matrix' | 'claims' | 'contradictions' | 'report'>('decision');
+  const [fusionResult, setFusionResult] = useState<FusionResult | null>(null);
+  
+  const handleRunFusion = () => {
+    const xpsResult = runXpsProcessing(xpsDemoData);
+    const ftirResult = runFtirProcessing(ftirDemoData);
+    const ramanResult = runRamanProcessing(ramanDemoData);
+    const result = runFusionAnalysis(xpsResult, ftirResult, ramanResult);
+    setFusionResult(result);
+  };
+  
+  // Auto-run fusion on mount
+  React.useEffect(() => {
+    handleRunFusion();
+  }, []);
+  
+  return (
+    <DashboardLayout
+      leftPanel={leftPanel}
+      centerPanel={centerPanel}
+      rightPanel={rightPanel}
+    />
+  );
+}
+```
+
+#### Left Panel
+
+**Content**:
+- Project Information (project name, sample name)
+- Included Techniques (XPS, FTIR, Raman with checkmarks)
+- Fusion Rules card explaining authority hierarchy
+- Run Fusion button
+
+**Styling**: Follows existing workspace patterns with white cards, blue info cards, and indigo primary button
+
+#### Right Panel
+
+**Content**:
+- Final Scientific Summary (primary conclusion text)
+- Confidence & Reliability section:
+  - Overall confidence badge (HIGH/MEDIUM/LOW)
+  - Confidence score percentage
+  - Supported claims count
+  - Contradictions count
+- Top Supporting Evidence (top 3 supported claims with techniques)
+- Recommended Validation (top 3 recommendations)
+
+**Styling**: White cards with colored badges, amber warning card for validation
+
+#### Center Panel
+
+**Tab Bar**: 5 tabs with active state styling (indigo border-bottom)
+
+**Tab 1: Fusion Decision**
+- Final Conclusion card with confidence badge
+- Supported Claims list with green checkmarks
+- Unresolved Claims list with yellow warning icons
+- Caveats card (amber background)
+
+**Tab 2: Evidence Matrix**
+- Table with claims as rows, techniques as columns
+- Each cell shows:
+  - Support badge (supports/contradicts/neutral/ambiguous)
+  - Short evidence text (truncated with tooltip)
+- Hover effect on rows
+
+**Tab 3: Claim Cards**
+- One card per claim (5 total)
+- Each card shows:
+  - Title and confidence badge
+  - Description
+  - Supporting techniques with reasoning
+  - Evidence items list
+  - Caveats (amber background)
+
+**Tab 4: Contradictions**
+- One card per contradiction
+- Each card shows:
+  - ID and severity badge
   - Techniques involved
   - Explanation
   - Effect on confidence
+- Empty state if no contradictions
 
-**Report Tab:**
-- Display `fusionResult.report` (formatted markdown/text)
+**Tab 5: Report**
+- Markdown-formatted report in prose styling
+- Pre-formatted text with whitespace preservation
+
+## Data Models
+
+### Demo Data Structure
+
+The fusion workspace uses processed outputs from existing technique agents:
+
+**XPS Demo Data** (`xpsDemoData`):
+- Cu 2p region with Cu²⁺ oxidation state
+- Satellite features indicating Cu²⁺
+- State aggregations with confidence levels
+
+**FTIR Demo Data** (`ftirDemoData`):
+- Surface hydroxyl band (~3400 cm⁻¹)
+- Adsorbed water band (~1630 cm⁻¹)
+- Carbonate/carboxylate overlap region
+- M-O band (~550 cm⁻¹)
+
+**Raman Demo Data** (`ramanDemoData`):
+- A1g spinel ferrite mode (~690 cm⁻¹)
+- Eg ferrite mode (~470 cm⁻¹)
+- Lower ferrite mode (~330 cm⁻¹)
+- D and G bands (carbon)
+
+### Expected Demo Output
+
+**Final Decision**:
+```
+"Evidence suggests a spinel-like ferrite material with surface hydroxyl/water species 
+and possible carbonaceous residue. Oxidation-state confirmation remains dependent on 
+XPS evidence quality"
+```
+
+**Confidence**: MEDIUM (0.55-0.65)
+
+**Supported Claims**:
+1. Spinel-like ferrite structure (MEDIUM)
+2. Cu and Fe oxidation state consistency (MEDIUM)
+3. Surface hydroxyl and adsorbed water (MEDIUM)
+4. Carbonaceous residue and disorder (LOW)
+5. Carbonate and carboxylate surface species (LOW)
+
+**Contradictions**:
+1. spinel-xps-mismatch (MEDIUM): Raman suggests spinel but XPS lacks corroborating oxidation state evidence
+2. surface-complexity (LOW): Carbonate/carboxylate surface species complicate interpretation
+3. carbon-contribution (LOW): D/G bands indicate additional carbon-based species
+
+## Error Handling
+
+### Validation
+
+- **Input Validation**: Fusion agent expects valid `XpsProcessingResult`, `FtirProcessingResult`, and `RamanProcessingResult` objects
+- **Missing Evidence**: If a technique provides no evidence, claim evaluators handle gracefully with neutral support
+- **Empty Results**: UI displays empty states for contradictions and unresolved claims
+
+### Edge Cases
+
+- **No Supported Claims**: Final decision defaults to LOW confidence with generic conclusion
+- **All Techniques Neutral**: Claim remains unresolved with LOW confidence
+- **High Contradiction Severity**: Confidence capped at MEDIUM even with strong evidence
+
+## Testing Strategy
+
+### Unit Tests
+
+**Evidence Extraction**:
+- Test `extractXpsEvidence()` with various XPS state aggregations
+- Test `extractFtirEvidence()` with various functional group candidates
+- Test `extractRamanEvidence()` with various mode candidates
+- Verify evidence item weights and confidence values
+
+**Claim Evaluation**:
+- Test each claim evaluator with all combinations of technique support
+- Verify authority hierarchy is respected
+- Verify confidence calculation formulas
+- Test edge cases (no evidence, single technique, all techniques)
+
+**Confidence Calculation**:
+- Test `calculateClaimConfidence()` with various technique scores and weights
+- Verify contradiction penalties are applied correctly
+- Verify hierarchy multipliers are applied correctly
+
+**Contradiction Detection**:
+- Test each contradiction rule with matching and non-matching evidence
+- Verify contradiction severity classification
+- Verify confidence impact calculation
+
+**Decision Generation**:
+- Test `generateFinalDecision()` with various claim combinations
+- Verify final confidence is minimum of primary claims
+- Verify contradiction penalties reduce confidence
+- Test caveat and recommendation generation
+
+### Integration Tests
+
+**Full Fusion Workflow**:
+- Test `runFusionAnalysis()` with demo data
+- Verify all 5 claims are evaluated
+- Verify evidence matrix is built correctly
+- Verify contradictions are detected
+- Verify final decision matches expected output
+
+**UI Component Tests**:
+- Test FusionWorkspace renders without errors
+- Test tab switching
+- Test Run Fusion button triggers analysis
+- Test all 5 tabs display correct content
+- Test empty states
+
+### Property-Based Testing
+
+Property-based testing is **NOT applicable** to this feature because:
+
+1. **Deterministic Demo Data**: The fusion workspace uses fixed demo data, not variable inputs
+2. **Complex Domain Logic**: Fusion rules are domain-specific and cannot be expressed as universal properties
+3. **UI Rendering**: The workspace is primarily a UI component with rendering logic
+4. **Configuration Validation**: Authority weights and contradiction rules are configuration, not testable properties
+
+**Alternative Testing Approach**:
+- **Snapshot Tests**: Capture expected fusion results for demo data
+- **Example-Based Unit Tests**: Test specific evidence combinations with known expected outcomes
+- **Integration Tests**: Verify end-to-end workflow with demo data
+
+## Deployment Considerations
+
+### Build Requirements
+
+- No new dependencies required
+- All fusion logic is TypeScript/React
+- Uses existing DIFARYX workspace patterns
+- Compatible with Vite build system
+
+### Performance
+
+- **Client-Side Only**: All fusion logic runs in browser
+- **Deterministic**: No network calls, no async operations
+- **Fast Execution**: Fusion analysis completes in <100ms
+- **Memory Efficient**: Demo data is small (~10KB total)
+
+### Browser Compatibility
+
+- Requires modern browser with ES6+ support
+- Uses React 18 features (hooks, concurrent rendering)
+- No special browser APIs required
+
+## Future Enhancements
+
+### Phase 2 Enhancements (Not in Current Scope)
+
+1. **Dynamic Data Loading**: Support uploading real XPS/FTIR/Raman data files
+2. **Customizable Authority Weights**: UI for adjusting technique authority weights
+3. **Export Functionality**: Export fusion report as PDF or JSON
+4. **Visualization**: Add graphs showing evidence strength by technique
+5. **Comparison Mode**: Compare fusion results across multiple samples
+6. **Advanced Contradiction Rules**: Add more sophisticated contradiction detection
+7. **Confidence Sensitivity Analysis**: Show how confidence changes with different weights
+
+### Extensibility
+
+The fusion agent architecture supports:
+- Adding new claim types (modify claim evaluators)
+- Adding new techniques (extend evidence extraction)
+- Modifying authority weights (update `TECHNIQUE_AUTHORITY_WEIGHTS`)
+- Adding new contradiction rules (extend `detectContradictions()`)
+
+## References
+
+### Scientific Background
+
+- **XPS**: X-ray Photoelectron Spectroscopy for oxidation state determination
+- **FTIR**: Fourier Transform Infrared Spectroscopy for functional group identification
+- **Raman**: Raman Spectroscopy for vibrational mode and phase identification
+- **Spinel Ferrites**: CuFe2O4 and related materials with spinel crystal structure
+
+### Implementation References
+
+- Existing DIFARYX workspace patterns (XPSWorkspace, FTIRWorkspace, RamanWorkspace)
+- DashboardLayout component for three-panel structure
+- Existing agent runners (xpsAgent, ftirAgent, ramanAgent)
+- Demo data structures (xpsDemoData, ftirDemoData, ramanDemoData)
 
 ---
 
-## 5. Implementation Files
-
-### 5.1 File Structure
-
-```
-src/
-├── pages/
-│   └── FusionWorkspace.tsx          (Main UI component)
-├── agents/
-│   └── fusionAgent/
-│       ├── types.ts                 (TypeScript interfaces)
-│       └── runner.ts                (Fusion logic)
-├── data/
-│   └── fusionDemoData.ts            (Optional: demo data wrapper)
-└── App.tsx                          (Add /workspace/fusion route)
-```
-
-### 5.2 Implementation Order
-
-1. **types.ts** - Define all TypeScript interfaces
-2. **runner.ts** - Implement fusion logic (evidence extraction, claim evaluators, contradiction detection, decision generation)
-3. **FusionWorkspace.tsx** - Build UI with tabs and data binding
-4. **App.tsx** - Add route
-5. **Build validation** - Run `npm run build`
-
----
-
-## 6. Deterministic Fusion Rules Summary
-
-### 6.1 Claim Evaluation Rules
-
-| Claim | Primary Authority | Support Criteria | Confidence |
-|-------|------------------|------------------|------------|
-| Spinel structure | Raman | A1g + Eg/T2g + XPS oxidation states | HIGH |
-| Spinel structure | Raman | A1g + Eg/T2g, no XPS | MEDIUM |
-| Spinel structure | Raman | A1g only | MEDIUM |
-| Oxidation states | XPS | Cu²⁺ or Fe³⁺ detected | HIGH |
-| Surface species | FTIR | OH + H-O-H bands | MEDIUM |
-| Carbonaceous residue | Raman | D + G bands | MEDIUM |
-| Carbonate surface | FTIR | Carbonate/carboxylate overlap | MEDIUM |
-
-### 6.2 Contradiction Rules
-
-| Condition | Severity | Effect |
-|-----------|----------|--------|
-| Raman spinel + no XPS oxidation states | MEDIUM | Reduce to MEDIUM confidence |
-| Strong FTIR carbonate/carboxylate | LOW | Note surface complexity |
-| Raman D/G bands present | LOW | Note carbon contribution |
-
-### 6.3 Final Confidence Rules
-
-- **HIGH**: ≥1 high-confidence claim + 0 major contradictions
-- **MEDIUM**: ≥1 medium-confidence claim OR (high-confidence claim + major contradiction)
-- **LOW**: No supported claims OR severe contradictions
-
----
-
-## 7. Expected Demo Output
-
-**Primary Conclusion:**
-"Multi-technique evidence supports a spinel-like ferrite material with surface hydroxyl/water species and possible carbonaceous residue. Oxidation-state confirmation remains dependent on XPS evidence quality."
-
-**Confidence:** MEDIUM (60%)
-
-**Supported Claims:**
-- Spinel-like ferrite structure (MEDIUM)
-- Surface hydroxyl/adsorbed water (MEDIUM)
-- Carbonaceous residue/disorder (MEDIUM)
-
-**Unresolved Claims:**
-- Cu/Fe oxidation state consistency (depends on XPS quality)
-
-**Contradictions:**
-- MEDIUM: Raman suggests spinel but XPS lacks corroborating oxidation state evidence
-- LOW: Raman D/G bands indicate carbon contribution
-
-**Caveats:**
-- A1g mode observed without full corroborating Eg or T2g modes
-- XPS oxidation state evidence not available for corroboration
-- D and G bands indicate carbonaceous species; these do not confirm ferrite phase
-- Carbonate/carboxylate surface species may complicate surface interpretation
-
-**Recommended Validation:**
-- XPS depth profiling to confirm bulk oxidation states
-- TEM for structural confirmation
-- Complementary XRD for crystallographic phase identification
-
-
----
-
-## 8. Evidence Weighting System
-
-### 8.1 Technique-Specific Weights
-
-Evidence weight depends on technique authority for the claim type:
-
-| Claim Type | XPS Weight | FTIR Weight | Raman Weight |
-|------------|------------|-------------|--------------|
-| Spinel structure | 0.6 (corroboration) | 0.2 (context) | **1.0 (authority)** |
-| Oxidation states | **1.0 (authority)** | 0.1 (irrelevant) | 0.3 (context) |
-| Surface species | 0.5 (corroboration) | **1.0 (authority)** | 0.2 (context) |
-| Carbonaceous residue | 0.3 (context) | 0.5 (corroboration) | **1.0 (authority)** |
-| Carbonate surface | 0.2 (context) | **1.0 (authority)** | 0.1 (irrelevant) |
-
-**Weight Assignment Rules:**
-- **Authority (1.0)**: Technique has primary decision power for this claim type
-- **Corroboration (0.5-0.7)**: Technique provides supporting evidence
-- **Context (0.2-0.3)**: Technique provides tangential information
-- **Irrelevant (0.1)**: Technique does not inform this claim
-
-### 8.2 Evidence Item Weights
-
-Individual evidence items have intrinsic weights based on diagnostic value:
-
-**XPS Evidence Weights:**
-- Primary oxidation state peak: 1.0
-- Satellite peak: 0.8
-- Binding energy shift: 0.6
-- Surface composition: 0.5
-
-**FTIR Evidence Weights:**
-- Diagnostic functional group (M-O, OH): 1.0
-- Ambiguous overlap region (carbonate/carboxylate): 0.6
-- Broad band (disorder): 0.5
-- Weak/shoulder band: 0.3
-
-**Raman Evidence Weights:**
-- A1g primary mode: 1.0
-- Eg/T2g supporting modes: 0.8
-- Lower-frequency ferrite modes: 0.6
-- D/G carbon bands: 0.5 (for carbon claims only)
-
-### 8.3 Weighted Evidence Aggregation
-
-When multiple evidence items support a claim from one technique:
-
-```
-techniqueScore = Σ(evidenceConfidence × evidenceWeight) / Σ(evidenceWeight)
-
-Where:
-- evidenceConfidence = original technique confidence (0-1)
-- evidenceWeight = evidence item weight (0-1)
-```
-
-**Example (Raman for Spinel Structure):**
-```
-Evidence items:
-- A1g mode: confidence=0.85, weight=1.0
-- Eg mode: confidence=0.75, weight=0.8
-- Lower ferrite: confidence=0.75, weight=0.6
-
-techniqueScore = (0.85×1.0 + 0.75×0.8 + 0.75×0.6) / (1.0 + 0.8 + 0.6)
-               = (0.85 + 0.60 + 0.45) / 2.4
-               = 1.90 / 2.4
-               = 0.79
-```
-
----
-
-## 9. Claim-Level Confidence Calculation
-
-### 9.1 Confidence Formula
-
-Claim confidence is calculated using weighted technique scores and contradiction penalties:
-
-```
-claimConfidence = (Σ(techniqueScore × techniqueWeight) / Σ(techniqueWeight)) 
-                  × (1 - contradictionPenalty)
-                  × hierarchyMultiplier
-
-Where:
-- techniqueScore = weighted evidence aggregation from technique (0-1)
-- techniqueWeight = technique authority weight for this claim (0-1)
-- contradictionPenalty = sum of contradiction impacts (0-0.3)
-- hierarchyMultiplier = 1.0 (primary), 0.9 (supporting), 0.8 (context)
-```
-
-### 9.2 Confidence Classification
-
-After calculating `claimConfidence` (0-1), classify as:
-
-| Confidence Score | Classification | Conditions |
-|------------------|----------------|------------|
-| **0.70 - 1.00** | HIGH | Authority technique supports + corroboration + no major contradictions |
-| **0.50 - 0.69** | MEDIUM | Authority technique supports OR partial corroboration OR minor contradictions |
-| **0.00 - 0.49** | LOW | No authority support OR major contradictions OR single weak evidence |
-
-### 9.3 Worked Example: Spinel Structure Claim
-
-**Scenario:**
-- Raman: A1g (0.85), Eg (0.75), Lower (0.75)
-- XPS: Cu²⁺ (0.70)
-- FTIR: M-O (0.65)
-- Contradiction: MEDIUM (Raman spinel without full XPS corroboration)
-
-**Step 1: Calculate technique scores**
-```
-ramanScore = (0.85×1.0 + 0.75×0.8 + 0.75×0.6) / (1.0 + 0.8 + 0.6) = 0.79
-xpsScore = 0.70 (single evidence item)
-ftirScore = 0.65 (single evidence item)
-```
-
-**Step 2: Apply technique weights**
-```
-Technique weights for spinel structure:
-- Raman: 1.0 (authority)
-- XPS: 0.6 (corroboration)
-- FTIR: 0.2 (context)
-
-weightedSum = (0.79×1.0 + 0.70×0.6 + 0.65×0.2) / (1.0 + 0.6 + 0.2)
-            = (0.79 + 0.42 + 0.13) / 1.8
-            = 1.34 / 1.8
-            = 0.74
-```
-
-**Step 3: Apply contradiction penalty**
-```
-Contradiction: MEDIUM severity
-contradictionScore = 0.5 (partial disagreement)
-confidenceImpact = 0.5 × 0.15 = 0.075
-
-claimConfidence = 0.74 × (1 - 0.075) × 1.0 (primary claim)
-                = 0.74 × 0.925
-                = 0.68
-```
-
-**Step 4: Classify**
-```
-0.68 falls in 0.50-0.69 range → MEDIUM confidence
-```
-
-### 9.4 Final Decision Confidence
-
-Overall fusion confidence is determined by primary claims only:
-
-```
-finalConfidence = min(primaryClaimConfidences)
-
-Classification:
-- HIGH: All primary claims ≥ 0.70
-- MEDIUM: At least one primary claim in 0.50-0.69
-- LOW: Any primary claim < 0.50
-```
-
-**Rationale:** The weakest primary claim determines overall confidence, as all primary claims must be well-supported for a HIGH confidence conclusion.
-
----
-
-## 10. Implementation Formulas Summary
-
-### 10.1 Evidence Aggregation
-```typescript
-function aggregateEvidenceScore(evidenceItems: EvidenceItem[]): number {
-  const weightedSum = evidenceItems.reduce((sum, item) => 
-    sum + (item.confidence * item.weight), 0);
-  const totalWeight = evidenceItems.reduce((sum, item) => 
-    sum + item.weight, 0);
-  return totalWeight > 0 ? weightedSum / totalWeight : 0;
-}
-```
-
-### 10.2 Contradiction Scoring
-```typescript
-function calculateContradictionScore(
-  evidenceStrength: number,
-  disagreementMagnitude: number,
-  claimImportance: number
-): number {
-  return evidenceStrength * disagreementMagnitude * claimImportance;
-}
-
-function calculateConfidenceImpact(
-  contradictionScore: number,
-  severity: 'high' | 'medium' | 'low'
-): number {
-  const multipliers = { high: 0.30, medium: 0.15, low: 0.05 };
-  return contradictionScore * multipliers[severity];
-}
-```
-
-### 10.3 Claim Confidence
-```typescript
-function calculateClaimConfidence(
-  techniqueScores: Map<string, number>,
-  techniqueWeights: Map<string, number>,
-  contradictionPenalty: number,
-  hierarchyMultiplier: number
-): number {
-  let weightedSum = 0;
-  let totalWeight = 0;
-  
-  for (const [technique, score] of techniqueScores) {
-    const weight = techniqueWeights.get(technique) || 0;
-    weightedSum += score * weight;
-    totalWeight += weight;
-  }
-  
-  const baseConfidence = totalWeight > 0 ? weightedSum / totalWeight : 0;
-  return baseConfidence * (1 - contradictionPenalty) * hierarchyMultiplier;
-}
-```
-
-### 10.4 Final Decision Confidence
-```typescript
-function calculateFinalConfidence(claims: Claim[]): {
-  confidence: 'high' | 'medium' | 'low';
-  confidenceScore: number;
-} {
-  const primaryClaims = claims.filter(c => c.hierarchy === 'primary');
-  const minConfidence = Math.min(...primaryClaims.map(c => c.confidenceScore));
-  
-  let confidence: 'high' | 'medium' | 'low';
-  if (minConfidence >= 0.70) {
-    confidence = 'high';
-  } else if (minConfidence >= 0.50) {
-    confidence = 'medium';
-  } else {
-    confidence = 'low';
-  }
-  
-  return { confidence, confidenceScore: minConfidence };
-}
-```
+**Document Version**: 1.0  
+**Last Updated**: 2025-01-29  
+**Status**: Implementation Complete
