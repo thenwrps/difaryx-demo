@@ -24,7 +24,7 @@ import { callLLMReasoning, mockLLMReasoning } from './llmProvider';
  * @param project - Selected project
  * @param xrdAnalysis - XRD analysis result (if context is XRD)
  * @param featureCount - Number of detected features
- * @param baseConfidence - Base confidence from deterministic tools
+ * @param baseSupportLevel - Base support level from deterministic tools
  * @param useMock - Use mock LLM for demo (default: true)
  * @returns LLM reasoning result
  */
@@ -35,7 +35,7 @@ export async function executeLLMReasoning(
   project: DemoProject,
   xrdAnalysis: any | null,
   featureCount: number,
-  baseConfidence: number,
+  baseSupportLevel: number,
   useMock = true,
 ): Promise<{
   success: boolean;
@@ -51,7 +51,7 @@ export async function executeLLMReasoning(
       project,
       xrdAnalysis,
       featureCount,
-      baseConfidence,
+      baseSupportLevel,
     );
 
     // Call LLM (mock or real)
@@ -96,8 +96,8 @@ export function getLLMModelName(modelMode: 'gemini' | 'gemma'): string {
 export function formatLLMOutput(output: LLMReasoningOutput): {
   primaryResult: string;
   subtitle: string;
-  confidence: number;
-  confidenceLabel: string;
+  supportLevel: number;
+  decisionStatus: string;
   reasoningSummary: string[];
   evidence: string[];
   alternatives: string[];
@@ -105,21 +105,21 @@ export function formatLLMOutput(output: LLMReasoningOutput): {
   caveat: string;
   recommendation: string;
 } {
-  const confidencePercent = Math.round(output.confidence * 100);
-  const confidenceLabel =
-    confidencePercent >= 90
-      ? 'High confidence'
-      : confidencePercent >= 80
-        ? 'Moderate confidence'
-        : confidencePercent >= 70
-          ? 'Evidence-limited confidence'
-          : 'Low confidence';
+  const supportPercent = Math.round(output.confidence * 100);
+  const decisionStatus =
+    supportPercent >= 90
+      ? 'Strongly Supported'
+      : supportPercent >= 80
+        ? 'Supported'
+        : supportPercent >= 70
+          ? 'Partially Supported'
+          : 'Requires Validation';
 
   return {
     primaryResult: output.primaryResult,
     subtitle: 'LLM-assisted scientific reasoning',
-    confidence: confidencePercent,
-    confidenceLabel,
+    supportLevel: supportPercent,
+    decisionStatus,
     reasoningSummary: output.evidenceSummary,
     evidence: output.evidenceSummary,
     alternatives: output.rejectedAlternatives,

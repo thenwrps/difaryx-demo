@@ -80,8 +80,8 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-sm font-bold text-emerald-600">Supported</div>
-                  <div className="text-[10px] text-text-muted uppercase tracking-wider">Status</div>
+                  <div className="text-sm font-bold text-emerald-600">Strongly Supported</div>
+                  <div className="text-[10px] text-text-muted uppercase tracking-wider">Decision Status</div>
                 </div>
               </div>
               <div className="flex-1 p-4 flex flex-col">

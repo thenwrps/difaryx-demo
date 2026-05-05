@@ -31,7 +31,7 @@ function statusClass(status: 'complete' | 'warning' | 'error') {
   return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700';
 }
 
-function confidenceClass(level: string) {
+function supportLevelClass(level: string) {
   if (level === 'high') return 'text-emerald-600';
   if (level === 'medium') return 'text-amber-600';
   return 'text-red-600';
@@ -603,15 +603,15 @@ export default function XRDWorkspace() {
                             </div>
                             <div className="pt-2 border-t border-border/30">
                               <div className="flex items-center justify-between">
-                                <span className="text-[10px] uppercase tracking-wide text-text-muted">STATUS</span>
+                                <span className="text-[10px] uppercase tracking-wide text-text-muted">DECISION STATUS</span>
                                 <span className={`text-sm font-semibold tabular-nums ${
                                   agentResult.interpretation.confidenceLevel === 'high' ? 'text-emerald-600' : 
                                   agentResult.interpretation.confidenceLevel === 'medium' ? 'text-amber-600' : 
                                   'text-red-600'
                                 }`}>
-                                  {agentResult.interpretation.confidenceLevel === 'high' ? 'Supported' : 
-                                   agentResult.interpretation.confidenceLevel === 'medium' ? 'Working hypothesis' : 
-                                   'Requires validation'}
+                                  {agentResult.interpretation.confidenceLevel === 'high' ? 'Strongly Supported' : 
+                                   agentResult.interpretation.confidenceLevel === 'medium' ? 'Supported' : 
+                                   'Requires Validation'}
                                 </span>
                               </div>
                             </div>
@@ -670,7 +670,9 @@ export default function XRDWorkspace() {
                   <div className="flex items-start justify-between gap-2 mb-1">
                     <h3 className="text-[10px] font-semibold uppercase tracking-wide">Scientific Summary</h3>
                     <span className={`rounded-full border px-1.5 py-0.5 text-[8px] font-semibold uppercase ${statusClass(agentResult.interpretation.confidenceLevel === 'low' ? 'warning' : 'complete')}`}>
-                      {agentResult.interpretation.confidenceLevel}
+                      {agentResult.interpretation.confidenceLevel === 'high' ? 'Strongly Supported' : 
+                       agentResult.interpretation.confidenceLevel === 'medium' ? 'Supported' : 
+                       'Requires Validation'}
                     </span>
                   </div>
 

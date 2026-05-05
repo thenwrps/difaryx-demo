@@ -40,15 +40,15 @@ export default function FusionWorkspace() {
     handleRunFusion();
   }, []);
   
-  // Get confidence badge color
-  const getConfidenceBadgeColor = (confidence: 'high' | 'medium' | 'low') => {
-    switch (confidence) {
-      case 'high':
+  // Get decision status badge color
+  const getDecisionStatusBadgeColor = (status: 'strongly-supported' | 'supported' | 'partial') => {
+    switch (status) {
+      case 'strongly-supported':
         return 'bg-green-100 text-green-800 border-green-200';
-      case 'medium':
+      case 'supported':
+        return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'partial':
         return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'low':
-        return 'bg-red-100 text-red-800 border-red-200';
     }
   };
   
@@ -155,18 +155,15 @@ export default function FusionWorkspace() {
         </p>
       </div>
       
-      {/* Confidence and Reliability */}
+      {/* Decision Status and Reliability */}
       <div className="bg-white rounded-lg border border-gray-200 p-4">
-        <h3 className="text-sm font-semibold text-gray-700 mb-3">Confidence & Reliability</h3>
+        <h3 className="text-sm font-semibold text-gray-700 mb-3">Decision Status & Reliability</h3>
         <div className="space-y-3">
           <div>
-            <div className="text-xs text-gray-500 mb-1">Overall Confidence</div>
+            <div className="text-xs text-gray-500 mb-1">Overall Status</div>
             <div className="flex items-center gap-2">
-              <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getConfidenceBadgeColor(fusionResult.decision.confidence)}`}>
-                {fusionResult.decision.confidence.toUpperCase()}
-              </span>
-              <span className="text-sm text-gray-600">
-                {(fusionResult.decision.confidenceScore * 100).toFixed(1)}%
+              <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getDecisionStatusBadgeColor(fusionResult.decision.confidenceScore >= 0.9 ? 'strongly-supported' : fusionResult.decision.confidenceScore >= 0.75 ? 'supported' : 'partial')}`}>
+                {fusionResult.decision.confidenceScore >= 0.9 ? 'STRONGLY SUPPORTED' : fusionResult.decision.confidenceScore >= 0.75 ? 'SUPPORTED' : 'PARTIAL'}
               </span>
             </div>
           </div>
@@ -297,12 +294,9 @@ export default function FusionWorkspace() {
                 {fusionResult.decision.primaryConclusion}
               </p>
               <div className="flex items-center gap-3">
-                <span className="text-sm text-gray-600">Confidence:</span>
-                <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getConfidenceBadgeColor(fusionResult.decision.confidence)}`}>
-                  {fusionResult.decision.confidence.toUpperCase()}
-                </span>
-                <span className="text-sm text-gray-600">
-                  ({(fusionResult.decision.confidenceScore * 100).toFixed(1)}%)
+                <span className="text-sm text-gray-600">Decision Status:</span>
+                <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getDecisionStatusBadgeColor(fusionResult.decision.confidenceScore >= 0.9 ? 'strongly-supported' : fusionResult.decision.confidenceScore >= 0.75 ? 'supported' : 'partial')}`}>
+                  {fusionResult.decision.confidenceScore >= 0.9 ? 'STRONGLY SUPPORTED' : fusionResult.decision.confidenceScore >= 0.75 ? 'SUPPORTED' : 'PARTIAL'}
                 </span>
               </div>
             </div>
@@ -317,8 +311,8 @@ export default function FusionWorkspace() {
                     <li key={claim.id} className="flex items-start gap-2 text-sm">
                       <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
                       <span className="text-gray-700">{claim.title}</span>
-                      <span className={`ml-auto px-2 py-0.5 rounded text-xs font-medium ${getConfidenceBadgeColor(claim.confidence)}`}>
-                        {claim.confidence.toUpperCase()}
+                      <span className={`ml-auto px-2 py-0.5 rounded text-xs font-medium ${getDecisionStatusBadgeColor(claim.confidenceScore >= 0.9 ? 'strongly-supported' : claim.confidenceScore >= 0.75 ? 'supported' : 'partial')}`}>
+                        {claim.confidenceScore >= 0.9 ? 'STRONG' : claim.confidenceScore >= 0.75 ? 'SUPPORTED' : 'PARTIAL'}
                       </span>
                     </li>
                   ))}
@@ -403,8 +397,8 @@ export default function FusionWorkspace() {
               <div key={claim.id} className="bg-white rounded-lg border border-gray-200 p-6">
                 <div className="flex items-start justify-between mb-4">
                   <h3 className="text-base font-semibold text-gray-900">{claim.title}</h3>
-                  <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getConfidenceBadgeColor(claim.confidence)}`}>
-                    {claim.confidence.toUpperCase()}
+                  <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getDecisionStatusBadgeColor(claim.confidenceScore >= 0.9 ? 'strongly-supported' : claim.confidenceScore >= 0.75 ? 'supported' : 'partial')}`}>
+                    {claim.confidenceScore >= 0.9 ? 'STRONGLY SUPPORTED' : claim.confidenceScore >= 0.75 ? 'SUPPORTED' : 'PARTIAL'}
                   </span>
                 </div>
                 

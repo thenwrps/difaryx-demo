@@ -17,11 +17,11 @@ interface ScientificReasoningPanelProps {
 }
 
 export function ScientificReasoningPanel({ result, className }: ScientificReasoningPanelProps) {
-  // Map confidence level to research-grade status
+  // Map confidence level to decision status
   const getDecisionStatus = (level: string) => {
-    if (level === 'high') return 'Supported';
-    if (level === 'medium') return 'Working hypothesis';
-    return 'Requires validation';
+    if (level === 'high') return 'Strongly Supported';
+    if (level === 'medium') return 'Supported';
+    return 'Requires Validation';
   };
   
   const status = getDecisionStatus(result.confidenceLevel);

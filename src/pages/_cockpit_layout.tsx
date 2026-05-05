@@ -204,11 +204,11 @@
         {/* RIGHT PANEL — Insight & Action */}
         <aside className="cockpit-scroll w-[360px] shrink-0 overflow-y-auto border-l border-slate-800/50 bg-[#080E19] p-3 space-y-3">
 
-          {/* Confidence Display */}
+          {/* Decision Status Display */}
           <div className={`rounded-lg border p-4 text-center transition-all duration-500 ${runComplete ? 'border-emerald-400/30 bg-emerald-400/5' : 'border-slate-800 bg-[#0A0F1A]'}`}>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Confidence</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Decision Status</p>
             <p className={`mt-1 text-4xl font-black ${runComplete ? 'text-emerald-300' : 'text-slate-700'}`}>{runComplete ? `${SCIENTIFIC_INSIGHT.confidence}%` : '—'}</p>
-            <p className="mt-1 text-[10px] text-slate-500">{runComplete ? 'High confidence — phase confirmed' : 'Pending agent execution'}</p>
+            <p className="mt-1 text-[10px] text-slate-500">{runComplete ? 'Strongly supported — phase confirmed' : 'Pending agent execution'}</p>
           </div>
 
           {/* Phase Result */}
@@ -232,9 +232,9 @@
                 </div>
               </div>
 
-              {/* Confidence Basis */}
+              {/* Evidence Strength Basis */}
               <div className="rounded-lg border border-slate-800 bg-[#0A0F1A] p-3">
-                <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">Confidence Basis</p>
+                <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">Evidence Strength Basis</p>
                 <div className="space-y-1">
                   {SCIENTIFIC_INSIGHT.confidenceBasis.map(c => (
                     <div key={c} className="flex items-center gap-2 rounded-md border border-indigo-400/20 bg-indigo-500/10 px-2 py-1.5 text-[11px] text-indigo-100">

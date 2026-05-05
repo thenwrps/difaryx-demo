@@ -146,10 +146,13 @@ export default function XPSWorkspace() {
   // Calculate summary statistics from processed results
   const totalPeaks = processingResult.peaks.length;
   const matchedPeaks = processingResult.matches.length;
-  const avgConfidence = matchedPeaks > 0 
+  const avgSupport = matchedPeaks > 0 
     ? processingResult.matches.reduce((sum, m) => sum + m.confidence, 0) / matchedPeaks 
     : 0;
-  const confidencePercent = (avgConfidence * 100).toFixed(1);
+  const supportLevel = avgSupport >= 0.9 ? 'Strongly Supported' 
+    : avgSupport >= 0.8 ? 'Supported' 
+    : avgSupport >= 0.7 ? 'Partially Supported' 
+    : 'Requires Validation';
   
   // Determine primary chemical state (most intense matched peak)
   const primaryMatch = processingResult.matches
@@ -170,10 +173,10 @@ export default function XPSWorkspace() {
     'Peak overlap requires careful deconvolution',
   ];
   
-  // Determine confidence badge
-  const confidenceBadge = processingResult.confidence === 'high' ? 'high' 
-    : processingResult.confidence === 'medium' ? 'medium' 
-    : 'low';
+  // Determine decision status badge
+  const decisionStatusBadge = processingResult.confidence === 'high' ? 'Strongly Supported' 
+    : processingResult.confidence === 'medium' ? 'Supported' 
+    : 'Requires Validation';
   
   // Handle Auto Mode toggle
   const handleAutoModeChange = (enabled: boolean) => {
@@ -542,8 +545,8 @@ export default function XPSWorkspace() {
                             <span className="text-lg font-semibold text-text-main tabular-nums block">{selectedDataset.signal.bindingEnergy.length}</span>
                           </div>
                           <div className="space-y-1">
-                            <span className="text-[10px] uppercase tracking-wide text-text-muted block">CONFIDENCE</span>
-                            <span className="text-lg font-semibold text-emerald-600 tabular-nums block">{confidencePercent}%</span>
+                            <span className="text-[10px] uppercase tracking-wide text-text-muted block">EVIDENCE STRENGTH</span>
+                            <span className="text-lg font-semibold text-emerald-600 tabular-nums block">{supportLevel}</span>
                           </div>
                         </div>
                       </div>
@@ -566,7 +569,7 @@ export default function XPSWorkspace() {
                               <th className="text-right px-3 py-2 font-medium">BE ref <span className="text-[8px]">(eV)</span></th>
                               <th className="text-right px-3 py-2 font-medium">ΔBE <span className="text-[8px]">(eV)</span></th>
                               <th className="text-right px-3 py-2 font-medium">Assignment</th>
-                              <th className="text-right px-3 py-2 font-medium">Conf.</th>
+                              <th className="text-right px-3 py-2 font-medium">Support</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -576,7 +579,9 @@ export default function XPSWorkspace() {
                                 <td className="px-3 py-2 font-mono text-right text-text-main text-sm font-medium tabular-nums">{match.referenceBE.toFixed(1)}</td>
                                 <td className="px-3 py-2 font-mono text-right text-text-main text-sm font-medium tabular-nums">{match.deltaBE.toFixed(2)}</td>
                                 <td className="px-3 py-2 font-mono text-right text-primary text-sm font-medium">{match.assignment}</td>
-                                <td className="px-3 py-2 font-mono text-right text-emerald-600 text-sm font-medium tabular-nums">{(match.confidence * 100).toFixed(0)}%</td>
+                                <td className="px-3 py-2 font-mono text-right text-emerald-600 text-sm font-medium tabular-nums">
+                                  {match.confidence >= 0.9 ? 'Strong' : match.confidence >= 0.8 ? 'Good' : match.confidence >= 0.7 ? 'Moderate' : 'Weak'}
+                                </td>
                               </tr>
                             ))}
                           </tbody>
@@ -598,13 +603,13 @@ export default function XPSWorkspace() {
               <div className="flex items-start justify-between gap-2 mb-1">
                 <h3 className="text-[10px] font-semibold uppercase tracking-wide">Scientific Summary</h3>
                 <span className={`rounded-full border px-1.5 py-0.5 text-[8px] font-semibold uppercase ${
-                  confidenceBadge === 'high' 
+                  decisionStatusBadge === 'Strongly Supported' 
                     ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700'
-                    : confidenceBadge === 'medium'
+                    : decisionStatusBadge === 'Supported'
                     ? 'border-amber-500/30 bg-amber-500/10 text-amber-700'
                     : 'border-red-500/30 bg-red-500/10 text-red-700'
                 }`}>
-                  {confidenceBadge}
+                  {decisionStatusBadge}
                 </span>
               </div>
 

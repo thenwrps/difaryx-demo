@@ -45,7 +45,7 @@ function fallbackDecision(reasoningMode = "fallback") {
   return {
     final_decision:
       "Spinel ferrite phase is likely present based on the provided XRD peak evidence.",
-    confidence: 85,
+    supportLevel: 85,
     evidence: [
       "Key diffraction peaks align with a spinel ferrite reference pattern.",
       "No dominant impurity phase is indicated in the provided peak list.",
@@ -178,10 +178,10 @@ app.post("/run-agent", async (req, res) => {
       success: true,
       data: {
         final_decision: data.final_decision || fallbackDecision().final_decision,
-        confidence:
-          typeof data.confidence === "number"
-            ? data.confidence
-            : fallbackDecision().confidence,
+        supportLevel:
+          typeof data.supportLevel === "number"
+            ? data.supportLevel
+            : fallbackDecision().supportLevel,
         evidence: Array.isArray(data.evidence)
           ? data.evidence.slice(0, 3)
           : fallbackDecision().evidence,

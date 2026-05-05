@@ -101,7 +101,7 @@ export function buildXPSEvidencePacket(
   dataset: DemoDataset,
   project: DemoProject,
   featureCount: number,
-  baseConfidence: number,
+  baseSupportLevel: number,
 ): AgentEvidencePacket {
   const uncertaintyFlags: string[] = [
     'XPS provides surface chemistry only, not bulk phase information',
@@ -144,7 +144,7 @@ export function buildXPSEvidencePacket(
     candidates: [
       {
         label: `Surface chemistry consistent with ${project.material}`,
-        score: baseConfidence / 100,
+        score: baseSupportLevel / 100,
         matchedFeatures: featureCount,
         totalFeatures: featureCount,
         missingFeatures: [],
@@ -159,7 +159,7 @@ export function buildXPSEvidencePacket(
         unexplainedFeatures: ['Possible C 1s contamination'],
       },
     ],
-    fusedScore: baseConfidence / 100,
+    fusedScore: baseSupportLevel / 100,
     uncertaintyFlags,
     processingNotes: [
       'Deterministic component detection in core-level regions',
@@ -176,7 +176,7 @@ export function buildFTIREvidencePacket(
   dataset: DemoDataset,
   project: DemoProject,
   featureCount: number,
-  baseConfidence: number,
+  baseSupportLevel: number,
 ): AgentEvidencePacket {
   const uncertaintyFlags: string[] = [
     'FTIR provides bonding information, not crystalline phase',
@@ -207,7 +207,7 @@ export function buildFTIREvidencePacket(
     candidates: [
       {
         label: `Bonding signatures consistent with ${project.material}`,
-        score: baseConfidence / 100,
+        score: baseSupportLevel / 100,
         matchedFeatures: featureCount,
         totalFeatures: featureCount,
         missingFeatures: [],
@@ -222,7 +222,7 @@ export function buildFTIREvidencePacket(
         unexplainedFeatures: ['Strong support interference'],
       },
     ],
-    fusedScore: baseConfidence / 100,
+    fusedScore: baseSupportLevel / 100,
     uncertaintyFlags,
     processingNotes: [
       'Deterministic band detection in diagnostic windows',
@@ -239,7 +239,7 @@ export function buildRamanEvidencePacket(
   dataset: DemoDataset,
   project: DemoProject,
   featureCount: number,
-  baseConfidence: number,
+  baseSupportLevel: number,
 ): AgentEvidencePacket {
   const uncertaintyFlags: string[] = [
     'Raman provides structural fingerprint, not quantitative phase analysis',
@@ -272,7 +272,7 @@ export function buildRamanEvidencePacket(
     candidates: [
       {
         label: `Structural fingerprint consistent with ${project.material}`,
-        score: baseConfidence / 100,
+        score: baseSupportLevel / 100,
         matchedFeatures: featureCount,
         totalFeatures: featureCount,
         missingFeatures: [],
@@ -287,7 +287,7 @@ export function buildRamanEvidencePacket(
         unexplainedFeatures: [],
       },
     ],
-    fusedScore: baseConfidence / 100,
+    fusedScore: baseSupportLevel / 100,
     uncertaintyFlags,
     processingNotes: [
       'Deterministic mode detection via peak finding',
@@ -307,22 +307,22 @@ export function buildEvidencePacket(
   project: DemoProject,
   xrdAnalysis: any | null,
   featureCount: number,
-  baseConfidence: number,
+  baseSupportLevel: number,
 ): AgentEvidencePacket {
   if (context === 'XRD' && xrdAnalysis) {
     return buildXRDEvidencePacket(dataset, project, xrdAnalysis);
   }
   
   if (context === 'XPS') {
-    return buildXPSEvidencePacket(dataset, project, featureCount, baseConfidence);
+    return buildXPSEvidencePacket(dataset, project, featureCount, baseSupportLevel);
   }
   
   if (context === 'FTIR') {
-    return buildFTIREvidencePacket(dataset, project, featureCount, baseConfidence);
+    return buildFTIREvidencePacket(dataset, project, featureCount, baseSupportLevel);
   }
   
   if (context === 'Raman') {
-    return buildRamanEvidencePacket(dataset, project, featureCount, baseConfidence);
+    return buildRamanEvidencePacket(dataset, project, featureCount, baseSupportLevel);
   }
   
   throw new Error(`Unsupported context: ${context}`);

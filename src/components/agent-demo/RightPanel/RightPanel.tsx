@@ -102,7 +102,7 @@ function getScientificSummary(technique: string) {
             content: 'Sharp, well-resolved peaks indicate high crystallinity (crystallite size ~35 nm from Scherrer analysis). Absence of secondary oxide phases (Fe₂O₃, CuO) above 2% detection limit.',
           },
         ],
-        confidence: 'High',
+        supportLevel: 'Strongly Supported',
       };
     case 'FTIR':
       return {
@@ -121,7 +121,7 @@ function getScientificSummary(technique: string) {
             content: 'Cation distribution Cu₀.₂Fe₀.₈[Cu₀.₈Fe₁.₂]O₄ supported by vibrational analysis. Surface hydroxyl groups (3400 cm⁻¹) suggest active catalytic sites. Support interaction preserved.',
           },
         ],
-        confidence: 'Moderate',
+        supportLevel: 'Supported',
       };
     case 'Raman':
       return {
@@ -140,7 +140,7 @@ function getScientificSummary(technique: string) {
             content: 'Sharp linewidths (FWHM < 25 cm⁻¹) indicate long-range structural order. Absence of D-band (1350 cm⁻¹) rules out carbon contamination. Lattice dynamics support inverse spinel assignment.',
           },
         ],
-        confidence: 'High',
+        supportLevel: 'Strongly Supported',
       };
     case 'XPS':
       return {
@@ -159,7 +159,7 @@ function getScientificSummary(technique: string) {
             content: 'Surface composition Cu₁.₃Fe₁.₇O₄ vs. bulk CuFe₂O₄ suggests reconstruction. Absence of metallic Cu (932.5 eV) confirms oxide stability. Hydroxyl coverage θ_OH = 0.4 ML indicates hydrated surface for catalysis.',
           },
         ],
-        confidence: 'Moderate to High',
+        supportLevel: 'Supported',
       };
     default:
       return {
@@ -174,7 +174,7 @@ function getScientificSummary(technique: string) {
             content: 'No major conflicting signals detected',
           },
         ],
-        confidence: 'Moderate',
+        supportLevel: 'Supported',
       };
   }
 }
@@ -484,7 +484,7 @@ function getLiteratureEvidence(technique: string, projectName?: string): Literat
         relevance: 'High - Supporting',
         keyEvidence: 'XRD shows CuFe₂O₄ lattice parameter a = 8.37 Å on SBA-15 support (vs. 8.39 Å bulk). XPS Cu 2p₃/₂ at 933.9 eV with surface Cu/Fe = 0.78 (vs. bulk 0.50). FTIR Si-O-Si band at 1048 cm⁻¹ indicates support interaction. Spinel (311) peak preserved after loading.',
         consistencyCheck: 'Our a = 8.38 Å intermediate between their supported (8.37 Å) and bulk values, consistent with partial support interaction. Our Cu/Fe = 0.76 matches their surface enrichment trend. Our FTIR shoulder at 1050 cm⁻¹ confirms Si-O-Si signature.',
-        impactOnDecision: 'Validates spinel structure retention on support (+0.02 confidence). Confirms Cu surface segregation is not artifact but thermodynamic effect. Support interaction detected but does not alter bulk crystal structure.',
+        impactOnDecision: 'Validates spinel structure retention on support. Confirms Cu surface segregation is not artifact but thermodynamic effect. Support interaction detected but does not alter bulk crystal structure.',
         externalLink: '#',
       },
       {
@@ -510,7 +510,7 @@ function getLiteratureEvidence(technique: string, projectName?: string): Literat
         relevance: 'High - Supporting',
         keyEvidence: 'Reports A₁g Raman mode at 688 cm⁻¹ for CuFe₂O₄ with 75-85% Cu²⁺ octahedral occupancy. XRD lattice parameter a = 8.377 Å from Rietveld refinement. Crystallite size 32-38 nm from Scherrer analysis correlates with catalytic activity.',
         consistencyCheck: 'Our A₁g = 690 cm⁻¹ matches within ±2 cm⁻¹ (instrumental resolution). Our a = 8.38 Å agrees within error bars. Our crystallite size 35 nm falls in reported range, validating Scherrer methodology.',
-        impactOnDecision: 'Strengthens inverse spinel assignment (+0.03 confidence). Confirms Cu²⁺ octahedral site preference from Raman-structure correlation. Validates crystallite size as catalytically relevant (30-40 nm optimal range).',
+        impactOnDecision: 'Strengthens inverse spinel assignment. Confirms Cu²⁺ octahedral site preference from Raman-structure correlation. Validates crystallite size as catalytically relevant (30-40 nm optimal range).',
         externalLink: '#',
       },
       {
@@ -521,7 +521,7 @@ function getLiteratureEvidence(technique: string, projectName?: string): Literat
         relevance: 'High - Supporting',
         keyEvidence: 'Provides reference d-spacings: d₃₁₁ = 2.532 Å, d₄₄₀ = 1.481 Å, d₅₁₁ = 1.615 Å for pure CuFe₂O₄. Raman T₂g splitting Δν = 142 cm⁻¹ attributed to Jahn-Teller Cu²⁺ distortion in octahedral sites. Absence of CuO band at 530 cm⁻¹ used as phase purity criterion.',
         consistencyCheck: 'Our d₃₁₁ = 2.53 Å matches exactly. Our T₂g splitting = 145 cm⁻¹ within ±3 cm⁻¹. No CuO signature detected in our data, confirming phase purity >98%. Excellent agreement across all metrics.',
-        impactOnDecision: 'Validates crystallographic indexing (+0.02 confidence). Confirms Jahn-Teller interpretation of Raman splitting. Supports single-phase conclusion by ruling out CuO contamination.',
+        impactOnDecision: 'Validates crystallographic indexing. Confirms Jahn-Teller interpretation of Raman splitting. Supports single-phase conclusion by ruling out CuO contamination.',
         externalLink: '#',
       },
       {
@@ -627,7 +627,7 @@ function getLiteratureEvidence(technique: string, projectName?: string): Literat
 
 **Resolved discrepancy:** Anderson's Fe³⁺/Fe²⁺ = 3.2 conflicts with our 2.8 and stoichiometric expectation (2.0). Analysis: Their ex-situ XPS after air exposure likely oxidized surface Fe²⁺ → Fe³⁺. Our value closer to ideal suggests fresher surface or inert transfer. This explains discrepancy without invalidating either dataset—both measure real but different surface states.
 
-**Confidence impact:** Supporting papers (Liu, Chen, Zhang) contribute +0.05 through independent validation of lattice parameters, Raman modes, and XPS binding energies. Partial conflicts (Anderson Fe ratio, Kumar crystallite size) contribute -0.02 but are explainable by experimental conditions. Net literature contribution: +0.03 to final confidence, raising score from 0.90 → 0.93.
+**Decision impact:** Supporting papers (Liu, Chen, Zhang) provide strong independent validation of lattice parameters, Raman modes, and XPS binding energies. Partial conflicts (Anderson Fe ratio, Kumar crystallite size) are explainable by experimental conditions and do not affect the primary structural assignment.
 
 **Critical insight:** Multi-laboratory convergence on Cu surface enrichment (1.2-1.4×) across three studies suggests universal thermodynamic driving force rather than measurement artifact. This elevates surface reconstruction from observation to validated phenomenon, justifying inclusion in structural model.`,
   };
@@ -965,42 +965,42 @@ export function RightPanel({
               ))}
               <div className="mt-3 pt-3 border-t border-slate-700">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold text-slate-400">Confidence:</span>
-                  <span className="text-xs text-emerald-400 font-semibold">{getScientificSummary(technique).confidence}</span>
+                  <span className="text-xs font-semibold text-slate-400">Decision Status:</span>
+                  <span className="text-xs text-emerald-400 font-semibold">{getScientificSummary(technique).supportLevel}</span>
                 </div>
               </div>
             </Section>
 
-            {/* Section 3: Uncertainty Assessment */}
-            <Section title="Uncertainty Assessment">
+            {/* Section 3: Evidence Reasoning */}
+            <Section title="Evidence Reasoning">
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-300">Residual uncertainty:</span>
+                  <span className="text-xs font-semibold text-slate-300">Evidence quality:</span>
                   <span className="px-2 py-0.5 rounded-full bg-emerald-400/10 border border-emerald-400/30 text-emerald-300 text-[10px] font-bold">
-                    Low (σ = 0.02)
+                    Strong
                   </span>
                 </div>
                 <div>
-                  <div className="text-xs font-semibold text-slate-400 mb-1.5">Quantified sources:</div>
+                  <div className="text-xs font-semibold text-slate-400 mb-1.5">Key supporting factors:</div>
                   <ul className="space-y-1 text-xs text-slate-500">
                     <li className="flex items-start gap-2">
                       <span className="text-slate-600">•</span>
-                      <span><span className="text-slate-400">Peak position uncertainty:</span> ±0.02° (2θ) from instrumental broadening and sample displacement (contributes σ₁ = 0.008)</span>
+                      <span><span className="text-slate-400">Peak position matching:</span> All major reflections align within ±0.15° (2θ) of reference pattern, indicating excellent structural agreement</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-slate-600">•</span>
-                      <span><span className="text-slate-400">Intensity measurement error:</span> ±3% from counting statistics and background subtraction (contributes σ₂ = 0.012)</span>
+                      <span><span className="text-slate-400">Intensity correlation:</span> Observed intensity ratios match expected values within 8%, supporting correct phase identification</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-slate-600">•</span>
-                      <span><span className="text-slate-400">Unindexed reflections:</span> 2 weak peaks (I/I₀ &lt; 2%) at 62.3° and 64.1° may indicate trace impurity or superlattice ordering (contributes σ₃ = 0.015)</span>
+                      <span><span className="text-slate-400">Minor unindexed features:</span> 2 weak peaks (I/I₀ &lt; 2%) at 62.3° and 64.1° may indicate trace impurity or superlattice ordering, but do not affect primary phase assignment</span>
                     </li>
                   </ul>
                 </div>
                 <div>
-                  <div className="text-xs font-semibold text-slate-400 mb-1.5">Impact on conclusion:</div>
+                  <div className="text-xs font-semibold text-slate-400 mb-1.5">Decision basis:</div>
                   <div className="text-xs text-emerald-400">
-                    Combined uncertainty σ_total = √(σ₁² + σ₂² + σ₃²) = 0.021 does not alter primary phase assignment. Confidence interval [0.91, 0.95] remains above decision threshold (0.85).
+                    Multiple independent evidence streams converge on the same structural assignment. Cross-technique validation (XRD + Raman + XPS) provides robust support for the phase identification.
                   </div>
                 </div>
               </div>
@@ -1019,7 +1019,7 @@ export function RightPanel({
                   <span className="text-slate-300 font-medium">Competing hypotheses:</span> Fe₃O₄ magnetite rejected due to absence of characteristic (111) reflection at 18.3° and incompatible lattice parameter (a_magnetite = 8.39 Å vs. a_observed = 8.38 Å). CuO tenorite ruled out by missing monoclinic signature at 38.7°.
                 </p>
                 <p className="text-slate-500 text-[10px] pt-2 border-t border-slate-800">
-                  <span className="text-violet-400">Gemini reasoning:</span> Cross-validated peak positions against 3 independent databases (ICDD, COD, AMCSD). Confidence score adjusted +6% based on multi-technique convergence (XRD + Raman + XPS all support spinel assignment).
+                  <span className="text-violet-400">Gemini reasoning:</span> Cross-validated peak positions against 3 independent databases (ICDD, COD, AMCSD). Multi-technique convergence (XRD + Raman + XPS) provides strong support for spinel assignment.
                 </p>
               </div>
             </Section>
@@ -1033,18 +1033,18 @@ export function RightPanel({
 
                 <div className="rounded-lg bg-emerald-400/5 border border-emerald-400/20 p-3">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-semibold text-slate-300">Confidence:</span>
+                    <span className="text-sm font-semibold text-slate-300">Decision Status:</span>
                     <span className="px-3 py-1 rounded-full bg-emerald-400/10 border border-emerald-400/30 text-emerald-300 text-xs font-bold">
-                      High (0.93 ± 0.02)
+                      Strongly Supported
                     </span>
                   </div>
                   <div className="text-xs text-slate-400 text-center mb-2">
                     Derived from evidence synthesis
                   </div>
                   <div className="text-[10px] text-cyan-400 text-center pt-2 border-t border-emerald-400/20">
-                    📊 Confidence source: <span className="font-semibold">Evidence tab → Confidence Formation</span>
+                    📊 Evidence basis: <span className="font-semibold">Evidence tab → Evidence Reasoning</span>
                     <br />
-                    <span className="text-slate-500">Click evidence items there to see detailed contributions</span>
+                    <span className="text-slate-500">Review evidence items for detailed reasoning trace</span>
                   </div>
                 </div>
 
@@ -1102,9 +1102,9 @@ export function RightPanel({
                   <span className="text-slate-300">Analysis:</span> Peak position inconsistent with CuFe₂O₄ spinel (no allowed reflection at d = 1.489 Å for Fd-3m). Possible origins: (1) trace CuO impurity (2-11) plane, (2) surface reconstruction superlattice, or (3) instrumental artifact from Kα₂ stripping error.
                 </div>
                 <div className="flex items-center gap-2 text-xs">
-                  <span className="text-amber-400 font-semibold">Confidence penalty:</span>
-                  <span className="text-amber-300 font-mono">-0.02</span>
-                  <span className="text-slate-500">(scaled by intensity ratio 1.8/100)</span>
+                  <span className="text-amber-400 font-semibold">Impact on decision:</span>
+                  <span className="text-amber-300">Minor concern</span>
+                  <span className="text-slate-500">(low intensity: 1.8%)</span>
                 </div>
                 <div className="text-[10px] text-slate-500 pt-1 border-t border-slate-700">
                   <span className="text-slate-400">Decision:</span> Insufficient intensity to support secondary phase hypothesis (detection limit ~2%). Flagged for follow-up XPS or TEM analysis if critical for application.
@@ -1116,154 +1116,37 @@ export function RightPanel({
             <Section title="Evidence Synthesis">
               <div className="rounded-lg bg-slate-800/30 border border-slate-700 p-4 space-y-3">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-400">Base alignment score (S_align):</span>
-                  <span className="text-slate-200 font-mono font-semibold">0.89</span>
+                  <span className="text-slate-400">Peak alignment quality:</span>
+                  <span className="text-slate-200 font-mono font-semibold">Excellent</span>
                 </div>
                 <div className="text-[10px] text-slate-500 -mt-2 ml-4">
-                  Weighted average: 0.4×(position match) + 0.35×(intensity corr.) + 0.25×(completeness)
+                  Position matching within ±0.15°, intensity correlation r = 0.87, completeness 95%
                 </div>
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-amber-400">Conflict penalty (P_conflict):</span>
-                  <span className="text-amber-300 font-mono">-0.02</span>
+                  <span className="text-amber-400">Minor anomalies:</span>
+                  <span className="text-amber-300 font-mono">1 weak unindexed peak</span>
                 </div>
                 <div className="text-[10px] text-slate-500 -mt-2 ml-4">
-                  Anomalous peak at 62.3° (1.8% intensity) → penalty = -0.02 × (I/I_threshold)
+                  Anomalous peak at 62.3° (1.8% intensity) does not affect primary phase assignment
                 </div>
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-emerald-400">Cross-technique bonus (B_cross):</span>
-                  <span className="text-emerald-300 font-mono">+0.06</span>
+                  <span className="text-emerald-400">Cross-technique validation:</span>
+                  <span className="text-emerald-300 font-mono">Strong agreement</span>
                 </div>
                 <div className="text-[10px] text-slate-500 -mt-2 ml-4">
-                  XRD + Raman + XPS convergence → +0.02 per independent technique agreement
+                  XRD + Raman + XPS all converge on inverse spinel structure
                 </div>
                 <div className="pt-3 border-t border-slate-700">
-                  <div className="text-[11px] text-slate-400 mb-2 font-mono">
-                    S_final = S_align + P_conflict + B_cross = 0.89 - 0.02 + 0.06
+                  <div className="text-[11px] text-slate-400 mb-2">
+                    Multiple independent evidence streams support the same structural conclusion
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold text-slate-300">Final confidence:</span>
-                    <span className="text-lg text-emerald-300 font-mono font-bold">0.93</span>
+                    <span className="text-sm font-semibold text-slate-300">Decision Status:</span>
+                    <span className="text-lg text-emerald-300 font-bold">Strongly Supported</span>
                   </div>
                 </div>
               </div>
             </Section>
-
-            {/* Confidence Formation */}
-            <Section title="Confidence Formation">
-              <div className="rounded-lg bg-slate-800/30 border border-slate-700 p-4 space-y-3">
-                <div className="text-xs text-slate-400 mb-3">
-                  Click on any evidence item below to see its detailed contribution to the final confidence score.
-                </div>
-
-                {/* Evidence Contribution List */}
-                <div className="space-y-2">
-                  {evidenceContributions.map((evidence) => (
-                    <button
-                      key={evidence.id}
-                      type="button"
-                      onClick={() => setActiveEvidenceId(evidence.id === activeEvidenceId ? null : evidence.id)}
-                      className={`w-full text-left rounded-lg border p-3 transition-all ${
-                        activeEvidenceId === evidence.id
-                          ? 'border-blue-400 bg-blue-400/5 shadow-sm'
-                          : 'border-slate-700 bg-slate-800/30 hover:border-slate-600 hover:bg-slate-800/50'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-semibold text-slate-300">{evidence.label}</span>
-                        <span className={`text-xs font-mono font-bold ${
-                          evidence.impact === 'positive' ? 'text-emerald-300' : 'text-amber-300'
-                        }`}>
-                          {evidence.contribution}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] text-slate-500">{evidence.source}</span>
-                        {activeEvidenceId === evidence.id && (
-                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-400/10 border border-blue-400/30 text-blue-300 font-bold">
-                            INSPECTING
-                          </span>
-                        )}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-
-                {/* Selected Evidence Detail Panel */}
-                {activeEvidenceId && (
-                  <div className="mt-4 rounded-lg border-2 border-blue-400 bg-blue-400/5 p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                      <span className="text-xs font-bold uppercase tracking-wider text-blue-300">
-                        Selected Evidence Contribution
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setActiveEvidenceId(null)}
-                        className="ml-auto text-[10px] text-slate-400 hover:text-slate-300"
-                      >
-                        Close
-                      </button>
-                    </div>
-                    {(() => {
-                      const selected = evidenceContributions.find((e) => e.id === activeEvidenceId);
-                      if (!selected) return null;
-                      return (
-                        <div className="space-y-3">
-                          <div>
-                            <div className="text-xs font-semibold text-slate-300 mb-1">{selected.label}</div>
-                            <div className="flex items-center gap-3 text-xs">
-                              <span className="text-slate-400">Source:</span>
-                              <span className="text-slate-200">{selected.source}</span>
-                            </div>
-                          </div>
-                          <div className="flex items-center justify-between py-2 border-y border-blue-400/20">
-                            <span className="text-xs font-semibold text-slate-300">Contribution to Final Score:</span>
-                            <span className={`text-lg font-mono font-bold ${
-                              selected.impact === 'positive' ? 'text-emerald-300' : 'text-amber-300'
-                            }`}>
-                              {selected.contribution}
-                            </span>
-                          </div>
-                          <div>
-                            <div className="text-xs font-semibold text-slate-300 mb-1.5">Calculation Details:</div>
-                            <div className="text-xs text-slate-400 leading-relaxed bg-slate-900/50 p-3 rounded border border-slate-700">
-                              {selected.explanation}
-                            </div>
-                          </div>
-                          <div className="pt-2 border-t border-blue-400/20">
-                            <div className="text-[10px] text-blue-300">
-                              💡 This evidence item is also referenced in the <span className="font-semibold">Scientific Reasoning → Scientific Determination</span> section.
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })()}
-                  </div>
-                )}
-
-                <div className="border-t border-slate-700 pt-3 mt-4">
-                  <div className="text-xs font-semibold text-slate-400 mb-2">Confidence Calculation:</div>
-                  <div className="text-xs text-slate-400 font-mono bg-slate-900/50 p-2 rounded border border-slate-700 mb-3">
-                    S_final = (0.36 + 0.30 + 0.21) + (-0.02) + (0.02 + 0.02 + 0.02) = 0.93
-                  </div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-semibold text-slate-300">Final confidence:</span>
-                    <span className="text-xl text-emerald-300 font-mono font-bold">0.93</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-slate-400">Uncertainty range:</span>
-                    <span className="text-xs text-slate-300 font-mono">± 0.02</span>
-                  </div>
-                </div>
-
-                <div className="border-t border-slate-700 pt-3">
-                  <div className="text-xs font-semibold text-slate-300 mb-1.5">Interpretation:</div>
-                  <div className="text-xs text-slate-400 leading-relaxed">
-                    Confidence is derived from peak alignment (position matching within ±0.2°), intensity correlation (Pearson r = 0.87), and cross-technique consistency (XRD + Raman + XPS convergence). Minor unindexed peaks reduce confidence slightly, but multi-technique agreement provides strong validation.
-                  </div>
-                </div>
-              </div>
-            </Section>
-
             {/* Evidence Sources */}
             <Section title="Evidence Sources">
               <div className="space-y-2">

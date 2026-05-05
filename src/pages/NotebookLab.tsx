@@ -56,8 +56,8 @@ export default function NotebookLab() {
         title: `Agent Run: ${project.name}`,
         summary: agentRun.outputs.interpretation,
         decision: agentRun.outputs.phase,
-        confidence: agentRun.outputs.confidence,
-        confidenceLabel: agentRun.outputs.confidenceLabel,
+        supportLevel: agentRun.outputs.confidence,
+        decisionStatus: agentRun.outputs.confidenceLabel,
         evidence: agentRun.outputs.evidence,
         warnings: agentRun.outputs.caveats,
         recommendations: agentRun.outputs.recommendations,
@@ -68,22 +68,22 @@ export default function NotebookLab() {
           'Generated autonomous decision with evidence chain',
         ],
         peakDetection: `${agentRun.outputs.detectedPeaks?.length ?? 0} peaks detected by agent`,
-        phaseInterpretation: `${agentRun.outputs.phase} at ${agentRun.outputs.confidence}% confidence`,
+        phaseInterpretation: `${agentRun.outputs.phase} - ${agentRun.outputs.confidenceLabel}`,
       };
     }
     
     const base = generateNotebookSections(project, runResult);
     if (!workspaceRun) return base;
 
-    const confidence = workspaceRun.matchResult?.confidence ?? project.confidence;
-    const confidenceLabel = confidence >= 90 ? 'Supported' : confidence >= 80 ? 'Working hypothesis' : 'Requires validation';
+    const supportLevel = workspaceRun.matchResult?.supportLevel ?? project.supportLevel;
+    const decisionStatus = supportLevel >= 90 ? 'Strongly Supported' : supportLevel >= 80 ? 'Supported' : supportLevel >= 70 ? 'Partially Supported' : 'Requires Validation';
 
     return {
       ...base,
       summary: `${workspaceRun.technique} workspace run generated from ${workspaceDataset?.fileName ?? 'selected dataset'} with ${workspaceRun.detectedFeatures.length} detected features and traceable processing parameters.`,
       decision: workspaceRun.matchResult?.phase ?? `${workspaceRun.technique} evidence saved for ${project.name}`,
-      confidence,
-      confidenceLabel,
+      supportLevel,
+      decisionStatus,
       evidence: workspaceRun.evidence.map((item) => item.claim),
       warnings: workspaceRun.matchResult?.missingPeaks.length
         ? [`Missing or weak references: ${workspaceRun.matchResult.missingPeaks.join(', ')}.`]
@@ -98,7 +98,7 @@ export default function NotebookLab() {
       ],
       peakDetection: `${workspaceRun.detectedFeatures.length} ${workspaceRun.technique === 'XRD' ? 'peaks' : 'features'} detected in the workspace run.`,
       phaseInterpretation: workspaceRun.matchResult
-        ? `${workspaceRun.matchResult.phase}. ${workspaceRun.matchResult.confidence}% confidence. ${workspaceRun.matchResult.caveat}`
+        ? `${workspaceRun.matchResult.phase}. ${workspaceRun.matchResult.caveat}`
         : base.phaseInterpretation,
     };
   }, [project, runResult, workspaceDataset, workspaceRun]);
@@ -110,7 +110,7 @@ export default function NotebookLab() {
 
   const exportFeedbackMessage = (format: DemoExportFormat) => {
     if (format === 'pdf') {
-      return 'Report prepared: Agent conclusion, evidence, confidence, caveats, and provenance included.';
+      return 'Report prepared: Agent conclusion, evidence, decision status, caveats, and provenance included.';
     }
     if (format === 'docx') {
       return 'DOCX report prepared with agent summary, evidence table, and next actions.';
@@ -140,7 +140,7 @@ export default function NotebookLab() {
       title: `${notebook.title} Report`,
       sections: [
         { heading: 'Summary', lines: [notebook.summary] },
-        { heading: 'Decision', lines: [notebook.decision, notebook.confidenceLabel] },
+        { heading: 'Decision', lines: [notebook.decision, notebook.decisionStatus] },
         { heading: 'Pipeline', lines: notebook.processingPipeline },
         { heading: 'Evidence', lines: notebook.evidence },
         { heading: 'Observations', lines: observations.length > 0 ? observations : ['No added observations.'] },
@@ -155,7 +155,7 @@ export default function NotebookLab() {
         project: project.name,
         row: index + 1,
         evidence: item,
-        confidence: notebook.confidence,
+        status: notebook.decisionStatus,
       })),
     });
     setExportMenuOpen(false);
@@ -184,7 +184,7 @@ export default function NotebookLab() {
 
   const copyAgentSummary = async () => {
     const summary =
-      'Ferrite spinel formation is supported with high confidence. Catalytic activation is provisionally supported but requires XPS oxidation-state validation.';
+      'Ferrite spinel formation is strongly supported. Catalytic activation is supported but requires XPS oxidation-state validation.';
     try {
       await navigator.clipboard.writeText(summary);
       showFeedback('Summary copied');
@@ -315,7 +315,7 @@ export default function NotebookLab() {
                       >
                         <span className="font-semibold text-text-main">{run.technique} run - {dataset?.fileName ?? run.datasetId}</span>
                         <span className="mt-1 block text-xs text-text-muted">
-                          {new Date(run.timestamp).toLocaleString()} / {run.detectedFeatures.length} features / {run.matchResult?.confidence ?? project.confidence}% confidence
+                          {new Date(run.timestamp).toLocaleString()} / {run.detectedFeatures.length} features / {run.matchResult?.supportLevel >= 90 ? 'Strongly Supported' : run.matchResult?.supportLevel >= 80 ? 'Supported' : run.matchResult?.supportLevel >= 70 ? 'Partially Supported' : 'Requires Validation'}
                         </span>
                       </button>
                     );
@@ -368,7 +368,7 @@ export default function NotebookLab() {
                 <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                   {[
                     ['Mode', 'Deep Analysis'],
-                    ['Confidence', 'High for spinel formation / Medium for catalytic activation'],
+                    ['Decision Status', 'Strongly Supported for spinel formation / Supported for catalytic activation'],
                     ['Run ID', 'AG-RUN-CF-042'],
                     ['Timestamp', '2026-04-29 17:30'],
                     ['Source', 'DIFARYX Agent Demo'],
@@ -446,7 +446,7 @@ export default function NotebookLab() {
                 <div className="mt-4 rounded-md border border-primary/20 bg-primary/5 p-3">
                   <div className="text-[11px] font-semibold uppercase tracking-wider text-primary">Decision statement</div>
                   <p className="mt-1 text-sm font-semibold text-text-main">
-                    Ferrite spinel formation is supported with high confidence. Catalytic activation is provisionally supported but requires XPS oxidation-state validation.
+                    Ferrite spinel formation is strongly supported. Catalytic activation is supported but requires XPS oxidation-state validation.
                   </p>
                 </div>
               </div>
@@ -517,9 +517,9 @@ export default function NotebookLab() {
               <div className="bg-surface p-4 rounded-md border border-border flex items-center justify-between gap-4">
                 <div>
                   <div className="text-lg font-bold">{notebook.decision}</div>
-                  <div className="text-xs text-text-muted mt-1">{notebook.confidenceLabel}</div>
+                  <div className="text-xs text-text-muted mt-1">{notebook.decisionStatus}</div>
                 </div>
-                <div className="text-sm font-bold text-emerald-600">{notebook.confidenceLabel}</div>
+                <div className="text-sm font-bold text-emerald-600">{notebook.decisionStatus}</div>
               </div>
               {notebook.warnings.length > 0 && (
                 <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-900">
@@ -566,7 +566,7 @@ export default function NotebookLab() {
                     </div>
                     <div className="mt-1">
                       {attachedRunRecord
-                        ? `${new Date(attachedRunRecord.timestamp).toLocaleString()} - ${attachedRunRecord.detectedFeatures.length} features - ${attachedRunRecord.matchResult?.confidence ?? project.confidence}% confidence`
+                        ? `${new Date(attachedRunRecord.timestamp).toLocaleString()} - ${attachedRunRecord.detectedFeatures.length} features - ${attachedRunRecord.matchResult?.supportLevel >= 90 ? 'Strongly Supported' : attachedRunRecord.matchResult?.supportLevel >= 80 ? 'Supported' : attachedRunRecord.matchResult?.supportLevel >= 70 ? 'Partially Supported' : 'Requires Validation'}`
                         : attachedRun}
                     </div>
                   </div>
@@ -618,7 +618,7 @@ export default function NotebookLab() {
                   <div className="text-lg font-bold">{project.phase}</div>
                   <div className="text-xs text-text-muted mt-1">{notebook.phaseInterpretation}</div>
                 </div>
-                <div className="text-2xl font-bold text-primary">{notebook.confidence}%</div>
+                <div className="text-lg font-bold text-primary">{notebook.decisionStatus}</div>
               </div>
             </section>
 

@@ -10,7 +10,7 @@ export interface DemoHistoryEntry {
   id: string;
   run: string;
   technique: string;
-  confidence: string;
+  supportLevel: string;
   status: string;
   date: string;
   action: 'workspace' | 'notebook' | 'agent';
@@ -22,8 +22,8 @@ export interface DemoProject {
   material: string;
   techniques: Technique[];
   status: string;
-  confidence: number;
-  confidenceLabel: string;
+  supportLevel: number;
+  decisionStatus: string;
   phase: string;
   lastUpdated: string;
   createdDate: string;
@@ -47,8 +47,8 @@ export interface AgentRunResult {
   material: string;
   selectedDatasets: Technique[];
   decision: string;
-  confidence: number;
-  confidenceLabel: string;
+  supportLevel: number;
+  decisionStatus: string;
   evidence: string[];
   warnings: string[];
   recommendations: string[];
@@ -77,7 +77,7 @@ export interface Evidence {
   technique: Technique;
   datasetId: string;
   claim: string;
-  confidence: number;
+  supportLevel: number;
   support: string;
   limitations?: string;
 }
@@ -131,7 +131,7 @@ export interface ProcessingRun {
   evidence: Evidence[];
   matchResult?: {
     phase: string;
-    confidence: number;
+    supportLevel: number;
     matchedPeaks: number;
     missingPeaks: string[];
     unexplainedPeaks: string[];
@@ -154,13 +154,13 @@ export const demoProjects: DemoProject[] = [
     material: 'Copper ferrite spinel',
     techniques: ['XRD', 'Raman'],
     status: 'Report Ready',
-    confidence: 93.3,
-    confidenceLabel: 'High confidence',
+    supportLevel: 93.3,
+    decisionStatus: 'Strongly Supported',
     phase: 'CuFe2O4 copper ferrite phase',
     lastUpdated: '2 hours ago',
     createdDate: '2026-04-29',
     summary:
-      'XRD analysis identified 9 diffraction peaks. Best phase match: CuFe2O4 with 93.3% confidence.',
+      'XRD analysis identified 9 diffraction peaks. Primary phase assignment: CuFe2O4 strongly supported by evidence.',
     xrdPeaks: [
       { position: 17.1, intensity: 72, label: '(111)' },
       { position: 20.8, intensity: 31, label: '(220)' },
@@ -192,14 +192,14 @@ export const demoProjects: DemoProject[] = [
       peakDetection:
         '9 diffraction peaks detected across 17.1-61.6 degrees 2theta after baseline correction.',
       phaseIdentification:
-        'Best phase match is CuFe2O4 copper ferrite phase with 93.3% confidence.',
+        'Primary phase assignment is CuFe2O4 copper ferrite phase, strongly supported by evidence.',
     },
     history: [
       {
         id: 'hist-cu-xrd',
         run: 'XRD phase identification',
         technique: 'XRD',
-        confidence: '93.3%',
+        supportLevel: 'Strongly Supported',
         status: 'Report Ready',
         date: '2026-04-29 07:25',
         action: 'workspace',
@@ -208,7 +208,7 @@ export const demoProjects: DemoProject[] = [
         id: 'hist-cu-agent',
         run: 'Agent decision run',
         technique: 'Agent Mode',
-        confidence: 'High confidence',
+        supportLevel: 'Strongly Supported',
         status: 'Complete',
         date: '2026-04-29 07:36',
         action: 'agent',
@@ -217,7 +217,7 @@ export const demoProjects: DemoProject[] = [
         id: 'hist-cu-report',
         run: 'Notebook report generated',
         technique: 'Notebook',
-        confidence: 'Complete',
+        supportLevel: 'Complete',
         status: 'Export Ready',
         date: '2026-04-29 07:42',
         action: 'notebook',
@@ -231,8 +231,8 @@ export const demoProjects: DemoProject[] = [
     material: 'Copper ferrite on mesoporous silica',
     techniques: ['XRD', 'XPS', 'FTIR', 'Raman'],
     status: 'In Progress',
-    confidence: 88,
-    confidenceLabel: 'High confidence',
+    supportLevel: 88,
+    decisionStatus: 'Supported',
     phase: 'CuFe2O4 dispersed on mesoporous SBA-15',
     lastUpdated: '5 hours ago',
     createdDate: '2026-04-28',
@@ -265,14 +265,14 @@ export const demoProjects: DemoProject[] = [
       peakDetection:
         '5 ferrite-related reflections detected with broad SBA-15 support contribution.',
       phaseIdentification:
-        'Evidence supports dispersed CuFe2O4 on SBA-15 with 88% confidence.',
+        'Evidence supports dispersed CuFe2O4 on SBA-15, supported by multiple techniques.',
     },
     history: [
       {
         id: 'hist-sba-multi',
         run: 'Multi-tech correlation',
         technique: 'XRD + XPS + FTIR',
-        confidence: '88%',
+        supportLevel: 'Supported',
         status: 'In Progress',
         date: '2026-04-28 16:18',
         action: 'workspace',
@@ -286,8 +286,8 @@ export const demoProjects: DemoProject[] = [
     material: 'Nickel ferrite spinel',
     techniques: ['XRD'],
     status: 'Report Ready',
-    confidence: 89,
-    confidenceLabel: 'High confidence',
+    supportLevel: 89,
+    decisionStatus: 'Supported',
     phase: 'Spinel nickel ferrite',
     lastUpdated: '1 day ago',
     createdDate: '2026-04-27',
@@ -313,14 +313,14 @@ export const demoProjects: DemoProject[] = [
         'Compared against nickel ferrite reference library.',
       ],
       peakDetection: '6 major reflections detected after background subtraction.',
-      phaseIdentification: 'Pattern is consistent with spinel nickel ferrite at 89% confidence.',
+      phaseIdentification: 'Pattern is consistent with spinel nickel ferrite, supported by evidence.',
     },
     history: [
       {
         id: 'hist-ni-xrd',
         run: 'XRD phase identification',
         technique: 'XRD',
-        confidence: '89%',
+        supportLevel: 'Supported',
         status: 'Report Ready',
         date: '2026-04-27 14:05',
         action: 'workspace',
@@ -334,8 +334,8 @@ export const demoProjects: DemoProject[] = [
     material: 'Cobalt ferrite spinel',
     techniques: ['XRD', 'XPS'],
     status: 'Report Ready',
-    confidence: 91,
-    confidenceLabel: 'High confidence',
+    supportLevel: 91,
+    decisionStatus: 'Strongly Supported',
     phase: 'Cobalt ferrite spinel phase',
     lastUpdated: '2 days ago',
     createdDate: '2026-04-26',
@@ -361,14 +361,14 @@ export const demoProjects: DemoProject[] = [
         'Linked surface chemistry evidence to phase result.',
       ],
       peakDetection: '6 ferrite reflections detected in the XRD pattern.',
-      phaseIdentification: 'Evidence supports cobalt ferrite spinel phase with 91% confidence.',
+      phaseIdentification: 'Evidence supports cobalt ferrite spinel phase, strongly supported.',
     },
     history: [
       {
         id: 'hist-co-xrd',
         run: 'XRD + XPS review',
         technique: 'XRD + XPS',
-        confidence: '91%',
+        supportLevel: 'Strongly Supported',
         status: 'Report Ready',
         date: '2026-04-26 11:20',
         action: 'workspace',
@@ -382,8 +382,8 @@ export const demoProjects: DemoProject[] = [
     material: 'Iron oxide nanoparticles',
     techniques: ['FTIR', 'Raman'],
     status: 'In Progress',
-    confidence: 84,
-    confidenceLabel: 'Moderate confidence',
+    supportLevel: 84,
+    decisionStatus: 'Partially Supported',
     phase: 'Iron oxide nanoparticle signatures',
     lastUpdated: '1 week ago',
     createdDate: '2026-04-22',
@@ -411,14 +411,14 @@ export const demoProjects: DemoProject[] = [
       ],
       peakDetection: 'Raman and FTIR bands suggest iron oxide nanoparticle signatures.',
       phaseIdentification:
-        'Iron oxide nanoparticle assignment is in progress with 84% confidence.',
+        'Iron oxide nanoparticle assignment is in progress, partially supported by current evidence.',
     },
     history: [
       {
         id: 'hist-fe-ftir',
         run: 'FTIR/Raman evidence review',
         technique: 'FTIR + Raman',
-        confidence: '84%',
+        supportLevel: 'Partially Supported',
         status: 'In Progress',
         date: '2026-04-22 09:15',
         action: 'workspace',
@@ -504,12 +504,12 @@ export function getAgentPath(project: DemoProject) {
 export function getProjectInsight(project: DemoProject) {
   return {
     primaryResult: project.phase,
-    confidenceScore: project.confidence,
-    confidenceLevel: project.confidenceLabel.replace(' confidence', ''),
+    supportScore: project.supportLevel,
+    decisionStatus: project.decisionStatus,
     interpretation: project.summary,
     keyEvidence: project.evidence,
     warnings: project.status === 'In Progress' ? ['This demo project still has pending review items.'] : [],
-    uncertainty: project.confidence >= 90 ? 'Low' : 'Moderate',
+    uncertainty: project.supportLevel >= 90 ? 'Low' : 'Moderate',
     recommendedNextStep: project.recommendations,
   };
 }
@@ -552,35 +552,35 @@ export function getTechniqueEvidence(project: DemoProject, selectedDatasets: Tec
   return evidence;
 }
 
-export function calculateDemoConfidence(project: DemoProject, selectedDatasets: Technique[]) {
-  if (selectedDatasets.length === 0) return Math.max(35, project.confidence - 35);
+export function calculateDemoSupportLevel(project: DemoProject, selectedDatasets: Technique[]) {
+  if (selectedDatasets.length === 0) return Math.max(35, project.supportLevel - 35);
 
-  let confidence = project.confidence;
+  let supportLevel = project.supportLevel;
   const selected = new Set(selectedDatasets);
 
-  if (selected.has('XRD') && selectedDatasets.length === 1) confidence -= 6;
-  if (selected.has('XRD') && selected.has('Raman')) confidence += 2.4;
-  if (project.id === 'cufe2o4-sba15' && selected.has('XPS') && selected.has('FTIR')) confidence += 3;
-  if (!selected.has('XRD') && project.techniques.includes('XRD')) confidence -= 8;
+  if (selected.has('XRD') && selectedDatasets.length === 1) supportLevel -= 6;
+  if (selected.has('XRD') && selected.has('Raman')) supportLevel += 2.4;
+  if (project.id === 'cufe2o4-sba15' && selected.has('XPS') && selected.has('FTIR')) supportLevel += 3;
+  if (!selected.has('XRD') && project.techniques.includes('XRD')) supportLevel -= 8;
 
   const missingCoreTechniques = project.techniques.filter((technique) => !selected.has(technique));
-  confidence -= missingCoreTechniques.length * 2.5;
+  supportLevel -= missingCoreTechniques.length * 2.5;
 
-  return Number(Math.max(45, Math.min(98, confidence)).toFixed(1));
+  return Number(Math.max(45, Math.min(98, supportLevel)).toFixed(1));
 }
 
 export function buildAgentRun(project: DemoProject, selectedDatasets: Technique[]): AgentRunResult {
-  const confidence = calculateDemoConfidence(project, selectedDatasets);
+  const supportLevel = calculateDemoSupportLevel(project, selectedDatasets);
   const evidence = getTechniqueEvidence(project, selectedDatasets);
   const warnings: string[] = [];
   const missingCoreTechniques = project.techniques.filter((technique) => !selectedDatasets.includes(technique));
 
   if (selectedDatasets.length === 0) {
-    warnings.push('No dataset is selected, so confidence is reduced and the decision is evidence-limited.');
+    warnings.push('No dataset is selected, so evidence strength is reduced and the decision is evidence-limited.');
   }
 
   if (selectedDatasets.length === 1 && selectedDatasets.includes('XRD')) {
-    warnings.push('XRD-only confidence is lower because surface and vibrational evidence were excluded.');
+    warnings.push('XRD-only evidence strength is lower because surface and vibrational evidence were excluded.');
   }
 
   if (missingCoreTechniques.length > 0) {
@@ -591,7 +591,7 @@ export function buildAgentRun(project: DemoProject, selectedDatasets: Technique[
     warnings.push('CuFe2O4/SBA-15 benefits from XPS and FTIR correlation before final reporting.');
   }
 
-  const confidenceLabel = confidence >= 90 ? 'High confidence' : confidence >= 80 ? 'Moderate confidence' : 'Evidence-limited confidence';
+  const decisionStatus = supportLevel >= 90 ? 'Strongly Supported' : supportLevel >= 80 ? 'Supported' : supportLevel >= 70 ? 'Partially Supported' : 'Requires Validation';
   const datasetPhrase = selectedDatasets.length > 0 ? selectedDatasets.join(' + ') : 'no selected datasets';
 
   return {
@@ -600,8 +600,8 @@ export function buildAgentRun(project: DemoProject, selectedDatasets: Technique[
     material: project.material,
     selectedDatasets,
     decision: `${project.phase} confirmed from ${datasetPhrase}`,
-    confidence,
-    confidenceLabel,
+    supportLevel,
+    decisionStatus,
     evidence,
     warnings,
     recommendations: project.recommendations,
@@ -613,10 +613,10 @@ export function buildAgentRun(project: DemoProject, selectedDatasets: Technique[
         ? `Detected ${project.xrdPeaks.length} diffraction peaks and matched the reference phase.`
         : 'Skipped XRD peak matching because XRD was not selected.',
       'Fused selected technique evidence into a traceable decision.',
-      `Assigned confidence score: ${confidence}%.`,
+      `Evidence strength: ${decisionStatus}.`,
     ],
     generatedAt: new Date().toISOString(),
-    summary: `${project.summary} Agent run used ${datasetPhrase} and produced ${confidence}% confidence.`,
+    summary: `${project.summary} Agent run used ${datasetPhrase} and produced ${decisionStatus} decision status.`,
   };
 }
 
@@ -627,8 +627,8 @@ export function generateNotebookSections(project: DemoProject, runResult?: Agent
     title: project.notebook.title,
     summary: result.summary,
     decision: result.decision,
-    confidence: result.confidence,
-    confidenceLabel: result.confidenceLabel,
+    supportLevel: result.supportLevel,
+    decisionStatus: result.decisionStatus,
     evidence: result.evidence,
     warnings: result.warnings,
     recommendations: result.recommendations,
@@ -637,7 +637,7 @@ export function generateNotebookSections(project: DemoProject, runResult?: Agent
       result.detectedPeaks.length > 0
         ? `${result.detectedPeaks.length} diffraction peaks used in the generated run.`
         : project.notebook.peakDetection,
-    phaseInterpretation: `${project.phase}. ${result.confidence}% confidence from ${result.selectedDatasets.join(' + ') || 'no selected datasets'}.`,
+    phaseInterpretation: `${project.phase}. ${result.decisionStatus} from ${result.selectedDatasets.join(' + ') || 'no selected datasets'}.`,
   };
 }
 
