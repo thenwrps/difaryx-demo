@@ -1292,6 +1292,20 @@ export default function AgentDemo() {
     navigate(`/notebook?project=${selectedProject.id}&entry=${notebookEntry.id}&template=${templateMode}`);
   };
 
+  const handleOpenSourceProcessing = () => {
+    navigate(workflowProcessingResult.sourceRoute);
+  };
+
+  const handleViewClaimBoundary = () => {
+    const refinement = refineDiscussionFromProcessing(workflowProcessingResult, templateMode);
+    appendLog({
+      stamp: '[boundary]',
+      message: `Claim boundary reviewed: ${refinement.claimBoundary.supported.length} supported, ${refinement.claimBoundary.requiresValidation.length} requiring validation.`,
+      type: 'info',
+    });
+    showFeedback('Claim boundary ready in the review log.');
+  };
+
   const handleGenerateReproducibleReport = () => {
     if (!currentResult) return;
     appendLog({
@@ -1456,6 +1470,26 @@ export default function AgentDemo() {
           >
             <FileText size={12} />
             Save Discussion to Notebook
+          </button>
+
+          <button
+            type="button"
+            onClick={handleOpenSourceProcessing}
+            disabled={runningGuardRef.current}
+            className="inline-flex h-[34px] w-full shrink-0 items-center justify-center gap-1.5 rounded-lg border border-slate-700 px-3 text-[11px] font-semibold text-slate-300 transition-colors hover:border-cyan-400/40 hover:text-cyan-200 disabled:cursor-not-allowed disabled:opacity-50 min-[760px]:w-[165px] min-[1440px]:w-[185px]"
+          >
+            <Database size={12} />
+            Open Source Processing
+          </button>
+
+          <button
+            type="button"
+            onClick={handleViewClaimBoundary}
+            disabled={runningGuardRef.current}
+            className="inline-flex h-[34px] w-full shrink-0 items-center justify-center gap-1.5 rounded-lg border border-slate-700 px-3 text-[11px] font-semibold text-slate-300 transition-colors hover:border-cyan-400/40 hover:text-cyan-200 disabled:cursor-not-allowed disabled:opacity-50 min-[760px]:w-[150px] min-[1440px]:w-[170px]"
+          >
+            <ClipboardList size={12} />
+            View Claim Boundary
           </button>
         </div>
       </div>

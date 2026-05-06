@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowRight, BookOpen, FileText, Layers3, Play, Save } from 'lucide-react';
+import { ArrowRight, BookOpen, CheckCircle2, FileText, Layers3, Play, Save } from 'lucide-react';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
@@ -616,6 +616,7 @@ export default function MultiTechWorkspace() {
   const [activeTab, setActiveTab] = useState<'conclusion' | 'justification' | 'evidence' | 'interpretation'>('conclusion');
   const [reviewOutput, setReviewOutput] = useState<FusionResult | null>(null);
   const [isTechniqueDropdownOpen, setIsTechniqueDropdownOpen] = useState(false);
+  const [workflowFeedback, setWorkflowFeedback] = useState('');
 
   // Compute graph highlights for a technique
   const getGraphHighlights = (technique: Technique): GraphHighlight[] => {
@@ -801,14 +802,21 @@ export default function MultiTechWorkspace() {
     setReviewOutput(fusionResult);
   };
 
+  const handleSaveProcessingResult = () => {
+    const processingResult = createProcessingResultFromXrdDemo(project.id);
+    saveProcessingResult(processingResult);
+    setWorkflowFeedback('Processing result saved');
+    window.setTimeout(() => setWorkflowFeedback(''), 1800);
+  };
+
   const handleRefineInterpretation = () => {
     const processingResult = createProcessingResultFromXrdDemo(project.id);
     saveProcessingResult(processingResult);
     navigate(`/demo/agent?project=${project.id}&scope=fusion&processing=${processingResult.id}&template=research`);
   };
 
-  // Generate notebook draft from FusionResult
-  const generateNotebookFromFusionResult = (result: FusionResult, projectName: string): string => {
+  // Build notebook draft from FusionResult
+  const buildNotebookDraftFromFusionResult = (result: FusionResult, projectName: string): string => {
     return `# Cross-Tech Review: ${projectName}
 
 ## Summary
@@ -888,8 +896,17 @@ ${result.decision}
                 onClick={handleRunReview}
                 className="flex-shrink-0 inline-flex items-center justify-center gap-1.5 h-8 px-3 text-xs rounded-md font-medium bg-primary text-white hover:bg-primary/90 transition-colors"
               >
-                <Play size={14} /> Run Review
+                <Play size={14} /> Run Evidence Review
               </button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-1.5 flex-shrink-0"
+                onClick={handleSaveProcessingResult}
+              >
+                <CheckCircle2 size={14} /> Save Processing Result
+              </Button>
               <Button
                 type="button"
                 variant="outline"
@@ -906,9 +923,18 @@ ${result.decision}
               </Link>
               <Link to={`/notebook?project=${project.id}&source=fusion&template=research`} className="flex-shrink-0">
                 <Button variant="outline" size="sm" className="gap-1.5">
-                  <Save size={14} /> Notebook Entry
+                  <Save size={14} /> Add to Notebook
                 </Button>
               </Link>
+            </div>
+          </div>
+          <div className="mt-3 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-text-muted">
+              <span className="font-bold text-emerald-700">Processing Result Ready</span>
+              <span>Detected peaks: 9</span>
+              <span>Preliminary assignment: CuFe2O4 spinel ferrite</span>
+              <span className="font-semibold text-text-main">Next: Refine Interpretation</span>
+              {workflowFeedback && <span className="font-semibold text-primary">{workflowFeedback}</span>}
             </div>
           </div>
         </div>
@@ -1226,7 +1252,7 @@ ${result.decision}
                 <div className="flex justify-end border-t border-border pt-2">
                   <Link to={getNotebookPath(project)}>
                     <Button variant="primary" size="sm" className="gap-1 text-[10px] h-7 px-2">
-                      <Save size={10} /> Save to Notebook
+                      <Save size={10} /> Add to Notebook
                     </Button>
                   </Link>
                 </div>

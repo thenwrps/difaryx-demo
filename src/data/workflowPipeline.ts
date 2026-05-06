@@ -99,7 +99,7 @@ export const NOTEBOOK_TEMPLATES: Record<NotebookTemplateMode, NotebookTemplate> 
     label: 'Research Mode',
     stepperLabels: ['Problem', 'Hypothesis', 'Processing', 'Evidence', 'Mechanism', 'Claim', 'Discussion', 'Manuscript'],
     tabs: ['Interpretation', 'Evidence', 'Claim Boundary', 'Validation', 'Manuscript', 'Run Log'],
-    requiredSections: ['Refined Discussion', 'Evidence Summary', 'Claim Boundary', 'Validation Notes', 'Manuscript Draft'],
+    requiredSections: ['Refined Discussion', 'Evidence Status', 'Claim Boundary', 'Validation Notes', 'Manuscript Draft'],
     statusLabels: ['Evidence Status', 'Claim Readiness', 'Discussion Readiness', 'Publication Readiness'],
     reportTemplate: 'manuscript',
   },
@@ -107,8 +107,8 @@ export const NOTEBOOK_TEMPLATES: Record<NotebookTemplateMode, NotebookTemplate> 
     mode: 'rd',
     label: 'R&D Mode',
     stepperLabels: ['Need', 'Requirement', 'Prototype', 'Test', 'Optimize', 'Validate', 'Risk', 'Decision'],
-    tabs: ['Overview', 'Prototype', 'Metrics', 'Evidence', 'Risk', 'Decision', 'Report'],
-    requiredSections: ['Need Summary', 'Prototype Context', 'Evidence Review', 'Risk Boundary', 'Decision Record'],
+    tabs: ['Overview', 'Prototype', 'Metrics', 'Risk Review', 'Go/No-Go', 'Next Plan', 'Report'],
+    requiredSections: ['Development Status', 'Prototype Metrics', 'Risk Review', 'Go/No-Go Decision', 'Next Development Plan'],
     statusLabels: ['Development Status', 'Target Achievement', 'Scale-up Readiness', 'Risk Level', 'Go/No-Go Decision'],
     reportTemplate: 'technical_report',
   },
@@ -116,11 +116,23 @@ export const NOTEBOOK_TEMPLATES: Record<NotebookTemplateMode, NotebookTemplate> 
     mode: 'analytical',
     label: 'Analytical-job Mode',
     stepperLabels: ['Sample', 'Prep', 'Method', 'Calibration', 'Run', 'QA/QC', 'Result', 'Report'],
-    tabs: ['Sample', 'Method', 'QA/QC', 'Results', 'Interpretation', 'Report', 'Run Log'],
-    requiredSections: ['Sample Context', 'Method Summary', 'QA/QC Review', 'Result Validity', 'Analytical Report'],
+    tabs: ['Sample', 'Method / SOP', 'Calibration', 'QA/QC', 'Analytical Result', 'Report', 'Run Log'],
+    requiredSections: ['Sample Context', 'Method / SOP', 'Calibration and QA/QC', 'Analytical Result', 'Pass / Fail / Retest Decision'],
     statusLabels: ['QA/QC Status', 'Result Validity', 'Specification Status', 'Report Status'],
     reportTemplate: 'analytical_report',
   },
+};
+
+const TEMPLATE_MICRO_FLOWS: Record<NotebookTemplateMode, string[]> = {
+  research: ['Processed Result', 'Evidence Review', 'Discussion Draft'],
+  rd: ['Test Result', 'Risk Review', 'Go/No-Go Rationale'],
+  analytical: ['Analytical Run', 'QA/QC Review', 'Validated Result'],
+};
+
+const TEMPLATE_STATUS_VALUES: Record<NotebookTemplateMode, string[]> = {
+  research: ['Requires validation', 'Bounded', 'Publication-limited', 'Publication-limited'],
+  rd: ['Prototype validation', 'Meets structural target', 'Not scale-up ready', 'Medium', 'Continue with validation'],
+  analytical: ['Review-ready', 'Valid within method scope', 'Requires validation', 'Report-ready'],
 };
 
 export const RESEARCH_DISCUSSION_DRAFT =
@@ -215,13 +227,13 @@ export function refineDiscussionFromProcessing(
     sourceRoute: `/demo/agent?project=${processingResult.projectId}&processing=${processingResult.id}&template=${templateMode}`,
     title: 'Refined Discussion',
     subtitle: 'Sharpened from processing output and evidence review',
-    microFlow: ['Processed Result', 'Evidence Review', 'Discussion Draft'],
+    microFlow: TEMPLATE_MICRO_FLOWS[templateMode],
     discussionDraft,
     claimBoundary: CLAIM_BOUNDARY,
     validationNotes: VALIDATION_NOTES,
     statusSummary: template.statusLabels.map((label, index) => ({
       label,
-      value: index === template.statusLabels.length - 1 ? 'Pending' : index === 0 ? 'Ready' : 'In Progress',
+      value: TEMPLATE_STATUS_VALUES[templateMode][index] ?? 'Review-ready',
     })),
     reportTemplate: template.reportTemplate,
     refinedAt: DEMO_TIMESTAMP,
@@ -242,32 +254,22 @@ export function createNotebookEntryFromRefinement(
     refinementId: refinement.id,
     processingResultId: refinement.processingResultId,
     createdAt: DEMO_TIMESTAMP,
-    title: `${template.label}: Refined Discussion`,
+    title: `${template.label}: ${getTemplateEntryTitle(templateMode)}`,
     subtitle: refinement.subtitle,
-    sourceLabel: 'Source: processing + interpretation refinement',
+    sourceLabel: 'Source: XRD processing + interpretation refinement',
     stepperLabels: template.stepperLabels,
     tabs: template.tabs,
     requiredSections: template.requiredSections,
     statusSummary: refinement.statusSummary,
-    sections: [
-      { heading: 'Refined Discussion', lines: [refinement.discussionDraft] },
-      {
-        heading: 'Claim Boundary',
-        lines: [
-          ...refinement.claimBoundary.supported.map((item) => `Supported: ${item}`),
-          ...refinement.claimBoundary.requiresValidation.map((item) => `Requires validation: ${item}`),
-          ...refinement.claimBoundary.notSupportedYet.map((item) => `Not supported yet: ${item}`),
-        ],
-      },
-      { heading: 'Validation Notes', lines: refinement.validationNotes },
-      { heading: 'Report Template', lines: [`Template: ${template.reportTemplate}`] },
-    ],
+    sections: getTemplateSections(refinement, templateMode),
     reportTemplate: template.reportTemplate,
   };
 }
 
 export function createReportSectionFromNotebookEntry(entry: NotebookEntry): ReportSection {
-  const discussion = entry.sections.find((section) => section.heading === 'Refined Discussion');
+  const discussion =
+    entry.sections.find((section) => section.heading === getReportSourceSectionHeading(entry.templateMode)) ??
+    entry.sections[0];
   const lines = discussion?.lines ?? [];
 
   return {
@@ -275,11 +277,115 @@ export function createReportSectionFromNotebookEntry(entry: NotebookEntry): Repo
     projectId: entry.projectId,
     notebookEntryId: entry.id,
     template: entry.reportTemplate,
-    heading: 'Refined Discussion',
+    heading: getReportSectionHeading(entry.templateMode),
     body: lines.join('\n'),
     lines,
     sourceLabel: entry.sourceLabel,
   };
+}
+
+function getTemplateEntryTitle(templateMode: NotebookTemplateMode) {
+  if (templateMode === 'rd') return 'Go/No-Go Rationale';
+  if (templateMode === 'analytical') return 'Validated Result';
+  return 'Refined Discussion';
+}
+
+function getReportSourceSectionHeading(templateMode: NotebookTemplateMode) {
+  if (templateMode === 'rd') return 'Go/No-Go Decision';
+  if (templateMode === 'analytical') return 'Analytical Result';
+  return 'Refined Discussion';
+}
+
+function getReportSectionHeading(templateMode: NotebookTemplateMode) {
+  if (templateMode === 'rd') return 'Technical Report Section';
+  if (templateMode === 'analytical') return 'Analytical Report Section';
+  return 'Manuscript Discussion Section';
+}
+
+function getTemplateSections(
+  refinement: AgentDiscussionRefinement,
+  templateMode: NotebookTemplateMode,
+): NotebookEntry['sections'] {
+  if (templateMode === 'rd') {
+    return [
+      { heading: 'Development Status', lines: ['Prototype characterization supports continued technical validation.'] },
+      {
+        heading: 'Prototype Metrics',
+        lines: [
+          'Target Achievement: spinel ferrite assignment is structurally plausible.',
+          'Technical Requirement: close phase-purity and oxidation-state validation gaps before scale-up review.',
+          'Metrics: detected reflections and cross-technique support meet the current prototype review threshold.',
+        ],
+      },
+      {
+        heading: 'Risk Review',
+        lines: [
+          ...refinement.claimBoundary.requiresValidation.map((item) => `Risk Level: ${item}`),
+          ...refinement.claimBoundary.notSupportedYet.map((item) => `Scale-up readiness gap: ${item}`),
+        ],
+      },
+      {
+        heading: 'Go/No-Go Decision',
+        lines: [
+          'Go/No-Go Decision: continue optimization with validation gates.',
+          'Go/No-Go Rationale: prototype evidence is sufficient for the next development plan but not yet scale-up ready.',
+        ],
+      },
+      { heading: 'Next Development Plan', lines: refinement.validationNotes },
+    ];
+  }
+
+  if (templateMode === 'analytical') {
+    return [
+      {
+        heading: 'Sample Context',
+        lines: [
+          'Sample: CuFe2O4 spinel ferrite characterization specimen.',
+          'Analytical Run: XRD-centered method execution with supporting Raman, XPS, and FTIR context.',
+        ],
+      },
+      {
+        heading: 'Method / SOP',
+        lines: [
+          'Method / SOP: process XRD reflections, compare diagnostic spinel peaks, and document QA/QC limitations.',
+          'Calibration: reference-pattern comparison remains the current calibration boundary.',
+        ],
+      },
+      {
+        heading: 'QA/QC Review',
+        lines: [
+          'QA/QC Status: review-ready within method scope.',
+          ...refinement.claimBoundary.requiresValidation.map((item) => `QA/QC requirement: ${item}`),
+        ],
+      },
+      {
+        heading: 'Analytical Result',
+        lines: [
+          'Analytical Result: result validity supports a CuFe2O4 spinel ferrite assignment within the current method scope.',
+          'Result Validity: pass for screening report; retest or complementary validation required for stronger specification claims.',
+        ],
+      },
+      {
+        heading: 'Pass / Fail / Retest Decision',
+        lines: ['Pass / Fail / Retest: pass with retest requirements for phase purity, surface state, and bulk composition.'],
+      },
+    ];
+  }
+
+  return [
+    { heading: 'Refined Discussion', lines: [refinement.discussionDraft] },
+    { heading: 'Evidence Status', lines: ['Evidence Status: ready with validation requirements.'] },
+    {
+      heading: 'Claim Boundary',
+      lines: [
+        ...refinement.claimBoundary.supported.map((item) => `Supported: ${item}`),
+        ...refinement.claimBoundary.requiresValidation.map((item) => `Requires validation: ${item}`),
+        ...refinement.claimBoundary.notSupportedYet.map((item) => `Not supported yet: ${item}`),
+      ],
+    },
+    { heading: 'Validation Notes', lines: refinement.validationNotes },
+    { heading: 'Manuscript Draft', lines: ['Publication Readiness: publication-limited until validation notes are closed.'] },
+  ];
 }
 
 export function getNotebookTemplate(mode: NotebookTemplateMode): NotebookTemplate {

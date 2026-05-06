@@ -86,6 +86,7 @@ export default function XRDWorkspace() {
   // Drawer state management
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [activeStep, setActiveStep] = useState<string | null>(null);
+  const [workflowFeedback, setWorkflowFeedback] = useState('');
   
   // Handle Auto Mode toggle
   const handleAutoModeChange = (enabled: boolean) => {
@@ -343,6 +344,13 @@ export default function XRDWorkspace() {
     };
   });
   const candidateRows = topCandidateRows(agentResult);
+  const handleSaveProcessingResult = () => {
+    const processingResult = createProcessingResultFromXrdDemo(project.id);
+    saveProcessingResult(processingResult);
+    setWorkflowFeedback('Processing result saved');
+    window.setTimeout(() => setWorkflowFeedback(''), 1800);
+  };
+
   const handleRefineInterpretation = () => {
     const processingResult = createProcessingResultFromXrdDemo(project.id);
     saveProcessingResult(processingResult);
@@ -434,18 +442,36 @@ export default function XRDWorkspace() {
           </div>
 
           <div className="p-4 border-t border-border space-y-2">
+            <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 p-3">
+              <div className="text-xs font-bold text-emerald-700">Processing Result Ready</div>
+              <div className="mt-2 space-y-1 text-[11px] text-text-muted">
+                <div>Detected peaks: {agentResult.detectedPeaks.length}</div>
+                <div>Preliminary assignment: {decisionStatus}</div>
+                <div className="font-semibold text-text-main">Next: Refine Interpretation</div>
+              </div>
+              {workflowFeedback && (
+                <div className="mt-2 text-[11px] font-semibold text-primary">{workflowFeedback}</div>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={handleSaveProcessingResult}
+              className="flex h-9 items-center justify-between rounded-md border border-border px-3 text-sm font-medium text-text-main hover:bg-surface-hover transition-colors"
+            >
+              Save Processing Result <CheckCircle2 size={14} />
+            </button>
             <Link
               to={getNotebookPath(project)}
               className="flex h-9 items-center justify-between rounded-md border border-border px-3 text-sm font-medium text-text-main hover:bg-surface-hover transition-colors"
             >
-              Open Notebook <ArrowRight size={14} />
+              Add to Notebook <ArrowRight size={14} />
             </Link>
             <button
               type="button"
               onClick={handleRefineInterpretation}
               className="flex h-9 items-center justify-between rounded-md bg-primary text-white px-3 text-sm font-medium hover:bg-primary/90 transition-colors"
             >
-              Refine Interpretation <ArrowRight size={14} />
+              Send to Evidence Review <ArrowRight size={14} />
             </button>
           </div>
         </aside>

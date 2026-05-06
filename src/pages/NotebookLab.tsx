@@ -53,6 +53,46 @@ function formatClaimStatus(status: string): string {
   }
 }
 
+const NOTEBOOK_TEMPLATE_DETAILS: Record<
+  NotebookTemplateMode,
+  {
+    description: string;
+    output: string;
+    status: string;
+    primaryLabel: string;
+    reportPreview: string;
+    badges: string[];
+  }
+> = {
+  research: {
+    description:
+      'For hypothesis-driven research, evidence fusion, claim boundaries, mechanism discussion, and manuscript-ready interpretation.',
+    output: 'Refined discussion + claim readiness + validation notes.',
+    status: 'Publication-limited',
+    primaryLabel: 'Refined Discussion',
+    reportPreview: 'Manuscript discussion section generated from this notebook entry.',
+    badges: ['Source workflow', 'Refined discussion', 'Evidence review', 'Claim boundary', 'Validation notes'],
+  },
+  rd: {
+    description:
+      'For prototype development, technical validation, optimization, feasibility review, and go/no-go decisions.',
+    output: 'Technical report + development status + next action.',
+    status: 'Review-ready',
+    primaryLabel: 'Go/No-Go Rationale',
+    reportPreview: 'Technical report section generated from prototype metrics, risk review, and decision rationale.',
+    badges: ['Source workflow', 'Risk review', 'Go/No-Go rationale', 'Development status', 'Next development plan'],
+  },
+  analytical: {
+    description:
+      'For sample analysis, method execution, calibration, QA/QC, result validity, and analytical reporting.',
+    output: 'Analytical report + QA/QC status + pass/fail or validity decision.',
+    status: 'Report-ready',
+    primaryLabel: 'Validated Result',
+    reportPreview: 'Analytical report section generated from method, QA/QC, and result validity.',
+    badges: ['Source workflow', 'QA/QC review', 'Result validity', 'Analytical result', 'Pass / Fail / Retest'],
+  },
+};
+
 export default function NotebookLab() {
   const [searchParams] = useSearchParams();
   const project = getProject(searchParams.get('project'));
@@ -105,6 +145,9 @@ export default function NotebookLab() {
     () => createReportSectionFromNotebookEntry(workflowNotebookEntry),
     [workflowNotebookEntry],
   );
+  const notebookTemplateDetails = NOTEBOOK_TEMPLATE_DETAILS[templateMode];
+  const primaryNotebookSection = workflowNotebookEntry.sections[0];
+  const supportingNotebookSections = workflowNotebookEntry.sections.slice(1);
   const notebook = useMemo(() => {
     // If we have an agent run, use that data
     if (agentRun) {
@@ -123,7 +166,7 @@ export default function NotebookLab() {
           `Detected ${agentRun.outputs.detectedPeaks?.length ?? 0} peaks`,
           'Prepared evidence-linked interpretation with traceable decision context',
         ],
-        peakDetection: `${agentRun.outputs.detectedPeaks?.length ?? 0} peaks detected by agent`,
+        peakDetection: `${agentRun.outputs.detectedPeaks?.length ?? 0} peaks detected in evidence review`,
         phaseInterpretation: `${agentRun.outputs.phase} - ${formatClaimStatus(agentRun.outputs.claimStatus || 'supported')}`,
       };
     }
@@ -304,9 +347,24 @@ export default function NotebookLab() {
               <div className="flex items-center gap-2 text-[11px] text-text-muted mb-1">
                 <span>Created: {project.createdDate}</span>
                 <span>|</span>
-                <span>{workspaceRun || runResult ? 'Source: processing + interpretation refinement' : 'Created from characterization workflow'}</span>
+                <span>Source: XRD processing + interpretation refinement</span>
               </div>
               <h1 className="text-lg font-bold">{notebook.title}</h1>
+              <div className="mt-2 flex max-w-4xl flex-wrap gap-1.5">
+                {[
+                  ['Mode', notebookTemplate.label],
+                  ['Pipeline', 'Processed Result -> Evidence Review -> Notebook Entry'],
+                  ['Status', notebookTemplateDetails.status],
+                ].map(([label, value]) => (
+                  <span
+                    key={label}
+                    className="rounded-md border border-border bg-background px-2.5 py-1 text-[11px] font-semibold text-text-muted"
+                  >
+                    <span className="text-text-dim">{label}: </span>
+                    <span className="text-text-main">{value}</span>
+                  </span>
+                ))}
+              </div>
             </div>
             <div className="flex flex-wrap gap-2">
               {feedback && (
@@ -419,6 +477,7 @@ export default function NotebookLab() {
                 <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-3">
                   {NOTEBOOK_TEMPLATE_MODES.map((mode) => {
                     const template = NOTEBOOK_TEMPLATES[mode];
+                    const details = NOTEBOOK_TEMPLATE_DETAILS[mode];
                     const isSelected = templateMode === mode;
 
                     return (
@@ -429,15 +488,43 @@ export default function NotebookLab() {
                         onClick={() => setTemplateMode(mode)}
                         className={`rounded-lg border p-3 text-left transition-colors ${
                           isSelected
-                            ? 'border-primary/50 bg-primary/10 text-primary'
+                            ? 'border-primary bg-primary/5 text-primary'
                             : 'border-border bg-background text-text-muted hover:border-primary/30 hover:text-text-main'
                         }`}
                       >
-                        <div className="text-sm font-bold text-text-main">{template.label}</div>
-                        <div className="mt-1 text-xs capitalize">{template.reportTemplate.replace('_', ' ')}</div>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="text-sm font-bold text-text-main">{template.label}</div>
+                          {isSelected && (
+                            <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary">
+                              Selected
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-2 text-xs leading-relaxed text-text-muted">{details.description}</p>
+                        <div className="mt-3 rounded-md border border-border bg-surface px-2 py-1.5">
+                          <div className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">Output</div>
+                          <div className="mt-0.5 text-xs font-semibold text-text-main">{details.output}</div>
+                        </div>
                       </button>
                     );
                   })}
+                </div>
+
+                <div className="mt-4 rounded-lg border border-border bg-background p-3">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                      <div className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">Template micro-flow</div>
+                      <div className="mt-1 text-sm font-semibold text-text-main">{notebookTemplateDetails.primaryLabel}</div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-text-muted">
+                      {workflowRefinement.microFlow.map((step, index) => (
+                        <React.Fragment key={step}>
+                          <span className="rounded-full border border-border bg-surface px-2.5 py-1">{step}</span>
+                          {index < workflowRefinement.microFlow.length - 1 && <ArrowRight size={13} className="text-primary" />}
+                        </React.Fragment>
+                      ))}
+                    </div>
+                  </div>
                 </div>
 
                 <div className="mt-4 flex flex-wrap gap-1.5">
@@ -476,9 +563,11 @@ export default function NotebookLab() {
               <div className="rounded-xl border border-primary/20 bg-surface p-5">
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                   <div>
-                    <div className="text-[11px] font-bold uppercase tracking-wider text-primary">REFINED DISCUSSION</div>
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-primary">
+                      {notebookTemplateDetails.primaryLabel}
+                    </div>
                     <p className="mt-1 text-sm font-medium text-text-muted">
-                      Sharpened from processing output and evidence review
+                      Source workflow converted into a template-based scientific record
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-text-muted">
@@ -492,47 +581,55 @@ export default function NotebookLab() {
                 </div>
 
                 <div className="mt-4 rounded-lg border border-border bg-background p-4">
-                  <div className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">Discussion Draft</div>
-                  <p className="mt-2 text-sm leading-relaxed text-text-main">{workflowRefinement.discussionDraft}</p>
-                </div>
-
-                <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-3">
-                  <div className="rounded-lg border border-border bg-background p-3">
-                    <div className="text-xs font-bold text-primary">Supported</div>
-                    <div className="mt-2 space-y-2">
-                      {workflowRefinement.claimBoundary.supported.map((item) => (
-                        <p key={item} className="text-xs leading-relaxed text-text-muted">{item}</p>
-                      ))}
-                    </div>
+                  <div className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">
+                    {primaryNotebookSection?.heading ?? notebookTemplateDetails.primaryLabel}
                   </div>
-                  <div className="rounded-lg border border-border bg-background p-3">
-                    <div className="text-xs font-bold text-amber-600">Requires validation</div>
-                    <div className="mt-2 space-y-2">
-                      {workflowRefinement.claimBoundary.requiresValidation.map((item) => (
-                        <p key={item} className="text-xs leading-relaxed text-text-muted">{item}</p>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="rounded-lg border border-border bg-background p-3">
-                    <div className="text-xs font-bold text-text-main">Not supported yet</div>
-                    <div className="mt-2 space-y-2">
-                      {workflowRefinement.claimBoundary.notSupportedYet.map((item) => (
-                        <p key={item} className="text-xs leading-relaxed text-text-muted">{item}</p>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-4 rounded-lg border border-border bg-background p-3">
-                  <div className="text-xs font-bold text-text-main">Validation Notes</div>
-                  <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    {workflowRefinement.validationNotes.map((note) => (
-                      <p key={note} className="rounded-md border border-border bg-surface p-2 text-xs leading-relaxed text-text-muted">
-                        {note}
-                      </p>
+                  <div className="mt-2 space-y-2">
+                    {(primaryNotebookSection?.lines ?? [workflowRefinement.discussionDraft]).map((line) => (
+                      <p key={line} className="text-sm leading-relaxed text-text-main">{line}</p>
                     ))}
                   </div>
                 </div>
+
+                <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                  {supportingNotebookSections.map((section) => (
+                    <div key={section.heading} className="rounded-lg border border-border bg-background p-3">
+                      <div className="text-xs font-bold text-text-main">{section.heading}</div>
+                      <div className="mt-2 space-y-2">
+                        {section.lines.map((line) => (
+                          <p key={line} className="text-xs leading-relaxed text-text-muted">{line}</p>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-border bg-surface p-5">
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-text-muted">Report Section Preview</div>
+                    <h3 className="mt-1 text-base font-bold text-text-main">{workflowReportSection.heading}</h3>
+                    <p className="mt-1 text-sm text-text-muted">{notebookTemplateDetails.reportPreview}</p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled
+                    title="Report route is not enabled in this demo. Export-ready sections are generated from notebook entries."
+                    className="gap-2"
+                  >
+                    <Download size={14} /> Export Report Section
+                  </Button>
+                </div>
+                <div className="mt-4 rounded-lg border border-border bg-background p-4">
+                  <p className="text-sm leading-relaxed text-text-main">
+                    {workflowReportSection.lines[0] ?? 'Export-ready section prepared from the selected notebook template.'}
+                  </p>
+                </div>
+                <p className="mt-2 text-xs text-text-muted">
+                  Report route is not enabled in this demo. Export-ready sections are generated from notebook entries.
+                </p>
               </div>
             </section>
 
@@ -540,24 +637,25 @@ export default function NotebookLab() {
               <div className="rounded-xl border border-primary/20 bg-surface p-5">
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                   <div>
-                    <h3 className="text-base font-bold text-text-main">Source</h3>
-                    <p className="mt-2 text-sm text-text-muted">Project: CuFe2O4 Spinel Formation</p>
+                    <h3 className="text-base font-bold text-text-main">Source Workflow</h3>
+                    <p className="mt-2 text-sm text-text-muted">Project: {project.name}</p>
                     <p className="mt-1 text-sm text-text-main">
-                      Goal: Determine whether the ferrite spinel phase formed and whether the evidence supports catalytic activation.
+                      Workspace processing is refined through evidence review, then saved as a template-based notebook entry.
                     </p>
                   </div>
                   <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-right">
-                    <div className="text-[11px] font-semibold uppercase tracking-wider text-primary">Status</div>
-                    <div className="mt-1 text-sm font-bold text-text-main">Report-ready trace</div>
+                    <div className="text-[11px] font-semibold uppercase tracking-wider text-primary">Discussion readiness</div>
+                    <div className="mt-1 text-sm font-bold text-text-main">{notebookTemplateDetails.status}</div>
                   </div>
                 </div>
                 <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                   {[
-                    ['Mode', 'Deep Analysis'],
-                    ['Conclusion', 'Ready for spinel formation / Ready for catalytic activation'],
-                    ['Run ID', 'AG-RUN-CF-042'],
-                    ['Timestamp', '2026-04-29 17:30'],
-                    ['Source', 'DIFARYX Characterization Run'],
+                    ['Mode', notebookTemplate.label],
+                    ['Source workflow', 'XRD processing + interpretation refinement'],
+                    ['Pipeline', 'Processed Result -> Evidence Review -> Notebook Entry'],
+                    ['Discussion readiness', notebookTemplateDetails.status],
+                    ['ReportSection', workflowReportSection.heading],
+                    ['Evidence status', 'Requires validation'],
                   ].map(([label, value]) => (
                     <div key={label} className="rounded-md border border-border bg-background p-3">
                       <div className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">{label}</div>
@@ -566,7 +664,7 @@ export default function NotebookLab() {
                   ))}
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  {['Data-attached', 'Evidence-linked', 'Report-ready', 'Provenance preserved'].map((badge) => (
+                  {notebookTemplateDetails.badges.map((badge) => (
                     <span key={badge} className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
                       {badge}
                     </span>
@@ -624,29 +722,31 @@ export default function NotebookLab() {
             </section>
 
             <section className="space-y-3">
-              <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted border-b border-border pb-2">Interpretation</h3>
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted border-b border-border pb-2">{notebookTemplateDetails.primaryLabel}</h3>
               <div className="rounded-lg border border-border bg-surface p-4">
-                <p className="text-sm leading-relaxed text-text-main">
-                  The analysis used XRD and Raman evidence to evaluate whether the sample is consistent with a CuFe{'\u2082'}O{'\u2084'} spinel ferrite assignment. The available diffraction and vibrational evidence support the phase assignment, while XPS oxidation-state validation remains required before stronger surface-chemistry or catalytic-activation claims.
-                </p>
+                {(primaryNotebookSection?.lines ?? [notebook.summary]).map((line) => (
+                  <p key={line} className="text-sm leading-relaxed text-text-main">{line}</p>
+                ))}
                 <div className="mt-4 rounded-md border border-primary/20 bg-primary/5 p-3">
-                  <div className="text-[11px] font-semibold uppercase tracking-wider text-primary">Conclusion</div>
+                  <div className="text-[11px] font-semibold uppercase tracking-wider text-primary">Discussion readiness</div>
                   <p className="mt-1 text-sm font-semibold text-text-main">
-                    The available XRD-centered evidence is consistent with a CuFe{'\u2082'}O{'\u2084'} spinel ferrite phase assignment. XPS validation remains required before making stronger claims about surface oxidation-state distribution or catalytic activation.
+                    {notebookTemplateDetails.status}: {notebookTemplateDetails.output}
                   </p>
                 </div>
               </div>
             </section>
 
             <section className="space-y-3">
-              <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted border-b border-border pb-2">Provenance / Traceability</h3>
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted border-b border-border pb-2">Notebook Run Log</h3>
               <div className="rounded-lg border border-border bg-surface p-4">
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {[
-                    ['Run ID', 'AG-RUN-CF-042'],
-                    ['Project ID', 'cu-fe2o4-spinel'],
-                    ['Techniques used', 'XRD, Raman, FTIR, XPS'],
-                    ['Data status', '3 Ready / 1 In Progress'],
+                    ['Processing run', 'xrd-run-042'],
+                    ['Refinement', 'refine-042'],
+                    ['Dataset', 'xrd-cufe2o4-clean'],
+                    ['Workflow version', 'difaryx-analysis-v0.1'],
+                    ['Template mode', notebookTemplate.label],
+                    ['Discussion readiness', notebookTemplateDetails.status],
                   ].map(([label, value]) => (
                     <div key={label} className="rounded-md border border-border bg-background p-3">
                       <div className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">{label}</div>
@@ -655,7 +755,7 @@ export default function NotebookLab() {
                   ))}
                 </div>
                 <div className="mt-4 rounded-md border border-primary/20 bg-primary/5 p-3 text-center text-xs font-semibold uppercase tracking-wider text-primary">
-                  {'Objective -> Evidence -> Interpretation -> Conclusion -> Report'}
+                  {'ProcessingResult -> AgentDiscussionRefinement -> NotebookEntry -> ReportSection'}
                 </div>
               </div>
             </section>

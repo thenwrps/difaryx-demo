@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
 import { Card } from '../components/ui/Card';
 import { Graph } from '../components/ui/Graph';
-import { Plus, Clock, FileText, Layers3, Sparkles } from 'lucide-react';
+import { Plus, Clock, FileText } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Link, useNavigate } from 'react-router-dom';
 import { ExperimentModal } from '../components/workspace/ExperimentModal';
@@ -15,7 +15,6 @@ import {
   getLocalExperiments,
   getNotebookPath,
   getProject,
-  getWorkspaceRoute,
 } from '../data/demoProjects';
 import { formatChemicalFormula } from '../utils';
 
@@ -155,40 +154,51 @@ export default function Dashboard() {
                       </span>
                     )}
                   </div>
+                  <div className="mt-3 grid grid-cols-1 gap-1.5 text-[10px] sm:grid-cols-2">
+                    {[
+                      ['Workflow', 'Processing -> Refinement -> Notebook'],
+                      ['Notebook Mode', 'Research Mode'],
+                      ['Discussion Status', 'Publication-limited'],
+                      ['Evidence Status', 'Requires validation'],
+                    ].map(([label, value]) => (
+                      <div key={label} className="rounded-md border border-border bg-background px-2 py-1">
+                        <span className="font-semibold text-text-dim">{label}: </span>
+                        <span className="font-medium text-text-muted">{value}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div className="mt-auto pt-4 flex items-center justify-between border-t border-border min-h-[52px]">
+                <div className="mt-auto pt-4 grid grid-cols-4 gap-1.5 border-t border-border min-h-[52px]">
                   <Link
                     to={`/workspace/${currentTechnique.toLowerCase()}?project=${project.id}`}
                     onClick={(event) => event.stopPropagation()}
-                    className="inline-flex h-8 items-center justify-center rounded-md border border-primary bg-primary/10 px-3 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors whitespace-nowrap"
+                    className="inline-flex h-8 items-center justify-center rounded-md border border-primary bg-primary/10 px-2 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors whitespace-nowrap"
                   >
-                    Open {currentTechnique}
+                    Analyze
                   </Link>
-                  <div className="flex items-center gap-3">
-                    <Link
-                      to={getNotebookPath(project)}
-                      onClick={(event) => event.stopPropagation()}
-                      className="inline-flex h-8 items-center justify-center text-xs font-medium text-text-muted hover:text-text-main transition-colors whitespace-nowrap"
-                    >
-                      Notebook
-                    </Link>
-                    <Link
-                      to={getAgentPath(project)}
-                      onClick={(event) => event.stopPropagation()}
-                      className="inline-flex h-8 items-center justify-center text-xs font-medium text-text-muted hover:text-text-main transition-colors whitespace-nowrap"
-                    >
-                      Refine
-                    </Link>
-                    {project.techniques.length > 1 && (
-                      <Link
-                        to={`/workspace/multi?project=${project.id}`}
-                        onClick={(event) => event.stopPropagation()}
-                        className="inline-flex h-8 items-center justify-center text-xs font-medium text-text-muted hover:text-text-main transition-colors whitespace-nowrap"
-                      >
-                        Review
-                      </Link>
-                    )}
-                  </div>
+                  <Link
+                    to={getAgentPath(project)}
+                    onClick={(event) => event.stopPropagation()}
+                    className="inline-flex h-8 items-center justify-center rounded-md border border-border px-2 text-xs font-medium text-text-muted hover:bg-surface-hover hover:text-text-main transition-colors whitespace-nowrap"
+                  >
+                    Review
+                  </Link>
+                  <Link
+                    to={getNotebookPath(project)}
+                    onClick={(event) => event.stopPropagation()}
+                    className="inline-flex h-8 items-center justify-center rounded-md border border-border px-2 text-xs font-medium text-text-muted hover:bg-surface-hover hover:text-text-main transition-colors whitespace-nowrap"
+                  >
+                    Notebook
+                  </Link>
+                  <button
+                    type="button"
+                    disabled
+                    onClick={(event) => event.stopPropagation()}
+                    title="Report route is not enabled in this demo. Export-ready sections are generated from notebook entries."
+                    className="inline-flex h-8 items-center justify-center rounded-md border border-border px-2 text-xs font-medium text-text-muted opacity-50 whitespace-nowrap"
+                  >
+                    Export
+                  </button>
                 </div>
               </div>
             </Card>
@@ -228,46 +238,57 @@ export default function Dashboard() {
                       <span className="px-2 py-0.5 bg-surface border border-border rounded text-[10px] font-medium text-text-dim uppercase tracking-wider">
                         {experiment.technique}
                       </span>
-                      <span className="text-xs text-primary flex items-center gap-1">
-                        <FileText size={12} /> Added dataset
-                      </span>
-                    </div>
+                    <span className="text-xs text-primary flex items-center gap-1">
+                      <FileText size={12} /> Added dataset
+                    </span>
                   </div>
-                  <div className="mt-auto pt-4 flex items-center justify-between border-t border-border min-h-[52px]">
+                  <div className="mt-3 grid grid-cols-1 gap-1.5 text-[10px] sm:grid-cols-2">
+                    {[
+                      ['Workflow', 'Processing -> Refinement -> Notebook'],
+                      ['Notebook Mode', 'Research Mode'],
+                      ['Discussion Status', 'Publication-limited'],
+                      ['Evidence Status', 'Requires validation'],
+                    ].map(([label, value]) => (
+                      <div key={label} className="rounded-md border border-border bg-background px-2 py-1">
+                        <span className="font-semibold text-text-dim">{label}: </span>
+                        <span className="font-medium text-text-muted">{value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                  <div className="mt-auto pt-4 grid grid-cols-4 gap-1.5 border-t border-border min-h-[52px]">
                     <Link
                       to={`/workspace/${workspaceTechnique.toLowerCase()}?project=${project.id}`}
                       onClick={(event) => event.stopPropagation()}
-                      className="inline-flex h-8 items-center justify-center rounded-md border border-primary bg-primary/10 px-3 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors whitespace-nowrap"
+                      className="inline-flex h-8 items-center justify-center rounded-md border border-primary bg-primary/10 px-2 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors whitespace-nowrap"
                     >
-                      Open {workspaceTechnique}
+                      Analyze
                     </Link>
-                    <div className="flex items-center gap-3">
-                      <Link
-                        to={getNotebookPath(project)}
-                        onClick={(event) => event.stopPropagation()}
-                        className="inline-flex h-8 items-center justify-center text-xs font-medium text-text-muted hover:text-text-main transition-colors whitespace-nowrap"
-                      >
-                        Notebook
-                      </Link>
-                      <Link
-                        to={getAgentPath(project)}
-                        onClick={(event) => event.stopPropagation()}
-                        className="inline-flex h-8 items-center justify-center text-xs font-medium text-text-muted hover:text-text-main transition-colors whitespace-nowrap"
-                      >
-                        Refine
-                      </Link>
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setExperimentProjectId(project.id);
-                          setExperimentModalOpen(true);
-                        }}
-                        className="inline-flex h-8 items-center justify-center text-xs font-medium text-text-muted hover:text-text-main transition-colors whitespace-nowrap"
-                      >
-                        Add Dataset
-                      </button>
-                    </div>
+                    <Link
+                      to={getAgentPath(project)}
+                      onClick={(event) => event.stopPropagation()}
+                      className="inline-flex h-8 items-center justify-center rounded-md border border-border px-2 text-xs font-medium text-text-muted hover:bg-surface-hover hover:text-text-main transition-colors whitespace-nowrap"
+                    >
+                      Review
+                    </Link>
+                    <Link
+                      to={getNotebookPath(project)}
+                      onClick={(event) => event.stopPropagation()}
+                      className="inline-flex h-8 items-center justify-center rounded-md border border-border px-2 text-xs font-medium text-text-muted hover:bg-surface-hover hover:text-text-main transition-colors whitespace-nowrap"
+                    >
+                      Notebook
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setExperimentProjectId(project.id);
+                        setExperimentModalOpen(true);
+                      }}
+                      className="inline-flex h-8 items-center justify-center rounded-md border border-border px-2 text-xs font-medium text-text-muted hover:bg-surface-hover hover:text-text-main transition-colors whitespace-nowrap"
+                    >
+                      Add Dataset
+                    </button>
                   </div>
                 </div>
               </Card>
