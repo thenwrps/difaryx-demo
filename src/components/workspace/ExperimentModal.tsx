@@ -263,12 +263,12 @@ export function ExperimentModal({ open, defaultProjectId = DEFAULT_PROJECT_ID, o
           </label>
 
           <div className="sm:col-span-2">
-            <div className="text-xs font-semibold text-text-muted mb-2">Workflow Mode</div>
+            <div className="text-xs font-semibold text-text-muted mb-2">Workflow Template</div>
             <div className="grid grid-cols-3 gap-2">
               {([
                 { id: 'research' as const, label: 'Research Mode', desc: 'Publication-limited' },
-                { id: 'rd' as const, label: 'R\u0026D Mode', desc: 'Internal use' },
-                { id: 'analytical' as const, label: 'Analytical-job', desc: 'QC / screening' },
+                { id: 'rd' as const, label: 'R&D Mode', desc: 'Internal use' },
+                { id: 'analytical' as const, label: 'Analytical-job Mode', desc: 'QC / screening' },
               ]).map((option) => (
                 <button
                   key={option.id}
@@ -280,7 +280,14 @@ export function ExperimentModal({ open, defaultProjectId = DEFAULT_PROJECT_ID, o
                       : 'border-border bg-surface text-text-muted hover:border-primary/40'
                   }`}
                 >
-                  <div className="font-semibold">{option.label}</div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-semibold">{option.label}</span>
+                    {templateMode === option.id && (
+                      <span className="rounded px-1 py-px text-[9px] font-semibold uppercase tracking-wide bg-primary/20 text-primary">
+                        Selected
+                      </span>
+                    )}
+                  </div>
                   <div className="mt-0.5 text-[10px] opacity-70">{option.desc}</div>
                 </button>
               ))}

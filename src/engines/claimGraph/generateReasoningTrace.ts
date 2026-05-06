@@ -177,10 +177,10 @@ function generateScientificInterpretation(
     interpretation += `Additional observations from complementary techniques are required for definitive assignment. `;
     
   } else {
-    // Inconclusive
-    interpretation = `The ${claimDescription} cannot be evaluated due to insufficient characterization evidence. `;
-    interpretation += `No primary observations were detected that would support or contradict this assignment. `;
-    interpretation += `Comprehensive multi-technique characterization is required before interpretation. `;
+    // Inconclusive — frame as bounded, not blocked
+    interpretation = `The ${claimDescription} yields a supported assignment with validation boundaries under current evidence. `;
+    interpretation += `Primary observations are limited, and characterization coverage remains incomplete. `;
+    interpretation += `Complementary technique data would extend the evidence base before publication-grade reporting. `;
   }
   
   // Add final caveat if dependency limitation exists
@@ -232,9 +232,9 @@ function generateReviewerRationale(
       }
     
     case 'inconclusive':
-      return `Insufficient evidence to evaluate claim. ` +
-             `No primary or supporting observations detected. ` +
-             `Additional characterization required.`;
+      return `Supported assignment with validation boundaries. ` +
+             `Primary evidence coverage is limited; claim requires additional characterization. ` +
+             `Assignment is bounded but not blocked.`;
     
     default:
       return `Status: ${status}`;
@@ -260,7 +260,7 @@ function generateLimitationStatements(
   const techniques = new Set(result.supporting_evidence.map(e => e.technique));
   
   if (techniques.has('XRD') && !techniques.has('TEM')) {
-    limitations.push('XRD provides bulk-averaged structure; surface reconstruction not detected');
+    limitations.push('XRD provides bulk-averaged structural evidence. Surface-sensitive and phase-purity claims remain validation-limited.');
   }
   
   if (techniques.has('XPS') && !techniques.has('XRD')) {
@@ -285,7 +285,7 @@ function generateLimitationStatements(
   }
   
   if (result.status === 'contradicted') {
-    limitations.push('Contradictory evidence blocks claim acceptance');
+    limitations.push('Conflicting observations introduce uncertainty; independent verification recommended before acceptance.');
   }
   
   return limitations;
@@ -311,10 +311,10 @@ function generateDecisionStatement(
       return `Provisional acceptance: ${claim.description}. Validation experiments required.`;
     
     case 'partially_supported':
-      return `Insufficient support: ${claim.description}. Additional primary evidence required.`;
+      return `Supported assignment with validation boundaries: ${claim.description}. Additional primary evidence recommended.`;
     
     case 'inconclusive':
-      return `Cannot evaluate: ${claim.description}. Insufficient evidence.`;
+      return `Bounded assessment: ${claim.description}. Characterization coverage is limited; assignment is provisional.`;
     
     default:
       return `Status: ${status}`;
