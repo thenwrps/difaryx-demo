@@ -135,8 +135,8 @@ const DEFAULT_MISSION =
 
 const MODEL_MODE_LABELS: Record<ModelMode, string> = {
   deterministic: 'Deterministic',
-  'vertex-gemini': 'Vertex AI Gemini',
-  gemma: 'Gemma Open Model',
+  'vertex-gemini': 'Cloud Agent',
+  gemma: 'Open Agent',
 };
 
 const CONTEXT_ORDER: AgentContext[] = ['XRD', 'XPS', 'FTIR', 'Raman'];
@@ -196,13 +196,13 @@ const CONTEXT_CONFIG: Record<
       },
       {
         id: 'score',
-        label: 'Score Candidates',
-        shortLabel: 'Scoring',
-        detail: 'Ranking candidates by matched peaks, strong-peak agreement, and conflicts.',
-        toolName: 'score_phase_candidates',
-        displayName: 'Score Phase Candidates',
+        label: 'Evaluate Candidates',
+        shortLabel: 'Evaluating',
+        detail: 'Evaluating candidates by structural consistency and evidence relations.',
+        toolName: 'evaluate_phase_candidates',
+        displayName: 'Evaluate Phase Candidates',
         inputSummary: 'Observed peaks and candidate references',
-        outputSummary: 'Candidate scores computed',
+        outputSummary: 'Candidate evaluation complete',
         durationMs: 620,
       },
       {
@@ -219,13 +219,13 @@ const CONTEXT_CONFIG: Record<
       },
       {
         id: 'ai_interpretation',
-        label: 'AI Interpretation',
-        shortLabel: 'AI Interpret',
-        detail: 'Invoking Gemini reasoning to interpret multi-source evidence.',
+        label: 'Agent Interpretation',
+        shortLabel: 'Interpret',
+        detail: 'Preparing agent interpretation for multi-source evidence.',
         toolName: 'gemini_reasoner',
-        displayName: 'Gemini Scientific Reasoner',
+        displayName: 'Agent Interpreter',
         inputSummary: 'Aggregated evidence from deterministic analysis',
-        outputSummary: 'Scientific interpretation generated',
+        outputSummary: 'Agent interpretation generated',
         durationMs: 720,
       },
       {
@@ -235,8 +235,8 @@ const CONTEXT_CONFIG: Record<
         detail: 'Synthesizing phase evidence into a decision-ready interpretation.',
         toolName: 'generate_xrd_interpretation',
         displayName: 'Generate XRD Interpretation',
-        inputSummary: 'Scores, evidence, conflicts, and caveats',
-        outputSummary: 'Scientific decision generated',
+        inputSummary: 'Evaluation results, evidence, conflicts, and caveats',
+        outputSummary: 'Conclusion generated',
         durationMs: 620,
       },
     ],
@@ -307,13 +307,13 @@ const CONTEXT_CONFIG: Record<
       },
       {
         id: 'ai_interpretation',
-        label: 'AI Interpretation',
-        shortLabel: 'AI Interpret',
-        detail: 'Invoking Gemini reasoning to interpret multi-source evidence.',
+        label: 'Agent Interpretation',
+        shortLabel: 'Interpret',
+        detail: 'Preparing agent interpretation for multi-source evidence.',
         toolName: 'gemini_reasoner',
-        displayName: 'Gemini Scientific Reasoner',
+        displayName: 'Agent Interpreter',
         inputSummary: 'Aggregated evidence from deterministic analysis',
-        outputSummary: 'Scientific interpretation generated',
+        outputSummary: 'Agent interpretation generated',
         durationMs: 720,
       },
       {
@@ -324,7 +324,7 @@ const CONTEXT_CONFIG: Record<
         toolName: 'decision_logic',
         displayName: 'Generate Surface Decision',
         inputSummary: 'Evidence summary and limitations',
-        outputSummary: 'Scientific decision generated',
+        outputSummary: 'Conclusion generated',
         durationMs: 620,
       },
     ],
@@ -395,13 +395,13 @@ const CONTEXT_CONFIG: Record<
       },
       {
         id: 'ai_interpretation',
-        label: 'AI Interpretation',
-        shortLabel: 'AI Interpret',
-        detail: 'Invoking Gemini reasoning to interpret multi-source evidence.',
+        label: 'Agent Interpretation',
+        shortLabel: 'Interpret',
+        detail: 'Preparing agent interpretation for multi-source evidence.',
         toolName: 'gemini_reasoner',
-        displayName: 'Gemini Scientific Reasoner',
+        displayName: 'Agent Interpreter',
         inputSummary: 'Aggregated evidence from deterministic analysis',
-        outputSummary: 'Scientific interpretation generated',
+        outputSummary: 'Agent interpretation generated',
         durationMs: 720,
       },
       {
@@ -412,7 +412,7 @@ const CONTEXT_CONFIG: Record<
         toolName: 'decision_logic',
         displayName: 'Generate Bonding Decision',
         inputSummary: 'Evidence summary and caveats',
-        outputSummary: 'Scientific decision generated',
+        outputSummary: 'Conclusion generated',
         durationMs: 620,
       },
     ],
@@ -483,13 +483,13 @@ const CONTEXT_CONFIG: Record<
       },
       {
         id: 'ai_interpretation',
-        label: 'AI Interpretation',
-        shortLabel: 'AI Interpret',
-        detail: 'Invoking Gemini reasoning to interpret multi-source evidence.',
+        label: 'Agent Interpretation',
+        shortLabel: 'Interpret',
+        detail: 'Preparing agent interpretation for multi-source evidence.',
         toolName: 'gemini_reasoner',
-        displayName: 'Gemini Scientific Reasoner',
+        displayName: 'Agent Interpreter',
         inputSummary: 'Aggregated evidence from deterministic analysis',
-        outputSummary: 'Scientific interpretation generated',
+        outputSummary: 'Agent interpretation generated',
         durationMs: 720,
       },
       {
@@ -500,7 +500,7 @@ const CONTEXT_CONFIG: Record<
         toolName: 'decision_logic',
         displayName: 'Generate Structural Decision',
         inputSummary: 'Evidence summary and limitations',
-        outputSummary: 'Scientific decision generated',
+        outputSummary: 'Conclusion generated',
         durationMs: 620,
       },
     ],
@@ -712,6 +712,22 @@ function toolStatusIcon(status: ToolStatus) {
   return <CircleDot size={12} className="text-slate-600" />;
 }
 
+function formatReviewStatus(status: string) {
+  switch (status) {
+    case 'strongly_supported':
+    case 'complete':
+      return 'Complete';
+    case 'supported':
+      return 'Ready';
+    case 'partial':
+      return 'In Progress';
+    case 'pending':
+      return 'Pending';
+    default:
+      return 'Review';
+  }
+}
+
 import { formatChemicalFormula } from '../utils';
 
 function FormulaText({
@@ -780,13 +796,13 @@ function createDecisionResult(
   const metrics: Array<{ label: string; value: string; tone?: 'cyan' | 'emerald' | 'violet' | 'amber' }> = [
     { label: config.featureName, value: String(featureCount), tone: 'cyan' },
     { label: 'Evidence nodes', value: String(evidenceNodes.length), tone: 'emerald' },
-    { label: 'Claim status', value: dominantClaim?.status ?? 'unsupported', tone: 'violet' },
+    { label: 'Conclusion', value: formatReviewStatus(dominantClaim?.status ?? 'unsupported'), tone: 'violet' },
   ];
   
   // Build detail rows from reasoning trace
   const detailRows = fusionResult.reasoningTrace.map((trace, index) => ({
-    Claim: trace.claimId,
-    Status: trace.status,
+    Conclusion: trace.claimId,
+    Review: formatReviewStatus(trace.status),
     Evidence: `${trace.evidenceIds.length} nodes`,
     Conflicts: trace.contradictingEvidenceIds.length > 0 ? 'Yes' : 'No',
   }));
@@ -794,7 +810,7 @@ function createDecisionResult(
   return {
     runId: generateRunId(),
     primaryResult: fusionResult.conclusion,
-    subtitle: `${config.label} - Fusion Engine Scientific Reasoning`,
+    subtitle: `${config.label} - Fusion Engine Agent Interpretation`,
     reasoningTrace: fusionResult.reasoningTrace,
     conclusion: fusionResult.conclusion,
     basis: fusionResult.basis,
@@ -821,7 +837,7 @@ function toAgentRunResult(
     selectedDatasets: [context],
     decision: result.primaryResult,
     confidence: 85, // Placeholder - fusionEngine doesn't use numeric confidence
-    confidenceLabel: 'Fusion Engine Decision',
+    confidenceLabel: 'Status',
     evidence: result.basis,
     warnings: result.limitations,
     recommendations: [result.decision],
@@ -966,7 +982,7 @@ export default function AgentDemo() {
       outputs: {
         phase: decision.primaryResult,
         confidence: 85, // Placeholder - fusionEngine doesn't use numeric confidence
-        confidenceLabel: 'Fusion Engine Decision',
+    confidenceLabel: 'Status',
         evidence: decision.basis,
         interpretation: decision.crossTech,
         caveats: decision.limitations,
@@ -1334,13 +1350,13 @@ export default function AgentDemo() {
               aria-label="Reasoning mode"
             >
               <option value="deterministic">Deterministic</option>
-              <option value="vertex-gemini">Vertex AI Gemini</option>
-              <option value="gemma">Gemma Open Model</option>
+              <option value="vertex-gemini">Cloud Agent</option>
+              <option value="gemma">Open Agent</option>
             </select>
             <span className="pointer-events-none flex min-w-0 items-baseline gap-1.5 whitespace-nowrap">
               <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-slate-500">Mode:</span>
               <span className="truncate text-xs font-semibold text-slate-100">
-                Vertex AI Gemini
+                {MODEL_MODE_LABELS[agentState.modelMode]}
               </span>
             </span>
           </label>
@@ -1420,9 +1436,9 @@ export default function AgentDemo() {
             xrdAnalysis?.candidates.slice(0, 3).map((candidate, index) => ({
               phase: candidate.phase.name,
               peakAlignment: index === 0 ? '0.12° ≤ 0.20°' : index === 1 ? '0.28° > 0.20°' : '0.31° > 0.20°',
-              intensityCorr: candidate.score.toFixed(2),
+              structuralFit: index === 0 ? 'consistent' : 'partial',
               completeness: (candidate.matches.length / candidate.phase.peaks.length).toFixed(2),
-              score: candidate.score.toFixed(2),
+              evaluation: index === 0 ? 'Ready' : 'In Progress',
               result: index === 0 ? 'Match' : 'Rejected',
               reason: index === 1 ? 'missing peak 35.7°' : index === 2 ? 'intensity mismatch' : undefined,
             }))

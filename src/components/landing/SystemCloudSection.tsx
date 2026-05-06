@@ -17,7 +17,7 @@ export default function SystemCloudSection() {
           Designed for integration and scale
         </h2>
         <p className="mx-auto mb-12 max-w-2xl text-center text-[16px] leading-relaxed text-slate-600">
-          DIFARYX is modular and extensible. It connects analytical tools, data systems, and AI models to support reproducible scientific workflows at scale.
+          DIFARYX is modular and extensible. It connects analytical tools, data systems, and agent services to support reproducible scientific workflows at scale.
         </p>
         <div className="flex flex-wrap justify-center gap-3">
           {tags.map((tag) => (

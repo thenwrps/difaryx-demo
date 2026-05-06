@@ -22,20 +22,20 @@ const workflowSteps = [
   },
   {
     number: '04',
-    title: 'Evidence Synthesis',
-    desc: 'Aggregate scores from multiple techniques, apply penalties for anomalies, and calculate confidence with uncertainty quantification.',
+    title: 'Supporting Data',
+    desc: 'Combine technique evidence, flag anomalies, and keep every conclusion linked to its source signals.',
     color: 'emerald'
   },
   {
     number: '05',
-    title: 'Scientific Reasoning',
-    desc: 'Gemini generates interpretation, compares candidates, analyzes conflicts, and explains decision logic.',
+    title: 'Agent Interpretation',
+    desc: 'Compare candidates, analyze conflicts, and explain how the evidence leads to the conclusion.',
     color: 'violet'
   },
   {
     number: '06',
-    title: 'Decision + Report',
-    desc: 'Finalize scientific determination with confidence estimation, generate report with evidence provenance, and export results.',
+    title: 'Conclusion',
+    desc: 'Finalize the characterization conclusion, generate a report with evidence provenance, and export results.',
     color: 'amber'
   }
 ];
@@ -55,10 +55,10 @@ export default function ProductFunctionSection() {
       <div className="mx-auto max-w-[1200px] px-6">
         <div className="mb-12 text-center">
           <h2 className="mb-4 text-[32px] font-bold leading-[1.2] text-slate-900 lg:text-[40px]">
-            How DIFARYX works: From signal to decision
+            How DIFARYX works: from signal to conclusion
           </h2>
           <p className="mx-auto max-w-3xl text-[16px] leading-relaxed text-slate-600">
-            A structured workflow that combines deterministic preprocessing, autonomous agent execution, and hybrid reasoning for traceable scientific decisions.
+            A structured workflow that combines deterministic preprocessing, autonomous agent execution, and traceable interpretation for characterization conclusions.
           </p>
         </div>
 
@@ -86,9 +86,9 @@ export default function ProductFunctionSection() {
 
         <div className="mt-12 rounded-2xl border border-slate-200 bg-white p-8 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
           <div className="text-center">
-            <h3 className="mb-3 text-[20px] font-bold text-slate-900">Hybrid Reasoning: Deterministic + Gemini</h3>
+            <h3 className="mb-3 text-[20px] font-bold text-slate-900">Agent Interpretation with Traceable Supporting Data</h3>
             <p className="mx-auto max-w-3xl text-[15px] leading-relaxed text-slate-700">
-              DIFARYX combines deterministic analysis (peak matching, database search, scoring) with Gemini-powered interpretation (conflict resolution, uncertainty assessment, scientific reasoning). Researchers see both sources and can verify each step.
+              DIFARYX combines deterministic analysis with agent interpretation, conflict review, and evidence-linked conclusions. Researchers see the source data and can verify each step.
             </p>
           </div>
         </div>

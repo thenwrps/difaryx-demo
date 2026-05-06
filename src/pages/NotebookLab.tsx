@@ -26,11 +26,11 @@ import { getRun, type AgentRun } from '../data/runModel';
 
 function formatClaimStatus(status: string): string {
   switch (status) {
-    case 'strongly_supported': return 'Strongly Supported';
-    case 'supported': return 'Supported';
-    case 'partial': return 'Partial';
-    case 'inconclusive': return 'Inconclusive';
-    case 'contradicted': return 'Contradicted';
+    case 'strongly_supported': return 'Complete';
+    case 'supported': return 'Ready';
+    case 'partial': return 'In Progress';
+    case 'inconclusive': return 'Review';
+    case 'contradicted': return 'Review';
     default: return status;
   }
 }
@@ -64,7 +64,7 @@ export default function NotebookLab() {
     // If we have an agent run, use that data
     if (agentRun) {
       return {
-        title: `Agent Run: ${project.name}`,
+        title: `Characterization Run: ${project.name}`,
         summary: agentRun.outputs.interpretation,
         decision: agentRun.outputs.phase,
         claimStatus: agentRun.outputs.claimStatus || 'supported',
@@ -79,7 +79,7 @@ export default function NotebookLab() {
           'Generated autonomous decision with evidence chain',
         ],
         peakDetection: `${agentRun.outputs.detectedPeaks?.length ?? 0} peaks detected by agent`,
-        phaseInterpretation: `${agentRun.outputs.phase} - ${agentRun.outputs.claimStatus || 'supported'}`,
+        phaseInterpretation: `${agentRun.outputs.phase} - ${formatClaimStatus(agentRun.outputs.claimStatus || 'supported')}`,
       };
     }
     
@@ -120,7 +120,7 @@ export default function NotebookLab() {
 
   const exportFeedbackMessage = (format: DemoExportFormat) => {
     if (format === 'pdf') {
-      return 'Report prepared: Agent conclusion, evidence, decision status, caveats, and provenance included.';
+      return 'Report prepared: Conclusion, supporting data, limitations, and source provenance included.';
     }
     if (format === 'docx') {
       return 'DOCX report prepared with agent summary, evidence table, and next actions.';
@@ -150,7 +150,7 @@ export default function NotebookLab() {
       title: `${notebook.title} Report`,
       sections: [
         { heading: 'Summary', lines: [notebook.summary] },
-        { heading: 'Decision', lines: [notebook.decision, formatClaimStatus(notebook.claimStatus)] },
+        { heading: 'Conclusion', lines: [notebook.decision, formatClaimStatus(notebook.claimStatus)] },
         { heading: 'Pipeline', lines: notebook.processingPipeline },
         { heading: 'Evidence', lines: notebook.evidence },
         { heading: 'Observations', lines: observations.length > 0 ? observations : ['No added observations.'] },
@@ -194,7 +194,7 @@ export default function NotebookLab() {
 
   const copyAgentSummary = async () => {
     const summary =
-      'Ferrite spinel formation is strongly supported. Catalytic activation is supported but requires XPS oxidation-state validation.';
+      'Ferrite spinel formation is supported. Catalytic activation is supported but requires XPS oxidation-state validation.';
     try {
       await navigator.clipboard.writeText(summary);
       showFeedback('Summary copied');
@@ -248,7 +248,7 @@ export default function NotebookLab() {
               <div className="flex items-center gap-2 text-[11px] text-text-muted mb-1">
                 <span>Created: {project.createdDate}</span>
                 <span>|</span>
-                <span>{workspaceRun ? 'Generated from workspace run' : runResult ? 'Generated from latest agent run' : 'Generated from analysis pipeline'}</span>
+                <span>{workspaceRun ? 'Generated from workspace run' : runResult ? 'Generated from latest characterization run' : 'Generated from analysis pipeline'}</span>
               </div>
               <h1 className="text-lg font-bold">{notebook.title}</h1>
             </div>
@@ -347,7 +347,7 @@ export default function NotebookLab() {
               <div className="rounded-xl border border-primary/20 bg-surface p-5">
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                   <div>
-                    <h3 className="text-base font-bold text-text-main">Attached Agent Run</h3>
+                    <h3 className="text-base font-bold text-text-main">Source</h3>
                     <p className="mt-2 text-sm text-text-muted">Project: CuFe2O4 Spinel Formation</p>
                     <p className="mt-1 text-sm text-text-main">
                       Goal: Determine whether the ferrite spinel phase formed and whether the evidence supports catalytic activation.
@@ -361,7 +361,7 @@ export default function NotebookLab() {
                 <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                   {[
                     ['Mode', 'Deep Analysis'],
-                    ['Decision Status', 'Strongly Supported for spinel formation / Supported for catalytic activation'],
+                    ['Conclusion', 'Ready for spinel formation / Ready for catalytic activation'],
                     ['Run ID', 'AG-RUN-CF-042'],
                     ['Timestamp', '2026-04-29 17:30'],
                     ['Source', 'DIFARYX Agent Demo'],
@@ -383,34 +383,34 @@ export default function NotebookLab() {
             </section>
 
             <section className="space-y-3">
-              <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted border-b border-border pb-2">Agent Evidence Summary</h3>
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted border-b border-border pb-2">Supporting Data</h3>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {[
                   {
                     technique: 'XRD',
                     evidence: 'Spinel diffraction peaks matched',
-                    strength: 'High',
+                    strength: 'Ready',
                     dataset: 'cu-fe2o4-spinel_xrd.xy',
                     caveat: 'Compare against reference CuFe2O4 pattern before final citation.',
                   },
                   {
                     technique: 'Raman',
                     evidence: 'A1g/T2g vibrational modes support spinel structure',
-                    strength: 'High',
+                    strength: 'Ready',
                     dataset: 'cu-fe2o4-spinel_raman.txt',
                     caveat: 'Mode assignment supports phase but does not replace XRD.',
                   },
                   {
                     technique: 'FTIR',
                     evidence: 'Metal-oxygen/support bonding signatures present',
-                    strength: 'Medium',
+                    strength: 'In Progress',
                     dataset: 'cu-fe2o4-support_ftir.csv',
                     caveat: 'Bonding signatures are supportive, not standalone proof.',
                   },
                   {
                     technique: 'XPS',
-                    evidence: 'Partial; oxidation-state validation still required',
-                    strength: 'Partial',
+                    evidence: 'Oxidation-state validation still required',
+                    strength: 'Review',
                     dataset: 'cu-fe2o4_surface_xps.spe',
                     caveat: 'Run Fe 2p / Cu 2p deconvolution for activation claims.',
                   },
@@ -418,7 +418,7 @@ export default function NotebookLab() {
                   <div key={item.technique} className="rounded-lg border border-border bg-surface p-4">
                     <div className="flex items-center justify-between gap-3">
                       <span className="text-sm font-bold text-text-main">{item.technique}</span>
-                      <span className={`text-xs font-semibold ${item.strength === 'Partial' ? 'text-amber-600' : item.strength === 'High' ? 'text-primary' : 'text-cyan'}`}>
+                      <span className={`text-xs font-semibold ${item.strength === 'Review' ? 'text-amber-600' : item.strength === 'Ready' ? 'text-primary' : 'text-cyan'}`}>
                         {item.strength}
                       </span>
                     </div>
@@ -431,15 +431,15 @@ export default function NotebookLab() {
             </section>
 
             <section className="space-y-3">
-              <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted border-b border-border pb-2">Scientific Interpretation</h3>
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted border-b border-border pb-2">Agent Interpretation</h3>
               <div className="rounded-lg border border-border bg-surface p-4">
                 <p className="text-sm leading-relaxed text-text-main">
                   XRD and Raman evidence support ferrite spinel formation. FTIR confirms support-related bonding signatures. XPS remains required for stronger claims regarding surface oxidation-state distribution and catalytic activation.
                 </p>
                 <div className="mt-4 rounded-md border border-primary/20 bg-primary/5 p-3">
-                  <div className="text-[11px] font-semibold uppercase tracking-wider text-primary">Decision statement</div>
+                  <div className="text-[11px] font-semibold uppercase tracking-wider text-primary">Conclusion</div>
                   <p className="mt-1 text-sm font-semibold text-text-main">
-                    Ferrite spinel formation is strongly supported. Catalytic activation is supported but requires XPS oxidation-state validation.
+                    Ferrite spinel formation is supported. Catalytic activation is supported but requires XPS oxidation-state validation.
                   </p>
                 </div>
               </div>
@@ -453,7 +453,7 @@ export default function NotebookLab() {
                     ['Run ID', 'AG-RUN-CF-042'],
                     ['Project ID', 'cu-fe2o4-spinel'],
                     ['Techniques used', 'XRD, Raman, FTIR, XPS'],
-                    ['Data status', '3 ready / 1 partial'],
+                    ['Data status', '3 Ready / 1 In Progress'],
                   ].map(([label, value]) => (
                     <div key={label} className="rounded-md border border-border bg-background p-3">
                       <div className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">{label}</div>
@@ -468,7 +468,7 @@ export default function NotebookLab() {
             </section>
 
             <section className="space-y-3">
-              <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted border-b border-border pb-2">Caveats and Next Steps</h3>
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted border-b border-border pb-2">Limitations and Follow-up Validation</h3>
               <div className="space-y-2">
                 {[
                   'Run XPS Fe 2p / Cu 2p deconvolution',
@@ -506,7 +506,7 @@ export default function NotebookLab() {
             </section>
 
             <section className="space-y-3">
-              <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted border-b border-border pb-2">Scientific Decision</h3>
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted border-b border-border pb-2">Conclusion</h3>
               <div className="bg-surface p-4 rounded-md border border-border flex items-center justify-between gap-4">
                 <div>
                   <div className="text-lg font-bold">{notebook.decision}</div>
@@ -658,7 +658,7 @@ export default function NotebookLab() {
 
         <div className="hidden w-[340px] border-l border-border bg-background 2xl:flex flex-col shrink-0 overflow-y-auto">
           <div className="p-6">
-            <div className="mb-4 text-xs font-semibold text-text-muted uppercase tracking-wider">Scientific Reasoning Summary</div>
+            <div className="mb-4 text-xs font-semibold text-text-muted uppercase tracking-wider">Characterization Overview</div>
             <AIInsightPanel result={getProjectInsight(project)} />
           </div>
         </div>

@@ -118,6 +118,14 @@ function dSpacing(twoTheta: number) {
   return wavelength / (2 * Math.sin(thetaRadians));
 }
 
+function formatClaimStatus(status: string) {
+  if (status === 'strongly_supported') return 'Complete';
+  if (status === 'supported') return 'Ready';
+  if (status === 'partial') return 'In Progress';
+  if (status === 'inconclusive') return 'Pending';
+  return 'Review';
+}
+
 function smoothData(data: SpectrumPoint[]) {
   return data.map((point, index) => {
     const neighbors = data.slice(Math.max(0, index - 2), Math.min(data.length, index + 3));
@@ -457,7 +465,7 @@ export default function TechniqueWorkspace() {
       csvRows: processedData.slice(0, 240).map((point) => ({ x: point.x, y: point.y, technique: activeTechnique })),
     });
     const message = workspaceExportMessage(format);
-    appendLog(`${message} Project: ${project.name}; technique: ${activeTechnique}; dataset: ${selectedDataset?.fileName ?? 'demo dataset'}; claim status: ${project.claimStatus}; provenance: ${selectedDataset?.id ?? project.id}.`);
+    appendLog(`${message} Project: ${project.name}; technique: ${activeTechnique}; dataset: ${selectedDataset?.fileName ?? 'demo dataset'}; status: ${formatClaimStatus(project.claimStatus)}; source: ${selectedDataset?.id ?? project.id}.`);
     showToast(message);
   };
 
@@ -852,18 +860,18 @@ export default function TechniqueWorkspace() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-2">
                       <Sparkles size={16} className="text-cyan shrink-0" />
-                      <h3 className="text-sm font-bold text-text-main">Agent Run Result</h3>
+                      <h3 className="text-sm font-bold text-text-main">Characterization Result</h3>
                       <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${
                         agentRun.outputs.claimStatus === 'strongly_supported' ? 'border-emerald-600/30 bg-emerald-600/10 text-emerald-600' :
                         agentRun.outputs.claimStatus === 'supported' ? 'border-cyan/30 bg-cyan/10 text-cyan' :
                         agentRun.outputs.claimStatus === 'partial' ? 'border-amber-500/30 bg-amber-500/10 text-amber-500' :
                         'border-text-muted/30 bg-text-muted/10 text-text-muted'
                       }`}>
-                        {agentRun.outputs.claimStatus === 'strongly_supported' ? 'Strongly Supported' :
-                         agentRun.outputs.claimStatus === 'supported' ? 'Supported' :
-                         agentRun.outputs.claimStatus === 'partial' ? 'Partial' :
-                         agentRun.outputs.claimStatus === 'inconclusive' ? 'Inconclusive' :
-                         'Contradicted'}
+                        {agentRun.outputs.claimStatus === 'strongly_supported' ? 'Complete' :
+                         agentRun.outputs.claimStatus === 'supported' ? 'Ready' :
+                         agentRun.outputs.claimStatus === 'partial' ? 'In Progress' :
+                         agentRun.outputs.claimStatus === 'inconclusive' ? 'Review' :
+                         'Review'}
                       </span>
                     </div>
                     <div className="space-y-2">
@@ -872,18 +880,18 @@ export default function TechniqueWorkspace() {
                         <p className="text-sm font-semibold text-text-main">{agentRun.outputs.phase}</p>
                       </div>
                       <div>
-                        <p className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">Claim Status</p>
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">Status</p>
                         <p className={`text-lg font-bold ${
                           agentRun.outputs.claimStatus === 'strongly_supported' ? 'text-emerald-600' :
                           agentRun.outputs.claimStatus === 'supported' ? 'text-cyan' :
                           agentRun.outputs.claimStatus === 'partial' ? 'text-amber-500' :
                           'text-text-muted'
                         }`}>
-                          {agentRun.outputs.claimStatus === 'strongly_supported' ? 'Strongly Supported' :
-                           agentRun.outputs.claimStatus === 'supported' ? 'Supported' :
-                           agentRun.outputs.claimStatus === 'partial' ? 'Partial' :
-                           agentRun.outputs.claimStatus === 'inconclusive' ? 'Inconclusive' :
-                           'Contradicted'}
+                          {agentRun.outputs.claimStatus === 'strongly_supported' ? 'Complete' :
+                           agentRun.outputs.claimStatus === 'supported' ? 'Ready' :
+                           agentRun.outputs.claimStatus === 'partial' ? 'In Progress' :
+                           agentRun.outputs.claimStatus === 'inconclusive' ? 'Review' :
+                           'Review'}
                         </p>
                       </div>
                       <div>
@@ -1199,11 +1207,11 @@ export default function TechniqueWorkspace() {
                       project.claimStatus === 'partial' ? 'border-amber-500/20 bg-amber-500/10 text-amber-500' :
                       'border-text-muted/20 bg-text-muted/10 text-text-muted'
                     }`}>
-                      {project.claimStatus === 'strongly_supported' ? 'Strongly Supported' :
-                       project.claimStatus === 'supported' ? 'Supported' :
-                       project.claimStatus === 'partial' ? 'Partial' :
-                       project.claimStatus === 'inconclusive' ? 'Inconclusive' :
-                       'Contradicted'}
+                      {project.claimStatus === 'strongly_supported' ? 'Complete' :
+                       project.claimStatus === 'supported' ? 'Ready' :
+                       project.claimStatus === 'partial' ? 'In Progress' :
+                       project.claimStatus === 'inconclusive' ? 'Review' :
+                       'Review'}
                     </span>
                   </div>
                   <p className="mt-2 text-xs text-text-muted">
@@ -1249,7 +1257,7 @@ export default function TechniqueWorkspace() {
                       </div>
                     ) : (
                       <p className="text-sm text-text-muted">
-                        Run {TECHNIQUE_COPY[activeTechnique].assignLabel.toLowerCase()} to populate claim status, matched features, limitations, and evidence.
+                    Run {TECHNIQUE_COPY[activeTechnique].assignLabel.toLowerCase()} to populate status, matched features, limitations, and supporting data.
                       </p>
                     )}
                   </div>

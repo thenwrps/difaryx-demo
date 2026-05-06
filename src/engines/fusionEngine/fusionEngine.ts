@@ -1,6 +1,8 @@
 // Fusion Engine - Main API
 
 import type { FusionInput, FusionResult, EvidenceNode, Claim, ReasoningTraceItem, ClaimStatus, EvidenceCategory, Technique } from './types';
+import { evaluateClaimGraph } from '../claimGraph';
+import type { RawEvidenceInput as ClaimGraphRawInput } from '../claimGraph';
 
 // ============================================================================
 // CENTRAL EVIDENCE NODE CREATION
@@ -248,6 +250,38 @@ const EXCLUSIVE_GROUPS: Record<string, string[]> = {
 };
 
 /**
+ * Convert FusionInput evidence to ClaimGraph RawEvidenceInput format
+ */
+function convertToClaimGraphInput(evidence: EvidenceNode[]): ClaimGraphRawInput[] {
+  // Group evidence by technique
+  const byTechnique = new Map<Technique, EvidenceNode[]>();
+  
+  for (const e of evidence) {
+    if (!byTechnique.has(e.technique)) {
+      byTechnique.set(e.technique, []);
+    }
+    byTechnique.get(e.technique)!.push(e);
+  }
+  
+  // Convert to RawEvidenceInput format
+  const inputs: ClaimGraphRawInput[] = [];
+  
+  for (const [technique, nodes] of byTechnique) {
+    inputs.push({
+      technique,
+      peaks: nodes.map(node => ({
+        id: node.id,
+        position: node.x,
+        intensity: 100, // Default intensity (not used in claimGraph)
+        label: node.label,
+      })),
+    });
+  }
+  
+  return inputs;
+}
+
+/**
  * Evaluate multi-technique evidence and generate scientific conclusion
  * @param input - Fusion input containing evidence nodes
  * @returns Fusion result with conclusion and reasoning
@@ -255,6 +289,33 @@ const EXCLUSIVE_GROUPS: Record<string, string[]> = {
 export function evaluate(input: FusionInput): FusionResult {
   const { evidence } = input;
 
+  // Try using ClaimGraph engine if evidence is available
+  if (evidence.length > 0) {
+    try {
+      const claimGraphInput = convertToClaimGraphInput(evidence);
+      const claimGraphResult = evaluateClaimGraph(claimGraphInput);
+      
+      // Map ClaimGraph report to FusionResult
+      const fusionResult: FusionResult = {
+        conclusion: claimGraphResult.report.conclusion,
+        basis: claimGraphResult.report.evidence_basis,
+        crossTech: claimGraphResult.report.cross_tech_consistency,
+        limitations: claimGraphResult.report.limitations,
+        decision: claimGraphResult.report.decision,
+        reasoningTrace: [], // Legacy format - will be populated below
+        highlightedEvidenceIds: claimGraphResult.propagation
+          .filter(p => p.status === 'supported' || p.status === 'partially_supported')
+          .flatMap(p => p.supporting_evidence.map(e => e.id)),
+      };
+      
+      return fusionResult;
+    } catch (error) {
+      console.warn('ClaimGraph evaluation failed, falling back to legacy fusion engine:', error);
+      // Fall through to legacy implementation
+    }
+  }
+
+  // Legacy fusion engine implementation (fallback)
   // Infer categories and concepts for evidence nodes
   const enrichedEvidence = evidence.map((e) => ({
     ...e,

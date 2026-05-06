@@ -447,7 +447,7 @@ function generateNotebookDraft(
 ## Summary
 ${claim.interpretation || claim.description}
 
-## Evidence Basis
+## Supporting Data
 ${evidence.map((e) => `- **${e.technique}**: ${e.description}`).join('\n')}
 
 ## Cross-Technique Consistency
@@ -470,7 +470,7 @@ ${generateDecision(claim)}
 ## Summary
 ${claim?.interpretation || 'Evidence-driven interpretation from selected observation'}
 
-## Evidence Basis
+## Supporting Data
 ${evidence.map((e) => `- **${e.technique}**: ${e.description}`).join('\n')}
 
 ## Cross-Technique Consistency
@@ -803,7 +803,7 @@ export default function MultiTechWorkspace() {
 ## Summary
 ${result.conclusion}
 
-## Evidence Basis
+## Supporting Data
 ${result.basis.map((b) => `- ${b}`).join('\n')}
 
 ## Cross-Technique Consistency
@@ -1104,9 +1104,9 @@ ${result.decision}
               </div>
             </Card>
 
-            {/* Evidence Matrix */}
+            {/* Cross-Technique Insights */}
             <Card className="p-3">
-              <h2 className="mb-2 text-xs font-bold text-text-main">Evidence Matrix</h2>
+              <h2 className="mb-2 text-xs font-bold text-text-main">Cross-Technique Insights</h2>
               <div className="overflow-x-auto">
                 <table className="w-full text-[9px]">
                   <thead>
@@ -1223,4 +1223,3 @@ ${result.decision}
     </DashboardLayout>
   );
 }
-

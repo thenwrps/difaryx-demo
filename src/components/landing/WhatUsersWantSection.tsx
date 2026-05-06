@@ -33,7 +33,7 @@ export default function WhatUsersWantSection() {
               Automation is preferred only when parameters remain controllable. Black-box automation is consistently rejected.
             </p>
             <p className="text-[15px] leading-relaxed text-amber-900">
-              AI-driven interpretation ranks as a supporting feature, not the primary need.
+              Agent Interpretation ranks as a supporting feature, not the primary need.
             </p>
           </div>
         </div>

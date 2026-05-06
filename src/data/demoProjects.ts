@@ -7,6 +7,14 @@ export interface DemoPeak {
 }
 
 export type ClaimStatus = 'strongly_supported' | 'supported' | 'partial' | 'inconclusive' | 'contradicted';
+
+function formatClaimStatusLabel(status: ClaimStatus): string {
+  if (status === 'strongly_supported') return 'Complete';
+  if (status === 'supported') return 'Ready';
+  if (status === 'partial') return 'In Progress';
+  if (status === 'inconclusive') return 'Pending';
+  return 'Review';
+}
 export type ValidationState = 'complete' | 'partial' | 'requires_validation';
 export type EvidenceRole = 'primary' | 'supporting' | 'context';
 
@@ -164,7 +172,7 @@ export const demoProjects: DemoProject[] = [
     lastUpdated: '2 hours ago',
     createdDate: '2026-04-29',
     summary:
-      'XRD analysis identified 9 diffraction peaks. Primary phase assignment: CuFe2O4 strongly supported by evidence.',
+      'XRD analysis identified 9 diffraction peaks. Primary phase assignment: CuFe2O4 is Complete with supporting data.',
     xrdPeaks: [
       { position: 17.1, intensity: 72, label: '(111)' },
       { position: 20.8, intensity: 31, label: '(220)' },
@@ -196,7 +204,7 @@ export const demoProjects: DemoProject[] = [
       peakDetection:
         '9 diffraction peaks detected across 17.1-61.6 degrees 2theta after baseline correction.',
       phaseIdentification:
-        'Primary phase assignment is CuFe2O4 copper ferrite phase, strongly supported by evidence.',
+        'Primary phase assignment is CuFe2O4 copper ferrite phase, Complete with supporting data.',
     },
     history: [
       {
@@ -365,7 +373,7 @@ export const demoProjects: DemoProject[] = [
         'Linked surface chemistry evidence to phase result.',
       ],
       peakDetection: '6 ferrite reflections detected in the XRD pattern.',
-      phaseIdentification: 'Evidence supports cobalt ferrite spinel phase, strongly supported.',
+      phaseIdentification: 'Evidence supports cobalt ferrite spinel phase. Status: Complete.',
     },
     history: [
       {
@@ -684,10 +692,10 @@ export function buildAgentRun(project: DemoProject, selectedDatasets: Technique[
         ? `Detected ${project.xrdPeaks.length} diffraction peaks and matched the reference phase.`
         : 'Skipped XRD peak matching because XRD was not selected.',
       'Fused selected technique evidence into a traceable decision.',
-      `Evidence assessment: ${claimStatus}.`,
+      `Evidence assessment: ${formatClaimStatusLabel(claimStatus)}.`,
     ],
     generatedAt: new Date().toISOString(),
-    summary: `${project.summary} Agent run used ${datasetPhrase} and produced ${claimStatus} claim status.`,
+    summary: `${project.summary} Agent run used ${datasetPhrase} and produced ${formatClaimStatusLabel(claimStatus)} status.`,
   };
 }
 
@@ -708,7 +716,7 @@ export function generateNotebookSections(project: DemoProject, runResult?: Agent
       result.detectedPeaks.length > 0
         ? `${result.detectedPeaks.length} diffraction peaks used in the generated run.`
         : project.notebook.peakDetection,
-    phaseInterpretation: `${project.phase}. ${result.claimStatus} from ${result.selectedDatasets.join(' + ') || 'no selected datasets'}.`,
+    phaseInterpretation: `${project.phase}. ${formatClaimStatusLabel(result.claimStatus)} from ${result.selectedDatasets.join(' + ') || 'no selected datasets'}.`,
   };
 }
 

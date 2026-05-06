@@ -147,7 +147,7 @@ export default function XPSWorkspace() {
   const totalPeaks = processingResult.peaks.length;
   const matchedPeaks = processingResult.matches.length;
   
-  // Determine claim status based on evidence relationships
+  // Determine finding status based on evidence relationships
   // Use reasoning: Do we have strong evidence from multiple matched peaks?
   const hasStrongEvidence = matchedPeaks >= 3 && processingResult.peaks.length > 0;
   const hasModerateEvidence = matchedPeaks >= 2;
@@ -175,10 +175,10 @@ export default function XPSWorkspace() {
     'Peak overlap requires careful deconvolution',
   ];
   
-  // Determine decision status badge
-  const decisionStatusBadge = processingResult.confidence === 'high' ? 'Strongly Supported' 
-    : processingResult.confidence === 'medium' ? 'Supported' 
-    : 'Requires Validation';
+  const reviewStatus = claimStatus === 'strongly_supported' ? 'Complete'
+    : claimStatus === 'supported' ? 'Ready'
+    : claimStatus === 'partial' ? 'In Progress'
+    : 'Review';
   
   // Handle Auto Mode toggle
   const handleAutoModeChange = (enabled: boolean) => {
@@ -547,12 +547,9 @@ export default function XPSWorkspace() {
                             <span className="text-lg font-semibold text-text-main tabular-nums block">{selectedDataset.signal.bindingEnergy.length}</span>
                           </div>
                           <div className="space-y-1">
-                            <span className="text-[10px] uppercase tracking-wide text-text-muted block">EVIDENCE STRENGTH</span>
+                            <span className="text-[10px] uppercase tracking-wide text-text-muted block">STATUS</span>
                             <span className="text-lg font-semibold text-emerald-600 tabular-nums block">
-                              {claimStatus === 'strongly_supported' ? 'Strongly Supported' : 
-                               claimStatus === 'supported' ? 'Supported' : 
-                               claimStatus === 'partial' ? 'Partial' : 
-                               'Inconclusive'}
+                              {reviewStatus}
                             </span>
                           </div>
                         </div>
@@ -588,9 +585,8 @@ export default function XPSWorkspace() {
                                 <td className="px-3 py-2 font-mono text-right text-primary text-sm font-medium">{match.assignment}</td>
                                 <td className="px-3 py-2 font-mono text-right text-emerald-600 text-sm font-medium tabular-nums">
                                   {/* Use reasoning: Strong match if ΔBE is very small, Good if reasonable, Moderate if larger */}
-                                  {Math.abs(match.deltaBE) < 0.2 ? 'Strong' : 
-                                   Math.abs(match.deltaBE) < 0.4 ? 'Good' : 
-                                   Math.abs(match.deltaBE) < 0.6 ? 'Moderate' : 'Weak'}
+                                  {Math.abs(match.deltaBE) < 0.4 ? 'Ready' : 
+                                   Math.abs(match.deltaBE) < 0.6 ? 'In Progress' : 'Review'}
                                 </td>
                               </tr>
                             ))}
@@ -608,18 +604,18 @@ export default function XPSWorkspace() {
         {/* RIGHT SIDEBAR */}
         <aside className="w-[380px] bg-surface border-r border-border flex flex-col shrink-0 overflow-y-auto">
           <div className="p-4 space-y-2">
-            {/* SCIENTIFIC SUMMARY */}
+            {/* CHARACTERIZATION OVERVIEW */}
             <div className="border border-border/40 bg-surface/50 px-2 py-1.5">
               <div className="flex items-start justify-between gap-2 mb-1">
-                <h3 className="text-[10px] font-semibold uppercase tracking-wide">Scientific Summary</h3>
+                <h3 className="text-[10px] font-semibold uppercase tracking-wide">Characterization Overview</h3>
                 <span className={`rounded-full border px-1.5 py-0.5 text-[8px] font-semibold uppercase ${
-                  decisionStatusBadge === 'Strongly Supported' 
+                  reviewStatus === 'Complete' 
                     ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700'
-                    : decisionStatusBadge === 'Supported'
+                    : reviewStatus === 'Ready'
                     ? 'border-amber-500/30 bg-amber-500/10 text-amber-700'
                     : 'border-red-500/30 bg-red-500/10 text-red-700'
                 }`}>
-                  {decisionStatusBadge}
+                  {reviewStatus}
                 </span>
               </div>
 

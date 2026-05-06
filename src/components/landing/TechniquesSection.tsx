@@ -105,7 +105,7 @@ export default function TechniquesSection() {
         <div className="mb-8">
           <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.15em] text-slate-400">Product</p>
           <h2 className="text-[28px] lg:text-[32px] font-bold leading-[1.2] text-slate-900 mb-3">
-            Multi-Technique Scientific Reasoning
+            Cross-Technique Insights
           </h2>
           <p className="text-[14px] text-slate-600 max-w-2xl">
             DIFARYX supports XRD, XPS, FTIR, Raman, and other characterization techniques. The agent demo demonstrates one execution of the system using XRD phase identification for catalyst materials.

@@ -749,7 +749,7 @@ function detectContradictions(
       claimId: 'spinel-structure',
       explanation: 'Raman vibrational modes suggest spinel structure, but XPS does not provide corroborating oxidation state evidence',
       confidenceImpact,
-      effectOnConfidence: 'Reduces overall confidence to MEDIUM; spinel assignment remains tentative',
+      effectOnConfidence: 'Sets overall status to In Progress; spinel assignment remains tentative',
     });
   }
   
@@ -947,21 +947,33 @@ function generateRecommendations(claims: Claim[], contradictions: Contradiction[
 /**
  * Generate reviewer-style report
  */
+function formatFusionStatus(level: 'high' | 'medium' | 'low'): string {
+  if (level === 'high') return 'Complete';
+  if (level === 'medium') return 'Ready';
+  return 'In Progress';
+}
+
+function formatClaimReviewStatus(status: 'supported' | 'unresolved' | 'contradicted'): string {
+  if (status === 'supported') return 'Ready';
+  if (status === 'unresolved') return 'Pending';
+  return 'Review';
+}
+
 function generateReport(
   decision: FusionDecision,
   claims: Claim[],
   evidenceMatrix: EvidenceMatrix,
   contradictions: Contradiction[]
 ): string {
-  let report = '# Cross-Tech Evidence Fusion Report\n\n';
+  let report = '# Cross-Technique Insights Report\n\n';
   
   // Final Decision
-  report += '## Final Decision\n\n';
+  report += '## Conclusion\n\n';
   report += `**Conclusion:** ${decision.primaryConclusion}\n\n`;
-  report += `**Confidence:** ${decision.confidence.toUpperCase()} (${(decision.confidenceScore * 100).toFixed(1)}%)\n\n`;
+  report += `**Status:** ${formatFusionStatus(decision.confidence)}\n\n`;
   
   // Evidence by Technique
-  report += '## Evidence by Technique\n\n';
+  report += '## Supporting Data\n\n';
   
   report += '### Raman Spectroscopy\n';
   const ramanClaims = claims.filter(c => 
@@ -993,15 +1005,15 @@ function generateReport(
   }
   report += '\n';
   
-  // Claim-Level Reasoning
-  report += '## Claim-Level Reasoning\n\n';
+  // Agent Interpretation
+  report += '## Agent Interpretation\n\n';
   for (const claim of claims) {
-    report += `### ${claim.title} (${claim.confidence.toUpperCase()})\n`;
-    report += `**Status:** ${claim.status}\n\n`;
+    report += `### ${claim.title} (${formatFusionStatus(claim.confidence)})\n`;
+    report += `**Status:** ${formatClaimReviewStatus(claim.status)}\n\n`;
     report += `**Description:** ${claim.description}\n\n`;
     
     if (claim.caveats.length > 0) {
-      report += '**Caveats:**\n';
+      report += '**Limitations and Follow-up Validation:**\n';
       for (const caveat of claim.caveats) {
         report += `- ${caveat}\n`;
       }
@@ -1011,12 +1023,12 @@ function generateReport(
   
   // Contradictions
   if (contradictions.length > 0) {
-    report += '## Contradictions\n\n';
+    report += '## Review\n\n';
     for (const contradiction of contradictions) {
       report += `### ${contradiction.id} (${contradiction.severity.toUpperCase()})\n`;
       report += `**Techniques:** ${contradiction.techniques.join(', ')}\n\n`;
       report += `**Explanation:** ${contradiction.explanation}\n\n`;
-      report += `**Effect:** ${contradiction.effectOnConfidence}\n\n`;
+      report += `**Effect on Conclusion:** ${contradiction.effectOnConfidence}\n\n`;
     }
   }
   

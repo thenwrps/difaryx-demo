@@ -15,7 +15,7 @@ export default function EvidenceSection() {
           <div className="mb-6 rounded-lg border border-slate-200 bg-white p-6">
             <p className="mb-3 text-[15px] font-bold text-slate-900">Decision Output:</p>
             <div className="space-y-2 text-[14px] leading-relaxed text-slate-700">
-              <p>CuFe2O4 spinel phase identified with high confidence</p>
+              <p>CuFe2O4 spinel phase identified with structural consistency</p>
               <p>Signal features align with reference patterns</p>
               <p>Supporting evidence confirms structural consistency</p>
               <p>No dominant conflicting signals detected</p>

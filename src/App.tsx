@@ -1,5 +1,5 @@
-import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+
 import Landing from "./pages/Landing";
 import Dashboard from "./pages/Dashboard";
 import MultiTechWorkspace from "./pages/MultiTechWorkspace";
@@ -10,10 +10,12 @@ import AgentDemo from "./pages/AgentDemo";
 import HistoryPage from "./pages/History";
 import SettingsPage from "./pages/Settings";
 import SignIn from "./pages/SignIn";
+import AuthCallback from "./pages/AuthCallback";
 import XPSWorkspace from "./pages/XPSWorkspace";
 import FTIRWorkspace from "./pages/FTIRWorkspace";
 import RamanWorkspace from "./pages/RamanWorkspace";
 import FusionWorkspace from "./pages/FusionWorkspace";
+
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 
@@ -23,9 +25,20 @@ function App() {
       <Router>
         <Routes>
           <Route path="/" element={<Landing />} />
+
           <Route path="/login" element={<SignIn />} />
           <Route path="/signin" element={<SignIn />} />
-          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/auth/callback" element={<AuthCallback />} />
+
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+
           <Route
             path="/workspace"
             element={
@@ -34,6 +47,7 @@ function App() {
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/workspace/multi"
             element={
@@ -42,6 +56,7 @@ function App() {
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/workspace/xps"
             element={
@@ -50,6 +65,7 @@ function App() {
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/workspace/ftir"
             element={
@@ -58,6 +74,7 @@ function App() {
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/workspace/raman"
             element={
@@ -66,6 +83,7 @@ function App() {
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/workspace/fusion"
             element={
@@ -74,6 +92,7 @@ function App() {
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/workspace/:technique"
             element={
@@ -82,6 +101,7 @@ function App() {
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/notebook"
             element={
@@ -90,6 +110,7 @@ function App() {
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/history"
             element={
@@ -98,6 +119,7 @@ function App() {
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/settings"
             element={
@@ -106,6 +128,7 @@ function App() {
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/demo/agent"
             element={

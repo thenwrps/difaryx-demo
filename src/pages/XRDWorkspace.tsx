@@ -275,8 +275,8 @@ export default function XRDWorkspace() {
       : `${parameters.peakFitting.model} (tol=${parameters.peakFitting.tolerance.toExponential(0)}, iter=${parameters.peakFitting.max_iterations})`;
     
     const referenceLabel = autoMode
-      ? `${candidateCount} candidates (ICDD, Δ2θ=±0.1°, score≥0.7)`
-      : `${candidateCount} candidates (${parameters.referenceMatching.database}, Δ2θ=±${parameters.referenceMatching.delta_tolerance}°, score≥${parameters.referenceMatching.min_match_score})`;
+      ? `${candidateCount} candidates (ICDD, Δ2θ=±0.1°, review≥0.7)`
+      : `${candidateCount} candidates (${parameters.referenceMatching.database}, Δ2θ=±${parameters.referenceMatching.delta_tolerance}°, review≥${parameters.referenceMatching.min_match_score})`;
     
     return [
       {
@@ -604,15 +604,15 @@ export default function XRDWorkspace() {
                             </div>
                             <div className="pt-2 border-t border-border/30">
                               <div className="flex items-center justify-between">
-                                <span className="text-[10px] uppercase tracking-wide text-text-muted">DECISION STATUS</span>
+                                <span className="text-[10px] uppercase tracking-wide text-text-muted">CONCLUSION</span>
                                 <span className={`text-sm font-semibold tabular-nums ${
                                   agentResult.interpretation.confidenceLevel === 'high' ? 'text-emerald-600' : 
                                   agentResult.interpretation.confidenceLevel === 'medium' ? 'text-amber-600' : 
                                   'text-red-600'
                                 }`}>
-                                  {agentResult.interpretation.confidenceLevel === 'high' ? 'Strongly Supported' : 
-                                   agentResult.interpretation.confidenceLevel === 'medium' ? 'Supported' : 
-                                   'Requires Validation'}
+                                  {agentResult.interpretation.confidenceLevel === 'high' ? 'Complete' : 
+                                   agentResult.interpretation.confidenceLevel === 'medium' ? 'Ready' : 
+                                   'Review'}
                                 </span>
                               </div>
                             </div>
@@ -666,14 +666,14 @@ export default function XRDWorkspace() {
         {/* RIGHT SIDEBAR */}
         <aside className="w-[380px] bg-surface border-r border-border flex flex-col shrink-0 overflow-y-auto">
           <div className="p-4 space-y-2">
-                {/* SCIENTIFIC SUMMARY (COMPRESSED) */}
+                {/* CHARACTERIZATION OVERVIEW (COMPRESSED) */}
                 <div className="border border-border/40 bg-surface/50 px-2 py-1.5">
                   <div className="flex items-start justify-between gap-2 mb-1">
-                    <h3 className="text-[10px] font-semibold uppercase tracking-wide">Scientific Summary</h3>
+                    <h3 className="text-[10px] font-semibold uppercase tracking-wide">Characterization Overview</h3>
                     <span className={`rounded-full border px-1.5 py-0.5 text-[8px] font-semibold uppercase ${statusClass(agentResult.interpretation.confidenceLevel === 'low' ? 'warning' : 'complete')}`}>
-                      {agentResult.interpretation.confidenceLevel === 'high' ? 'Strongly Supported' : 
-                       agentResult.interpretation.confidenceLevel === 'medium' ? 'Supported' : 
-                       'Requires Validation'}
+                      {agentResult.interpretation.confidenceLevel === 'high' ? 'Complete' : 
+                       agentResult.interpretation.confidenceLevel === 'medium' ? 'Ready' : 
+                       'Review'}
                     </span>
                   </div>
 

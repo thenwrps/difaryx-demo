@@ -11,7 +11,7 @@ export default function CTASection() {
             Experience autonomous scientific workflow execution
           </h2>
           <p className="mx-auto mb-10 max-w-3xl text-[17px] leading-relaxed text-slate-300">
-            Try DIFARYX's agent demo to see how autonomous execution, hybrid reasoning, and evidence transparency work together for traceable scientific decisions.
+            Try DIFARYX's agent demo to see how autonomous execution, agent interpretation, and supporting data work together for traceable characterization conclusions.
           </p>
           
           <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
@@ -44,7 +44,7 @@ export default function CTASection() {
             </div>
             <div className="rounded-xl border border-white/10 bg-white/5 p-6 backdrop-blur-sm">
               <div className="mb-2 text-[28px] font-bold text-white">100%</div>
-              <div className="text-[13px] font-semibold text-slate-300">Reasoning Transparency</div>
+              <div className="text-[13px] font-semibold text-slate-300">Supporting Data</div>
               <div className="mt-1 text-[12px] text-slate-400">Every step is traceable</div>
             </div>
           </div>

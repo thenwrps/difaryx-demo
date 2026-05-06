@@ -173,7 +173,7 @@
             {/* Reasoning Trace */}
             <div className="rounded-lg border border-slate-800 bg-[#0A0F1A] p-3">
               <div className="mb-2 flex items-center justify-between">
-                <div className="flex items-center gap-2"><Brain size={13} className="text-amber-300" /><span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Gemma Reasoning Trace</span></div>
+                <div className="flex items-center gap-2"><Brain size={13} className="text-amber-300" /><span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Agent Interpretation</span></div>
                 <span className="text-[9px] font-bold uppercase text-slate-600">{isRunning ? 'running' : runComplete ? 'done' : 'idle'}</span>
               </div>
               <div className="h-[140px] space-y-1.5 overflow-y-auto pr-1">
@@ -204,11 +204,11 @@
         {/* RIGHT PANEL — Insight & Action */}
         <aside className="cockpit-scroll w-[360px] shrink-0 overflow-y-auto border-l border-slate-800/50 bg-[#080E19] p-3 space-y-3">
 
-          {/* Decision Status Display */}
+          {/* Conclusion Display */}
           <div className={`rounded-lg border p-4 text-center transition-all duration-500 ${runComplete ? 'border-emerald-400/30 bg-emerald-400/5' : 'border-slate-800 bg-[#0A0F1A]'}`}>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Decision Status</p>
-            <p className={`mt-1 text-4xl font-black ${runComplete ? 'text-emerald-300' : 'text-slate-700'}`}>{runComplete ? `${SCIENTIFIC_INSIGHT.confidence}%` : '—'}</p>
-            <p className="mt-1 text-[10px] text-slate-500">{runComplete ? 'Strongly supported — phase confirmed' : 'Pending agent execution'}</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Conclusion</p>
+            <p className={`mt-1 text-4xl font-black ${runComplete ? 'text-emerald-300' : 'text-slate-700'}`}>{runComplete ? 'Complete' : 'Pending'}</p>
+            <p className="mt-1 text-[10px] text-slate-500">{runComplete ? 'Ready - phase confirmed' : 'Pending characterization'}</p>
           </div>
 
           {/* Phase Result */}
@@ -232,11 +232,11 @@
                 </div>
               </div>
 
-              {/* Evidence Strength Basis */}
+              {/* Supporting Data */}
               <div className="rounded-lg border border-slate-800 bg-[#0A0F1A] p-3">
-                <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">Evidence Strength Basis</p>
+                <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">Supporting Data</p>
                 <div className="space-y-1">
-                  {SCIENTIFIC_INSIGHT.confidenceBasis.map(c => (
+            <p className={`mt-1 text-4xl font-black ${runComplete ? 'text-emerald-300' : 'text-slate-700'}`}>{runComplete ? 'Complete' : 'Pending'}</p>
                     <div key={c} className="flex items-center gap-2 rounded-md border border-indigo-400/20 bg-indigo-500/10 px-2 py-1.5 text-[11px] text-indigo-100">
                       <CircleDot size={11} className="shrink-0 text-indigo-200" /><span>{c}</span>
                     </div>

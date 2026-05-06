@@ -17,14 +17,14 @@ interface ScientificReasoningPanelProps {
 }
 
 export function ScientificReasoningPanel({ result, className }: ScientificReasoningPanelProps) {
-  // Map confidence level to decision status
-  const getDecisionStatus = (level: string) => {
-    if (level === 'high') return 'Strongly Supported';
-    if (level === 'medium') return 'Supported';
-    return 'Requires Validation';
+  // Map confidence level to conclusion
+  const getConclusion = (level: string) => {
+    if (level === 'high') return 'Complete';
+    if (level === 'medium') return 'Ready';
+    return 'Review';
   };
   
-  const status = getDecisionStatus(result.confidenceLevel);
+  const status = getConclusion(result.confidenceLevel);
   const statusColor = result.confidenceLevel === 'high' ? 'text-emerald-600' : 
                       result.confidenceLevel === 'medium' ? 'text-cyan-600' : 'text-amber-600';
   
@@ -33,13 +33,13 @@ export function ScientificReasoningPanel({ result, className }: ScientificReason
       <CardHeader className="pb-4 border-b border-border bg-surface-hover/50">
         <div className="flex items-center gap-2 text-accent">
           <Microscope size={18} />
-          <span className="text-xs font-semibold tracking-wider uppercase">Scientific Reasoning Summary</span>
+          <span className="text-xs font-semibold tracking-wider uppercase">Characterization Overview</span>
         </div>
         <CardTitle className="text-xl mt-2 flex justify-between items-start">
           <span>{result.primaryResult}</span>
           <div className="flex flex-col items-end">
             <span className={`text-sm font-bold ${statusColor}`}>{status}</span>
-            <span className="text-xs text-text-muted font-normal">Decision status</span>
+            <span className="text-xs text-text-muted font-normal">Conclusion</span>
           </div>
         </CardTitle>
       </CardHeader>
@@ -52,7 +52,7 @@ export function ScientificReasoningPanel({ result, className }: ScientificReason
         </div>
 
         <div>
-          <h4 className="text-xs font-semibold text-text-main uppercase tracking-wider mb-3">Evidence Basis</h4>
+          <h4 className="text-xs font-semibold text-text-main uppercase tracking-wider mb-3">Supporting Data</h4>
           <ul className="space-y-2">
             {result.keyEvidence.map((evidence, i) => (
               <li key={i} className="text-sm text-text-muted flex items-start gap-2">
@@ -79,7 +79,7 @@ export function ScientificReasoningPanel({ result, className }: ScientificReason
         )}
 
         <div className="pt-4 border-t border-border">
-          <h4 className="text-xs font-semibold text-text-main uppercase tracking-wider mb-3">Recommended Next Steps</h4>
+          <h4 className="text-xs font-semibold text-text-main uppercase tracking-wider mb-3">Limitations and Follow-up Validation</h4>
           <div className="space-y-2">
             {result.recommendedNextStep.map((step, i) => (
               <button key={i} className="w-full text-left text-sm px-3 py-2 rounded-md hover:bg-surface-hover border border-transparent hover:border-border transition-colors flex items-center justify-between text-cyan">

@@ -83,13 +83,13 @@ export default function Dashboard() {
                     project.claimStatus === 'partial' ? 'text-amber-500' :
                     'text-text-muted'
                   }`}>
-                    {project.claimStatus === 'strongly_supported' ? 'Strongly Supported' :
-                     project.claimStatus === 'supported' ? 'Supported' :
-                     project.claimStatus === 'partial' ? 'Partial' :
-                     project.claimStatus === 'inconclusive' ? 'Inconclusive' :
-                     'Contradicted'}
+                    {project.claimStatus === 'strongly_supported' ? 'Complete' :
+                     project.claimStatus === 'supported' ? 'Ready' :
+                     project.claimStatus === 'partial' ? 'In Progress' :
+                     project.claimStatus === 'inconclusive' ? 'Pending' :
+                     'Review'}
                   </div>
-                  <div className="text-[10px] text-text-muted uppercase tracking-wider">Claim Status</div>
+                  <div className="text-[10px] text-text-muted uppercase tracking-wider">Status</div>
                 </div>
               </div>
               <div className="flex-1 p-4 flex flex-col">

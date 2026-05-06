@@ -3,11 +3,11 @@ import { Sparkles, Cloud, Database, Cpu, Network, BarChart3 } from 'lucide-react
 
 const googleServices = [
   {
-    title: 'Gemini API',
-    subtitle: 'AI-Powered Scientific Reasoning',
+    title: 'Agent Interpretation Runtime',
+    subtitle: 'Agent Interpretation',
     points: [
-      'Scientific interpretation and conflict resolution',
-      'Multi-paragraph reasoning with evidence synthesis',
+      'Agent interpretation and conflict resolution',
+      'Multi-paragraph interpretation with evidence synthesis',
       'Literature cross-validation and hypothesis evaluation',
       'Natural language explanation of complex analytical results'
     ],
@@ -21,7 +21,7 @@ const googleServices = [
       'Cloud Storage for large-scale characterization datasets',
       'Compute Engine for distributed data processing',
       'Cloud Run for containerized agent deployment',
-      'Vertex AI for model training and inference'
+      'Managed model runtime for technique-specific pattern recognition'
     ],
     Icon: Cloud,
     color: 'blue'
@@ -30,8 +30,8 @@ const googleServices = [
 
 const technicalIntegration = [
   {
-    title: 'Gemini Integration',
-    desc: 'Real-time scientific interpretation with source attribution and reasoning transparency',
+    title: 'Agent Interpretation',
+    desc: 'Real-time interpretation with source attribution and traceable supporting data',
     Icon: Sparkles
   },
   {
@@ -50,8 +50,8 @@ const technicalIntegration = [
     Icon: Network
   },
   {
-    title: 'Vertex AI',
-    desc: 'Custom model training for technique-specific pattern recognition and classification',
+    title: 'Model Runtime',
+    desc: 'Technique-specific pattern recognition and classification support',
     Icon: BarChart3
   }
 ];
@@ -77,10 +77,10 @@ export default function GoogleAlignmentSection() {
       <div className="mx-auto max-w-[1200px] px-6">
         <div className="mb-12 text-center">
           <h2 className="mb-4 text-[32px] font-bold leading-[1.2] text-slate-900 lg:text-[40px]">
-            Powered by Google Cloud and Gemini
+            Cloud-ready characterization workflows
           </h2>
           <p className="mx-auto max-w-3xl text-[16px] leading-relaxed text-slate-600">
-            DIFARYX leverages Google Cloud Platform services and Gemini API to deliver scalable, intelligent scientific workflow automation with enterprise-grade reliability.
+            DIFARYX is designed for scalable scientific workflow automation with managed data, processing, and agent interpretation services.
           </p>
         </div>
 

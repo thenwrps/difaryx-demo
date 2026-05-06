@@ -6,7 +6,7 @@ const solutions = [
   { title: 'Universal file reader', desc: 'Load proprietary formats without manual export or conversion.', Icon: FileInput },
   { title: 'Controlled preprocessing', desc: 'Automated baseline, normalization, and peak detection with full parameter control.', Icon: Sliders },
   { title: 'Cross-technique comparison', desc: 'Compare evidence across techniques in a single view.', Icon: GitCompare },
-  { title: 'Reasoning layer', desc: 'AI-assisted interpretation as a supporting layer.', Icon: Brain },
+  { title: 'Agent interpretation', desc: 'Evidence-linked interpretation as a supporting layer.', Icon: Brain },
 ];
 
 export default function SolutionSection() {
@@ -19,7 +19,7 @@ export default function SolutionSection() {
           </h2>
           <div className="mx-auto max-w-2xl space-y-3">
             <p className="text-[16px] leading-relaxed text-slate-600">
-              DIFARYX is not an AI tool.
+              DIFARYX is not a black-box automation tool.
             </p>
             <p className="text-[16px] leading-relaxed text-slate-600">
               It is a workflow system with a reasoning layer.

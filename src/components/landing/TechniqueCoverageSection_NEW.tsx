@@ -116,7 +116,7 @@ export default function TechniqueCoverageSection() {
           <div className="text-center">
             <h3 className="mb-3 text-[20px] font-bold text-slate-900">Cross-Technique Evidence Fusion</h3>
             <p className="mx-auto max-w-3xl text-[15px] leading-relaxed text-slate-700">
-              Compare XRD phase assignments with XPS oxidation states, FTIR functional groups, and Raman vibrational modes in a unified multi-technique workspace. The agent synthesizes evidence across techniques to increase confidence and resolve conflicts.
+              Compare XRD phase assignments with XPS oxidation states, FTIR functional groups, and Raman vibrational modes in a unified multi-technique workspace. The agent synthesizes evidence across techniques to strengthen supporting data and resolve conflicts.
             </p>
           </div>
         </div>

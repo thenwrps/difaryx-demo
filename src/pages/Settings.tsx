@@ -71,11 +71,11 @@ export default function SettingsPage() {
           </Card>
 
           <Card className="p-5">
-            <h2 className="text-sm font-semibold flex items-center gap-2"><Bot size={16} className="text-primary" /> AI Reasoning</h2>
+            <h2 className="text-sm font-semibold flex items-center gap-2"><Bot size={16} className="text-primary" /> Analysis Preferences</h2>
             <div className="mt-5 grid gap-4">
-              <ToggleRow label="Evidence-linked conclusions" description="Require every decision to cite source evidence." />
-              <Field label="Confidence threshold" value="85%" />
-              <ToggleRow label="Include caveats in reports" description="Surface uncertainty and pending review notes." />
+              <ToggleRow label="Evidence-linked conclusions" description="Require every conclusion to cite supporting data." />
+              <Field label="Review criterion" value="Structural consistency" />
+              <ToggleRow label="Include limitations in reports" description="Surface uncertainty and follow-up validation notes." />
             </div>
           </Card>
 

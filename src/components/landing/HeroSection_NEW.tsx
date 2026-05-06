@@ -192,9 +192,9 @@ export default function HeroSection() {
                     <div className="text-[9px] text-slate-500">4 datasets loaded • Cross-technique correlation active</div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-[9px] text-slate-600">Match confidence:</span>
+                    <span className="text-[9px] text-slate-600">Review status:</span>
                     <span className="rounded bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
-                      93.3%
+                      Complete
                     </span>
                   </div>
                 </div>

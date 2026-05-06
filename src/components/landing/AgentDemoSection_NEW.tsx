@@ -9,13 +9,13 @@ const demoFeatures = [
     Icon: Play
   },
   {
-    title: 'Reasoning Transparency',
+    title: 'Agent Interpretation',
     desc: 'See candidate comparison, conflict analysis, uncertainty assessment, and evidence synthesis.',
     Icon: Eye
   },
   {
-    title: 'Hybrid Interpretation',
-    desc: 'View both deterministic analysis and Gemini-generated scientific reasoning with clear attribution.',
+    title: 'Supporting Data',
+    desc: 'View deterministic analysis and agent interpretation with clear source attribution.',
     Icon: FileText
   },
   {
@@ -55,8 +55,8 @@ export default function AgentDemoSection() {
             <h3 className="mb-4 text-[24px] font-bold text-slate-900">
               See the agent in action
             </h3>
-            <p className="mb-8 text-[15px] leading-relaxed text-slate-600">
-              The demo shows a complete XRD phase identification workflow: load dataset, detect peaks, generate candidates, evaluate hypotheses, synthesize evidence, generate interpretation, and finalize scientific determination with confidence estimation.
+          <p className="mb-8 text-[15px] leading-relaxed text-slate-600">
+              The demo shows a complete XRD phase identification workflow: load dataset, detect peaks, generate candidates, evaluate hypotheses, synthesize evidence, generate interpretation, and finalize the characterization conclusion.
             </p>
             <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
               <Link

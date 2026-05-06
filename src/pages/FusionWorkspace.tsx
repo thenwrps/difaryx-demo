@@ -40,8 +40,8 @@ export default function FusionWorkspace() {
     handleRunFusion();
   }, []);
   
-  // Get decision status badge color
-  const getDecisionStatusBadgeColor = (status: 'strongly-supported' | 'supported' | 'partial') => {
+  // Get conclusion badge color
+  const getConclusionBadgeColor = (status: 'strongly-supported' | 'supported' | 'partial') => {
     switch (status) {
       case 'strongly-supported':
         return 'bg-green-100 text-green-800 border-green-200';
@@ -79,6 +79,10 @@ export default function FusionWorkspace() {
         return 'bg-gray-100 text-gray-600 border-gray-200';
     }
   };
+
+  const formatReviewStatus = (value: number) => (
+    value >= 0.9 ? 'Complete' : value >= 0.75 ? 'Ready' : 'In Progress'
+  );
   
   // Left Panel Content
   const leftPanel = (
@@ -128,7 +132,7 @@ export default function FusionWorkspace() {
           <div>• <strong>Raman:</strong> Authority for structure</div>
           <div>• <strong>FTIR:</strong> Authority for functional groups</div>
           <div className="mt-2 pt-2 border-t border-blue-200">
-            Confidence based on evidence agreement, not averaging
+            Status based on evidence agreement, not averaging
           </div>
         </div>
       </div>
@@ -147,28 +151,28 @@ export default function FusionWorkspace() {
   // Right Panel Content
   const rightPanel = fusionResult ? (
     <div className="space-y-4">
-      {/* Final Scientific Summary */}
+      {/* Characterization Overview */}
       <div className="bg-white rounded-lg border border-gray-200 p-4">
-        <h3 className="text-sm font-semibold text-gray-700 mb-3">Final Scientific Summary</h3>
+        <h3 className="text-sm font-semibold text-gray-700 mb-3">Characterization Overview</h3>
         <p className="text-sm text-gray-700 leading-relaxed">
           {fusionResult.decision.primaryConclusion}
         </p>
       </div>
       
-      {/* Decision Status and Reliability */}
+      {/* Conclusion */}
       <div className="bg-white rounded-lg border border-gray-200 p-4">
-        <h3 className="text-sm font-semibold text-gray-700 mb-3">Decision Status & Reliability</h3>
+        <h3 className="text-sm font-semibold text-gray-700 mb-3">Conclusion</h3>
         <div className="space-y-3">
           <div>
             <div className="text-xs text-gray-500 mb-1">Overall Status</div>
             <div className="flex items-center gap-2">
-              <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getDecisionStatusBadgeColor(fusionResult.decision.confidenceScore >= 0.9 ? 'strongly-supported' : fusionResult.decision.confidenceScore >= 0.75 ? 'supported' : 'partial')}`}>
-                {fusionResult.decision.confidenceScore >= 0.9 ? 'STRONGLY SUPPORTED' : fusionResult.decision.confidenceScore >= 0.75 ? 'SUPPORTED' : 'PARTIAL'}
+              <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getConclusionBadgeColor(fusionResult.decision.confidenceScore >= 0.9 ? 'strongly-supported' : fusionResult.decision.confidenceScore >= 0.75 ? 'supported' : 'partial')}`}>
+                {formatReviewStatus(fusionResult.decision.confidenceScore)}
               </span>
             </div>
           </div>
           <div>
-            <div className="text-xs text-gray-500 mb-1">Supported Claims</div>
+            <div className="text-xs text-gray-500 mb-1">Supporting Data</div>
             <div className="text-lg font-semibold text-gray-900">
               {fusionResult.supportedClaims.length} / {fusionResult.claims.length}
             </div>
@@ -182,9 +186,9 @@ export default function FusionWorkspace() {
         </div>
       </div>
       
-      {/* Top Supporting Evidence */}
+      {/* Supporting Data */}
       <div className="bg-white rounded-lg border border-gray-200 p-4">
-        <h3 className="text-sm font-semibold text-gray-700 mb-3">Top Supporting Evidence</h3>
+        <h3 className="text-sm font-semibold text-gray-700 mb-3">Supporting Data</h3>
         <div className="space-y-2 text-xs">
           {fusionResult.claims
             .filter(c => c.status === 'supported')
@@ -239,7 +243,7 @@ export default function FusionWorkspace() {
               : 'text-gray-600 hover:text-gray-900'
           }`}
         >
-          Fusion Decision
+          Conclusion
         </button>
         <button
           onClick={() => setActiveTab('matrix')}
@@ -249,7 +253,7 @@ export default function FusionWorkspace() {
               : 'text-gray-600 hover:text-gray-900'
           }`}
         >
-          Evidence Matrix
+          Cross-Technique Insights
         </button>
         <button
           onClick={() => setActiveTab('claims')}
@@ -259,7 +263,7 @@ export default function FusionWorkspace() {
               : 'text-gray-600 hover:text-gray-900'
           }`}
         >
-          Claim Cards
+          Review Cards
         </button>
         <button
           onClick={() => setActiveTab('contradictions')}
@@ -294,16 +298,16 @@ export default function FusionWorkspace() {
                 {fusionResult.decision.primaryConclusion}
               </p>
               <div className="flex items-center gap-3">
-                <span className="text-sm text-gray-600">Decision Status:</span>
-                <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getDecisionStatusBadgeColor(fusionResult.decision.confidenceScore >= 0.9 ? 'strongly-supported' : fusionResult.decision.confidenceScore >= 0.75 ? 'supported' : 'partial')}`}>
-                  {fusionResult.decision.confidenceScore >= 0.9 ? 'STRONGLY SUPPORTED' : fusionResult.decision.confidenceScore >= 0.75 ? 'SUPPORTED' : 'PARTIAL'}
+                <span className="text-sm text-gray-600">Conclusion:</span>
+                <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getConclusionBadgeColor(fusionResult.decision.confidenceScore >= 0.9 ? 'strongly-supported' : fusionResult.decision.confidenceScore >= 0.75 ? 'supported' : 'partial')}`}>
+                  {formatReviewStatus(fusionResult.decision.confidenceScore)}
                 </span>
               </div>
             </div>
             
-            {/* Supported Claims */}
+            {/* Supporting Data */}
             <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <h3 className="text-base font-semibold text-gray-900 mb-3">Supported Claims</h3>
+              <h3 className="text-base font-semibold text-gray-900 mb-3">Supporting Data</h3>
               <ul className="space-y-2">
                 {fusionResult.claims
                   .filter(c => c.status === 'supported')
@@ -311,18 +315,18 @@ export default function FusionWorkspace() {
                     <li key={claim.id} className="flex items-start gap-2 text-sm">
                       <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
                       <span className="text-gray-700">{claim.title}</span>
-                      <span className={`ml-auto px-2 py-0.5 rounded text-xs font-medium ${getDecisionStatusBadgeColor(claim.confidenceScore >= 0.9 ? 'strongly-supported' : claim.confidenceScore >= 0.75 ? 'supported' : 'partial')}`}>
-                        {claim.confidenceScore >= 0.9 ? 'STRONG' : claim.confidenceScore >= 0.75 ? 'SUPPORTED' : 'PARTIAL'}
+                      <span className={`ml-auto px-2 py-0.5 rounded text-xs font-medium border ${getConclusionBadgeColor(claim.confidenceScore >= 0.9 ? 'strongly-supported' : claim.confidenceScore >= 0.75 ? 'supported' : 'partial')}`}>
+                        {formatReviewStatus(claim.confidenceScore)}
                       </span>
                     </li>
                   ))}
               </ul>
             </div>
             
-            {/* Unresolved Claims */}
+            {/* Pending Review */}
             {fusionResult.unresolvedClaims.length > 0 && (
               <div className="bg-white rounded-lg border border-gray-200 p-6">
-                <h3 className="text-base font-semibold text-gray-900 mb-3">Unresolved Claims</h3>
+                <h3 className="text-base font-semibold text-gray-900 mb-3">Pending Review</h3>
                 <ul className="space-y-2">
                   {fusionResult.claims
                     .filter(c => c.status === 'unresolved')
@@ -356,7 +360,7 @@ export default function FusionWorkspace() {
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Claim</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Conclusion</th>
                     <th className="px-4 py-3 text-center font-semibold text-gray-700">XPS</th>
                     <th className="px-4 py-3 text-center font-semibold text-gray-700">FTIR</th>
                     <th className="px-4 py-3 text-center font-semibold text-gray-700">Raman</th>
@@ -397,8 +401,8 @@ export default function FusionWorkspace() {
               <div key={claim.id} className="bg-white rounded-lg border border-gray-200 p-6">
                 <div className="flex items-start justify-between mb-4">
                   <h3 className="text-base font-semibold text-gray-900">{claim.title}</h3>
-                  <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getDecisionStatusBadgeColor(claim.confidenceScore >= 0.9 ? 'strongly-supported' : claim.confidenceScore >= 0.75 ? 'supported' : 'partial')}`}>
-                    {claim.confidenceScore >= 0.9 ? 'STRONGLY SUPPORTED' : claim.confidenceScore >= 0.75 ? 'SUPPORTED' : 'PARTIAL'}
+                  <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getConclusionBadgeColor(claim.confidenceScore >= 0.9 ? 'strongly-supported' : claim.confidenceScore >= 0.75 ? 'supported' : 'partial')}`}>
+                    {formatReviewStatus(claim.confidenceScore)}
                   </span>
                 </div>
                 
@@ -406,7 +410,7 @@ export default function FusionWorkspace() {
                 
                 {/* Supporting Techniques */}
                 <div className="mb-4">
-                  <h4 className="text-sm font-semibold text-gray-700 mb-2">Supporting Techniques</h4>
+                  <h4 className="text-sm font-semibold text-gray-700 mb-2">Cross-Technique Insights</h4>
                   <div className="space-y-2">
                     {claim.supportingTechniques
                       .filter(t => t.support === 'supports')
@@ -436,7 +440,7 @@ export default function FusionWorkspace() {
                 {/* Caveats */}
                 {claim.caveats.length > 0 && (
                   <div className="bg-amber-50 rounded border border-amber-200 p-3">
-                    <h4 className="text-sm font-semibold text-amber-900 mb-1">Caveats</h4>
+                    <h4 className="text-sm font-semibold text-amber-900 mb-1">Limitations and Follow-up Validation</h4>
                     <ul className="space-y-1 text-xs text-amber-800">
                       {claim.caveats.map((caveat, idx) => (
                         <li key={idx}>• {caveat}</li>
@@ -478,7 +482,7 @@ export default function FusionWorkspace() {
                     </div>
                     
                     <div>
-                      <span className="font-semibold text-gray-700">Effect on Confidence:</span>
+                      <span className="font-semibold text-gray-700">Effect on Conclusion:</span>
                       <p className="mt-1 text-gray-600">{contradiction.effectOnConfidence}</p>
                     </div>
                   </div>

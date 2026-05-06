@@ -2,6 +2,8 @@ import React from 'react';
 import { Graph } from '../../ui/Graph';
 import { MetricCard } from './MetricCard';
 import { ExecutionStepItem } from './ExecutionStepItem';
+import { CharacterizationObjectiveCard } from '../../demo/CharacterizationObjectiveCard';
+import { SampleContextCard } from '../../demo/SampleContextCard';
 import type { DemoDataset, DemoPeak, DemoProject } from '../../../data/demoProjects';
 
 type AgentContext = 'XRD' | 'XPS' | 'FTIR' | 'Raman';
@@ -62,6 +64,12 @@ export function CenterColumn({
 
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-6">
+      {/* Context cards: Characterization Objective + Sample Context */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <CharacterizationObjectiveCard />
+        <SampleContextCard />
+      </div>
+
       {/* Card 1: XRD Phase Identification */}
       <div className="rounded-lg border border-slate-800 bg-[#0F172A] p-6">
         <div className="flex items-center justify-between mb-4">

@@ -117,8 +117,8 @@ export default function FTIRWorkspace() {
   );
   const matchedBands = uniqueMatchedBandIds.size;
   
-  const confidencePercent = processingResult.interpretation.confidenceScore.toFixed(1);
   const confidenceBadge = processingResult.interpretation.confidenceLevel;
+  const reviewStatus = confidenceBadge === 'high' ? 'Complete' : confidenceBadge === 'medium' ? 'Ready' : 'Review';
   
   // Handle Auto Mode toggle
   const handleAutoModeChange = (enabled: boolean) => {
@@ -188,9 +188,9 @@ export default function FTIRWorkspace() {
     },
     {
       id: 'interpretationSummary',
-      label: 'Interpretation Summary',
+      label: 'Agent Interpretation',
       status: 'complete' as const,
-      summary: autoMode ? 'Scientific summary' : 'Scientific summary'
+      summary: autoMode ? 'Characterization overview' : 'Characterization overview'
     }
   ];
 
@@ -456,8 +456,8 @@ export default function FTIRWorkspace() {
                             <span className="text-lg font-semibold text-text-main tabular-nums block">{processingResult.signal.wavenumber.length}</span>
                           </div>
                           <div className="space-y-1">
-                            <span className="text-[10px] uppercase tracking-wide text-text-muted block">CONFIDENCE</span>
-                            <span className="text-lg font-semibold text-emerald-600 tabular-nums block">{confidencePercent}%</span>
+                            <span className="text-[10px] uppercase tracking-wide text-text-muted block">STATUS</span>
+                            <span className="text-lg font-semibold text-emerald-600 tabular-nums block">{reviewStatus}</span>
                           </div>
                         </div>
                       </div>
@@ -479,7 +479,7 @@ export default function FTIRWorkspace() {
                               <th className="text-left px-3 py-2 font-medium">Functional Group</th>
                               <th className="text-left px-3 py-2 font-medium">Assignment</th>
                               <th className="text-right px-3 py-2 font-medium">Wavenumber <span className="text-[8px]">(cm⁻¹)</span></th>
-                              <th className="text-right px-3 py-2 font-medium">Conf.</th>
+                              <th className="text-right px-3 py-2 font-medium">Review</th>
                               <th className="text-left px-3 py-2 font-medium">Ambiguity</th>
                             </tr>
                           </thead>
@@ -492,7 +492,7 @@ export default function FTIRWorkspace() {
                                   {candidate.matches[0]?.observedBand.wavenumber.toFixed(0) || '-'}
                                 </td>
                                 <td className="px-3 py-2 font-mono text-right text-emerald-600 text-sm font-medium tabular-nums">
-                                  {(candidate.score * 100).toFixed(0)}%
+                                  {candidate.score >= 0.75 ? 'Ready' : candidate.score >= 0.5 ? 'In Progress' : 'Review'}
                                 </td>
                                 <td className="px-3 py-2 text-left text-amber-600 text-sm">
                                   {candidate.ambiguity || '-'}
@@ -513,10 +513,10 @@ export default function FTIRWorkspace() {
         {/* RIGHT SIDEBAR */}
         <aside className="w-[380px] bg-surface border-r border-border flex flex-col shrink-0 overflow-y-auto">
           <div className="p-4 space-y-2">
-            {/* SCIENTIFIC SUMMARY */}
+            {/* CHARACTERIZATION OVERVIEW */}
             <div className="border border-border/40 bg-surface/50 px-2 py-1.5">
               <div className="flex items-start justify-between gap-2 mb-1">
-                <h3 className="text-[10px] font-semibold uppercase tracking-wide">Scientific Summary</h3>
+                <h3 className="text-[10px] font-semibold uppercase tracking-wide">Characterization Overview</h3>
                 <span className={`rounded-full border px-1.5 py-0.5 text-[8px] font-semibold uppercase ${
                   confidenceBadge === 'high' 
                     ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700'
@@ -524,7 +524,7 @@ export default function FTIRWorkspace() {
                     ? 'border-amber-500/30 bg-amber-500/10 text-amber-700'
                     : 'border-red-500/30 bg-red-500/10 text-red-700'
                 }`}>
-                  {confidenceBadge}
+                  {reviewStatus}
                 </span>
               </div>
 

@@ -18,7 +18,7 @@ const researchFindings = [
     context: "Reproducibility requirements"
   },
   {
-    quote: "Black-box AI tools are useless for scientific work. I need to understand how the system reached its conclusion.",
+    quote: "Black-box automation tools are useless for scientific work. I need to understand how the system reached its conclusion.",
     role: "Principal Investigator, Materials Institute",
     context: "Decision transparency"
   }

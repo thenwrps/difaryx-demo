@@ -8,11 +8,11 @@ import { formatChemicalFormula } from '../utils';
 
 function formatClaimStatus(status: string): string {
   switch (status) {
-    case 'strongly_supported': return 'Strongly Supported';
-    case 'supported': return 'Supported';
-    case 'partial': return 'Partial';
-    case 'inconclusive': return 'Inconclusive';
-    case 'contradicted': return 'Contradicted';
+    case 'strongly_supported': return 'Complete';
+    case 'supported': return 'Ready';
+    case 'partial': return 'In Progress';
+    case 'inconclusive': return 'Review';
+    case 'contradicted': return 'Review';
     default: return status;
   }
 }
@@ -56,7 +56,7 @@ const agentRuns = [
   },
 ];
 
-const filters = ['Project', 'Technique', 'Claim Status', 'Mode', 'Status'];
+const filters = ['Project', 'Technique', 'Review', 'Mode', 'Status'];
 
 function actionLabel(action: string) {
   if (action === 'notebook') return 'Open Notebook';
@@ -90,12 +90,12 @@ export default function HistoryPage() {
       <div className="p-8 h-full overflow-y-auto">
         <div className="mb-8">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">DIFARYX records</p>
-          <h1 className="mt-2 text-2xl font-bold tracking-tight">Agent Run History</h1>
+          <h1 className="mt-2 text-2xl font-bold tracking-tight">Experiment History</h1>
           <p className="text-text-muted mt-1 text-sm">
-            Trace previous scientific goals, evidence, confidence, decisions, and report provenance.
+            Trace previous characterization runs, supporting data, conclusions, and source provenance.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
-            {['Agent memory', 'Evidence trace', 'Reproducibility log'].map((badge) => (
+            {['Source', 'Supporting Data', 'Reproducibility log'].map((badge) => (
               <span
                 key={badge}
                 className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary"
@@ -132,8 +132,8 @@ export default function HistoryPage() {
         <div className="mb-8 grid gap-6 xl:grid-cols-[1fr_320px]">
           <div className="space-y-4">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">Agent memory</p>
-              <h2 className="mt-1 text-lg font-semibold">Deterministic agent runs</h2>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">Source</p>
+              <h2 className="mt-1 text-lg font-semibold">Characterization runs</h2>
             </div>
             {agentRuns.map((run) => (
               <Card key={run.id} className="p-5">
@@ -170,7 +170,7 @@ export default function HistoryPage() {
                   <div className="w-full shrink-0 space-y-3 lg:w-52">
                     <div className="grid grid-cols-2 gap-2 text-xs">
                       <div className="rounded-lg border border-border bg-background p-3">
-                        <p className="text-text-muted">Claim Status</p>
+                        <p className="text-text-muted">Status</p>
                         <p className={`mt-1 font-semibold ${
                           run.claimStatus === 'strongly_supported' ? 'text-emerald-600' :
                           run.claimStatus === 'supported' ? 'text-cyan' :
@@ -215,10 +215,10 @@ export default function HistoryPage() {
 
           <Card className="h-fit p-5">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">Memory / provenance</p>
-            <h2 className="mt-1 text-lg font-semibold">Agent memory summary</h2>
+            <h2 className="mt-1 text-lg font-semibold">Source summary</h2>
             <div className="mt-4 space-y-3 text-sm">
               {[
-                ['Total agent runs', '3'],
+                ['Total characterization runs', '3'],
                 ['Report-ready runs', '1'],
                 ['Evidence-linked runs', '2'],
                 ['Techniques covered', 'XRD, Raman, FTIR, XPS'],
@@ -246,7 +246,7 @@ export default function HistoryPage() {
             <div>Analysis run</div>
             <div>Project</div>
             <div>Technique</div>
-            <div>Claim Status</div>
+            <div>Status</div>
             <div>Status</div>
             <div>Date</div>
             <div>Action</div>

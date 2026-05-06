@@ -117,8 +117,8 @@ export default function RamanWorkspace() {
   );
   const matchedPeaks = uniqueMatchedPeakIds.size;
   
-  const confidencePercent = processingResult.interpretation.confidenceScore.toFixed(1);
   const confidenceBadge = processingResult.interpretation.confidenceLevel;
+  const reviewStatus = confidenceBadge === 'high' ? 'Complete' : confidenceBadge === 'medium' ? 'Ready' : 'Review';
   
   // Create ranked evidence list with strict hierarchy:
   // 1. A1g first
@@ -138,7 +138,7 @@ export default function RamanWorkspace() {
     if (aIsSupporting && !bIsSupporting) return -1;
     if (!aIsSupporting && bIsSupporting) return 1;
     
-    // Then by score
+    // Then by internal match strength
     return b.score - a.score;
   });
   
@@ -210,7 +210,7 @@ export default function RamanWorkspace() {
     },
     {
       id: 'scientificSummary',
-      label: 'Scientific Summary',
+      label: 'Characterization Overview',
       status: 'complete' as const,
       summary: autoMode ? 'Phase interpretation' : 'Phase interpretation'
     }
@@ -478,8 +478,8 @@ export default function RamanWorkspace() {
                             <span className="text-lg font-semibold text-text-main tabular-nums block">{processingResult.signal.ramanShift.length}</span>
                           </div>
                           <div className="space-y-1">
-                            <span className="text-[10px] uppercase tracking-wide text-text-muted block">CONFIDENCE</span>
-                            <span className="text-lg font-semibold text-emerald-600 tabular-nums block">{confidencePercent}%</span>
+                            <span className="text-[10px] uppercase tracking-wide text-text-muted block">STATUS</span>
+                            <span className="text-lg font-semibold text-emerald-600 tabular-nums block">{reviewStatus}</span>
                           </div>
                         </div>
                       </div>
@@ -501,7 +501,7 @@ export default function RamanWorkspace() {
                               <th className="text-left px-3 py-2 font-medium">Mode</th>
                               <th className="text-left px-3 py-2 font-medium">Assignment</th>
                               <th className="text-right px-3 py-2 font-medium">Raman Shift <span className="text-[8px]">(cm⁻¹)</span></th>
-                              <th className="text-right px-3 py-2 font-medium">Conf.</th>
+                              <th className="text-right px-3 py-2 font-medium">Review</th>
                               <th className="text-left px-3 py-2 font-medium">Type</th>
                             </tr>
                           </thead>
@@ -514,7 +514,7 @@ export default function RamanWorkspace() {
                                   {candidate.matches[0]?.observedPeak.ramanShift.toFixed(0) || '-'}
                                 </td>
                                 <td className="px-3 py-2 font-mono text-right text-emerald-600 text-sm font-medium tabular-nums">
-                                  {(candidate.score * 100).toFixed(0)}%
+                                  {candidate.score >= 0.75 ? 'Ready' : candidate.score >= 0.5 ? 'In Progress' : 'Review'}
                                 </td>
                                 <td className="px-3 py-2 text-left text-text-muted text-sm">
                                   {candidate.phaseType}
@@ -535,10 +535,10 @@ export default function RamanWorkspace() {
         {/* RIGHT SIDEBAR */}
         <aside className="w-[380px] bg-surface border-r border-border flex flex-col shrink-0 overflow-y-auto">
           <div className="p-4 space-y-2">
-            {/* SCIENTIFIC SUMMARY */}
+            {/* CHARACTERIZATION OVERVIEW */}
             <div className="border border-border/40 bg-surface/50 px-2 py-1.5">
               <div className="flex items-start justify-between gap-2 mb-1">
-                <h3 className="text-[10px] font-semibold uppercase tracking-wide">Scientific Summary</h3>
+                <h3 className="text-[10px] font-semibold uppercase tracking-wide">Characterization Overview</h3>
                 <span className={`rounded-full border px-1.5 py-0.5 text-[8px] font-semibold uppercase ${
                   confidenceBadge === 'high' 
                     ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700'
@@ -546,7 +546,7 @@ export default function RamanWorkspace() {
                     ? 'border-amber-500/30 bg-amber-500/10 text-amber-700'
                     : 'border-red-500/30 bg-red-500/10 text-red-700'
                 }`}>
-                  {confidenceBadge}
+                  {reviewStatus}
                 </span>
               </div>
 

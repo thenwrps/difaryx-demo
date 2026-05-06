@@ -44,9 +44,9 @@ export default function AgentDemoSection() {
               {[
                 { step: '1', label: 'Load dataset', desc: 'XRD diffraction pattern' },
                 { step: '2', label: 'Extract features', desc: '9 peaks detected' },
-                { step: '3', label: 'Evaluate candidates', desc: '5 phase matches scored' },
-                { step: '4', label: 'Link evidence', desc: 'Confidence + uncertainty' },
-                { step: '5', label: 'Produce decision', desc: 'Traceable reasoning output' },
+                { step: '3', label: 'Evaluate candidates', desc: '5 phase matches reviewed' },
+                { step: '4', label: 'Link evidence', desc: 'Supporting data + uncertainty' },
+                { step: '5', label: 'Produce conclusion', desc: 'Traceable interpretation output' },
               ].map((item) => (
                 <div key={item.step} className="flex items-start gap-4">
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-600 text-[13px] font-bold text-white">
