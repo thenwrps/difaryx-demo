@@ -44,6 +44,7 @@ export function ExperimentModal({ open, defaultProjectId = DEFAULT_PROJECT_ID, o
   const [technique, setTechnique] = useState<Technique>(project.techniques[0] ?? 'XRD');
   const [parsedUpload, setParsedUpload] = useState<{ fileName: string; points: SpectrumPoint[] } | null>(null);
   const [uploadMessage, setUploadMessage] = useState('');
+  const [templateMode, setTemplateMode] = useState<'research' | 'rd' | 'analytical'>('research');
   const [form, setForm] = useState({
     experimentTitle: `${project.name} follow-up`,
     sampleName: project.name,
@@ -67,6 +68,7 @@ export function ExperimentModal({ open, defaultProjectId = DEFAULT_PROJECT_ID, o
     });
     setParsedUpload(null);
     setUploadMessage('');
+    setTemplateMode('research');
   }, [defaultProjectId, open]);
 
   const handleProjectChange = (nextProjectId: string) => {
@@ -259,6 +261,31 @@ export function ExperimentModal({ open, defaultProjectId = DEFAULT_PROJECT_ID, o
               className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text-muted file:mr-3 file:rounded-md file:border-0 file:bg-primary/10 file:px-2 file:py-1 file:text-primary"
             />
           </label>
+
+          <div className="sm:col-span-2">
+            <div className="text-xs font-semibold text-text-muted mb-2">Workflow Mode</div>
+            <div className="grid grid-cols-3 gap-2">
+              {([
+                { id: 'research' as const, label: 'Research Mode', desc: 'Publication-limited' },
+                { id: 'rd' as const, label: 'R\u0026D Mode', desc: 'Internal use' },
+                { id: 'analytical' as const, label: 'Analytical-job', desc: 'QC / screening' },
+              ]).map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => setTemplateMode(option.id)}
+                  className={`rounded-md border px-3 py-2 text-left text-xs transition-colors ${
+                    templateMode === option.id
+                      ? 'border-primary bg-primary/10 text-primary'
+                      : 'border-border bg-surface text-text-muted hover:border-primary/40'
+                  }`}
+                >
+                  <div className="font-semibold">{option.label}</div>
+                  <div className="mt-0.5 text-[10px] opacity-70">{option.desc}</div>
+                </button>
+              ))}
+            </div>
+          </div>
 
           <label className="text-xs font-semibold text-text-muted sm:col-span-2">
             Notes

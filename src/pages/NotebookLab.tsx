@@ -755,7 +755,7 @@ export default function NotebookLab() {
                   ))}
                 </div>
                 <div className="mt-4 rounded-md border border-primary/20 bg-primary/5 p-3 text-center text-xs font-semibold uppercase tracking-wider text-primary">
-                  {'ProcessingResult -> AgentDiscussionRefinement -> NotebookEntry -> ReportSection'}
+                  Processing Result <span className="opacity-50">→</span> Interpretation Refinement <span className="opacity-50">→</span> Notebook Entry <span className="opacity-50">→</span> Report Section
                 </div>
               </div>
             </section>

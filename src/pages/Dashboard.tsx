@@ -154,18 +154,15 @@ export default function Dashboard() {
                       </span>
                     )}
                   </div>
-                  <div className="mt-3 grid grid-cols-1 gap-1.5 text-[10px] sm:grid-cols-2">
-                    {[
-                      ['Workflow', 'Processing -> Refinement -> Notebook'],
-                      ['Notebook Mode', 'Research Mode'],
-                      ['Discussion Status', 'Publication-limited'],
-                      ['Evidence Status', 'Requires validation'],
-                    ].map(([label, value]) => (
-                      <div key={label} className="rounded-md border border-border bg-background px-2 py-1">
-                        <span className="font-semibold text-text-dim">{label}: </span>
-                        <span className="font-medium text-text-muted">{value}</span>
-                      </div>
-                    ))}
+                  <div className="mt-3 space-y-1.5">
+                    <div className="flex flex-wrap gap-1.5 text-[10px]">
+                      {['Research Mode', 'Publication-limited', 'Validation required'].map((badge) => (
+                        <span key={badge} className="rounded-full border border-border bg-background px-2 py-0.5 font-medium text-text-muted">{badge}</span>
+                      ))}
+                    </div>
+                    <div className="text-[10px] font-medium text-text-dim tracking-wide">
+                      Processing <span className="text-primary/60">→</span> Refinement <span className="text-primary/60">→</span> Notebook
+                    </div>
                   </div>
                 </div>
                 <div className="mt-auto pt-4 grid grid-cols-4 gap-1.5 border-t border-border min-h-[52px]">
@@ -242,18 +239,15 @@ export default function Dashboard() {
                       <FileText size={12} /> Added dataset
                     </span>
                   </div>
-                  <div className="mt-3 grid grid-cols-1 gap-1.5 text-[10px] sm:grid-cols-2">
-                    {[
-                      ['Workflow', 'Processing -> Refinement -> Notebook'],
-                      ['Notebook Mode', 'Research Mode'],
-                      ['Discussion Status', 'Publication-limited'],
-                      ['Evidence Status', 'Requires validation'],
-                    ].map(([label, value]) => (
-                      <div key={label} className="rounded-md border border-border bg-background px-2 py-1">
-                        <span className="font-semibold text-text-dim">{label}: </span>
-                        <span className="font-medium text-text-muted">{value}</span>
-                      </div>
-                    ))}
+                  <div className="mt-3 space-y-1.5">
+                    <div className="flex flex-wrap gap-1.5 text-[10px]">
+                      {['Research Mode', 'Publication-limited', 'Validation required'].map((badge) => (
+                        <span key={badge} className="rounded-full border border-border bg-background px-2 py-0.5 font-medium text-text-muted">{badge}</span>
+                      ))}
+                    </div>
+                    <div className="text-[10px] font-medium text-text-dim tracking-wide">
+                      Processing <span className="text-primary/60">→</span> Refinement <span className="text-primary/60">→</span> Notebook
+                    </div>
                   </div>
                 </div>
                   <div className="mt-auto pt-4 grid grid-cols-4 gap-1.5 border-t border-border min-h-[52px]">
