@@ -22,7 +22,7 @@ const trustPrinciples = [
   },
   {
     title: 'Source Attribution',
-    desc: 'Clear labels for deterministic analysis and agent interpretation. Researchers know which parts are rule-based and which are agent-prepared.',
+    desc: 'Clear labels for deterministic analysis and interpretation. Researchers know which parts are rule-based and which are agent-prepared.',
     Icon: GitBranch,
     color: 'amber'
   }

@@ -38,6 +38,15 @@ const techniques: TechniqueConfig[] = [
   },
 ];
 
+const workspaceWorkflowSteps = [
+  'Analysis Workspace',
+  'Technique Processing',
+  'Cross-Tech Evidence Review',
+  'Agentic Interpretation Refinement',
+  'Notebook Template Entry',
+  'Report Export',
+];
+
 interface WorkspaceHistoryItem {
   id: string;
   dataset: string;
@@ -128,6 +137,21 @@ export default function WorkspaceLauncher() {
             <p className="mt-1 text-sm text-text-muted max-w-3xl">
               Choose a technique, load a sample or project dataset, then process, analyze, and export results.
             </p>
+          </div>
+
+          <div className="rounded-lg border border-border bg-surface p-3">
+            <div className="flex flex-wrap items-center gap-2">
+              {workspaceWorkflowSteps.map((step, index) => (
+                <React.Fragment key={step}>
+                  <span className="rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-semibold text-text-muted">
+                    {step}
+                  </span>
+                  {index < workspaceWorkflowSteps.length - 1 && (
+                    <span className="text-[11px] font-semibold text-primary">/</span>
+                  )}
+                </React.Fragment>
+              ))}
+            </div>
           </div>
 
           {/* Technique Cards - Compact 4x1 Grid */}

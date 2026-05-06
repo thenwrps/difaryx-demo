@@ -111,7 +111,7 @@ function generateBasicRationale(
       rationale = `Insufficient evidence to evaluate claim`;
       break;
     default:
-      rationale = `Claim status: ${status}`;
+      rationale = `Status: ${status}`;
   }
   
   if (dependencyLimitation && status !== 'requires_validation') {

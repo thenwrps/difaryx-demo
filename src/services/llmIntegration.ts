@@ -115,7 +115,7 @@ export function formatLLMOutput(output: LLMReasoningOutput): {
 
   return {
     primaryResult: output.primaryResult,
-    subtitle: 'LLM-assisted scientific reasoning',
+    subtitle: 'LLM-assisted interpretation',
     claimStatus,
     reasoningSummary: output.evidenceSummary,
     evidence: output.evidenceSummary,

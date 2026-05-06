@@ -3,10 +3,10 @@ import { Sparkles, Cloud, Database, Cpu, Network, BarChart3 } from 'lucide-react
 
 const googleServices = [
   {
-    title: 'Agent Interpretation Runtime',
-    subtitle: 'Agent Interpretation',
+    title: 'Interpretation Runtime',
+    subtitle: 'Interpretation',
     points: [
-      'Agent interpretation and conflict resolution',
+      'Interpretation and conflict resolution',
       'Multi-paragraph interpretation with evidence synthesis',
       'Literature cross-validation and hypothesis evaluation',
       'Natural language explanation of complex analytical results'
@@ -30,7 +30,7 @@ const googleServices = [
 
 const technicalIntegration = [
   {
-    title: 'Agent Interpretation',
+    title: 'Interpretation',
     desc: 'Real-time interpretation with source attribution and traceable supporting data',
     Icon: Sparkles
   },
@@ -80,7 +80,7 @@ export default function GoogleAlignmentSection() {
             Cloud-ready characterization workflows
           </h2>
           <p className="mx-auto max-w-3xl text-[16px] leading-relaxed text-slate-600">
-            DIFARYX is designed for scalable scientific workflow automation with managed data, processing, and agent interpretation services.
+            DIFARYX is designed for scalable scientific workflow automation with managed data, processing, and interpretation services.
           </p>
         </div>
 

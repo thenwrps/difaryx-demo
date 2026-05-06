@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Activity,
   AlertTriangle,
@@ -25,7 +25,6 @@ import {
   demoProjects,
   getProject,
   getProjectDatasets,
-  getWorkspaceRoute,
   saveAgentRunResult,
 } from '../data/demoProjects';
 import type {
@@ -40,6 +39,17 @@ import { buildEvidencePacket } from '../agent/mcp/evidencePacket';
 import { callReasoningAPI } from '../server/api/reasoning';
 import { getProviderStatus } from '../server/llm/router';
 import type { ReasoningOutput, ToolResult } from '../agent/mcp/types';
+import {
+  createNotebookEntryFromRefinement,
+  createProcessingResultFromXrdDemo,
+  getLatestProcessingResult,
+  getProcessingResult,
+  normalizeNotebookTemplateMode,
+  refineDiscussionFromProcessing,
+  saveAgentDiscussionRefinement,
+  saveNotebookEntry,
+  saveProcessingResult,
+} from '../data/workflowPipeline';
 import { LeftSidebar } from '../components/agent-demo/LeftSidebar';
 import { MainHeader } from '../components/agent-demo/MainHeader';
 import { CenterColumn } from '../components/agent-demo/CenterColumn';
@@ -219,20 +229,20 @@ const CONTEXT_CONFIG: Record<
       },
       {
         id: 'ai_interpretation',
-        label: 'Agent Interpretation',
+        label: 'Interpretation',
         shortLabel: 'Interpret',
-        detail: 'Preparing agent interpretation for multi-source evidence.',
+        detail: 'Preparing interpretation for multi-source evidence.',
         toolName: 'gemini_reasoner',
         displayName: 'Agent Interpreter',
         inputSummary: 'Aggregated evidence from deterministic analysis',
-        outputSummary: 'Agent interpretation generated',
+        outputSummary: 'Interpretation generated',
         durationMs: 720,
       },
       {
         id: 'decision',
-        label: 'Make Decision',
+        label: 'Finalize Interpretation',
         shortLabel: 'Decision',
-        detail: 'Synthesizing phase evidence into a decision-ready interpretation.',
+        detail: 'Synthesizing phase evidence into a conclusion-ready interpretation.',
         toolName: 'generate_xrd_interpretation',
         displayName: 'Generate XRD Interpretation',
         inputSummary: 'Evaluation results, evidence, conflicts, and caveats',
@@ -307,18 +317,18 @@ const CONTEXT_CONFIG: Record<
       },
       {
         id: 'ai_interpretation',
-        label: 'Agent Interpretation',
+        label: 'Interpretation',
         shortLabel: 'Interpret',
-        detail: 'Preparing agent interpretation for multi-source evidence.',
+        detail: 'Preparing interpretation for multi-source evidence.',
         toolName: 'gemini_reasoner',
         displayName: 'Agent Interpreter',
         inputSummary: 'Aggregated evidence from deterministic analysis',
-        outputSummary: 'Agent interpretation generated',
+        outputSummary: 'Interpretation generated',
         durationMs: 720,
       },
       {
         id: 'decision',
-        label: 'Make Decision',
+        label: 'Finalize Interpretation',
         shortLabel: 'Decision',
         detail: 'Generating a surface-chemistry decision with caveats.',
         toolName: 'decision_logic',
@@ -395,18 +405,18 @@ const CONTEXT_CONFIG: Record<
       },
       {
         id: 'ai_interpretation',
-        label: 'Agent Interpretation',
+        label: 'Interpretation',
         shortLabel: 'Interpret',
-        detail: 'Preparing agent interpretation for multi-source evidence.',
+        detail: 'Preparing interpretation for multi-source evidence.',
         toolName: 'gemini_reasoner',
         displayName: 'Agent Interpreter',
         inputSummary: 'Aggregated evidence from deterministic analysis',
-        outputSummary: 'Agent interpretation generated',
+        outputSummary: 'Interpretation generated',
         durationMs: 720,
       },
       {
         id: 'decision',
-        label: 'Make Decision',
+        label: 'Finalize Interpretation',
         shortLabel: 'Decision',
         detail: 'Generating a bonding interpretation with limitations.',
         toolName: 'decision_logic',
@@ -483,18 +493,18 @@ const CONTEXT_CONFIG: Record<
       },
       {
         id: 'ai_interpretation',
-        label: 'Agent Interpretation',
+        label: 'Interpretation',
         shortLabel: 'Interpret',
-        detail: 'Preparing agent interpretation for multi-source evidence.',
+        detail: 'Preparing interpretation for multi-source evidence.',
         toolName: 'gemini_reasoner',
         displayName: 'Agent Interpreter',
         inputSummary: 'Aggregated evidence from deterministic analysis',
-        outputSummary: 'Agent interpretation generated',
+        outputSummary: 'Interpretation generated',
         durationMs: 720,
       },
       {
         id: 'decision',
-        label: 'Make Decision',
+        label: 'Finalize Interpretation',
         shortLabel: 'Decision',
         detail: 'Generating a structural interpretation with caveats.',
         toolName: 'decision_logic',
@@ -810,7 +820,7 @@ function createDecisionResult(
   return {
     runId: generateRunId(),
     primaryResult: fusionResult.conclusion,
-    subtitle: `${config.label} - Fusion Engine Agent Interpretation`,
+    subtitle: `${config.label} - Fusion Engine Interpretation`,
     reasoningTrace: fusionResult.reasoningTrace,
     conclusion: fusionResult.conclusion,
     basis: fusionResult.basis,
@@ -850,6 +860,7 @@ function toAgentRunResult(
 
 export default function AgentDemo() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [missionText, setMissionText] = useState(DEFAULT_MISSION);
   const [feedback, setFeedback] = useState('');
   const [agentState, setAgentState] = useState<AgentDemoState>(() =>
@@ -935,7 +946,14 @@ export default function AgentDemo() {
     agentState.reasoningState.currentStepIndex < 0
       ? 0
       : Math.min(100, ((agentState.reasoningState.currentStepIndex + 1) / stages.length) * 100);
-  const workspacePath = getWorkspaceRoute(selectedProject, agentState.context, selectedDataset.id);
+  const templateMode = normalizeNotebookTemplateMode(searchParams.get('template'));
+  const workflowProcessingResult = useMemo(
+    () =>
+      getProcessingResult(searchParams.get('processing')) ??
+      getLatestProcessingResult(selectedProject.id) ??
+      createProcessingResultFromXrdDemo(selectedProject.id),
+    [searchParams, selectedProject.id],
+  );
 
   const showFeedback = (message: string) => {
     setFeedback(message);
@@ -1237,22 +1255,41 @@ export default function AgentDemo() {
     showFeedback('Export report preview prepared.');
   };
 
-  const handleSaveToNotebook = () => {
-    if (!currentResult) return;
-    const runResult = toAgentRunResult(
-      currentResult,
-      agentState.context,
-      selectedOption,
-      stages.map((stage) => stage.toolName),
-      peakMarkers ?? [],
-    );
-    saveAgentRunResult(runResult);
+  const handleRefineInterpretation = () => {
+    saveProcessingResult(workflowProcessingResult);
+    const refinement = refineDiscussionFromProcessing(workflowProcessingResult, templateMode);
+    saveAgentDiscussionRefinement(refinement);
     appendLog({
-      stamp: '[notebook]',
-      message: 'Decision saved to the Notebook handoff surface.',
+      stamp: '[refine]',
+      message: `Refined discussion prepared from ${workflowProcessingResult.technique} processing output using ${templateMode} notebook template.`,
       type: 'success',
     });
-    showFeedback('Saved to Notebook handoff.');
+    showFeedback('Refined discussion prepared.');
+  };
+
+  const handleSaveToNotebook = () => {
+    if (currentResult) {
+      const runResult = toAgentRunResult(
+        currentResult,
+        agentState.context,
+        selectedOption,
+        stages.map((stage) => stage.toolName),
+        peakMarkers ?? [],
+      );
+      saveAgentRunResult(runResult);
+    }
+
+    saveProcessingResult(workflowProcessingResult);
+    const refinement = refineDiscussionFromProcessing(workflowProcessingResult, templateMode);
+    saveAgentDiscussionRefinement(refinement);
+    const notebookEntry = createNotebookEntryFromRefinement(refinement, templateMode);
+    saveNotebookEntry(notebookEntry);
+    appendLog({
+      stamp: '[notebook]',
+      message: `Refined discussion saved to Notebook Lab as ${notebookEntry.templateLabel}.`,
+      type: 'success',
+    });
+    navigate(`/notebook?project=${selectedProject.id}&entry=${notebookEntry.id}&template=${templateMode}`);
   };
 
   const handleGenerateReproducibleReport = () => {
@@ -1400,6 +1437,26 @@ export default function AgentDemo() {
           >
             Reset
           </button>
+
+          <button
+            type="button"
+            onClick={handleRefineInterpretation}
+            disabled={runningGuardRef.current}
+            className="inline-flex h-[34px] w-full shrink-0 items-center justify-center gap-1.5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 text-[11px] font-semibold text-cyan-100 transition-colors hover:border-cyan-300/50 hover:bg-cyan-500/15 disabled:cursor-not-allowed disabled:opacity-50 min-[760px]:w-[150px] min-[1440px]:w-[170px]"
+          >
+            <Brain size={12} />
+            Refine Interpretation
+          </button>
+
+          <button
+            type="button"
+            onClick={handleSaveToNotebook}
+            disabled={runningGuardRef.current}
+            className="inline-flex h-[34px] w-full shrink-0 items-center justify-center gap-1.5 rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-3 text-[11px] font-semibold text-emerald-100 transition-colors hover:border-emerald-300/50 hover:bg-emerald-400/15 disabled:cursor-not-allowed disabled:opacity-50 min-[760px]:w-[190px] min-[1440px]:w-[210px]"
+          >
+            <FileText size={12} />
+            Save Discussion to Notebook
+          </button>
         </div>
       </div>
 
@@ -1432,6 +1489,8 @@ export default function AgentDemo() {
           projectName={selectedProject.name}
           currentStep={agentState.reasoningState.currentStepIndex}
           totalSteps={stages.length}
+          executionSteps={executionSteps}
+          progressPercent={progressPercent}
           candidates={
             xrdAnalysis?.candidates.slice(0, 3).map((candidate, index) => ({
               phase: candidate.phase.name,

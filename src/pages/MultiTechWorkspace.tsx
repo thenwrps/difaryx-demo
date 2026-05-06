@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowRight, BookOpen, FileText, Layers3, Play, Save } from 'lucide-react';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
 import { Button } from '../components/ui/Button';
@@ -16,6 +16,10 @@ import {
 } from '../data/demoProjects';
 import { formatChemicalFormula } from '../utils';
 import { evaluate as evaluateFusionEngine, createEvidenceNodes, type EvidenceNode, type FusionResult, type EvidenceCategory, type PeakInput } from '../engines/fusionEngine';
+import {
+  createProcessingResultFromXrdDemo,
+  saveProcessingResult,
+} from '../data/workflowPipeline';
 
 // Cross-tech evidence types
 interface CrossTechEvidence {
@@ -601,6 +605,7 @@ const matrixCells: MatrixCell[] = [
 
 export default function MultiTechWorkspace() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const project = getProject(searchParams.get('project') ?? DEFAULT_PROJECT_ID);
   
   // Cross-tech interaction state
@@ -796,6 +801,12 @@ export default function MultiTechWorkspace() {
     setReviewOutput(fusionResult);
   };
 
+  const handleRefineInterpretation = () => {
+    const processingResult = createProcessingResultFromXrdDemo(project.id);
+    saveProcessingResult(processingResult);
+    navigate(`/demo/agent?project=${project.id}&scope=fusion&processing=${processingResult.id}&template=research`);
+  };
+
   // Generate notebook draft from FusionResult
   const generateNotebookFromFusionResult = (result: FusionResult, projectName: string): string => {
     return `# Cross-Tech Review: ${projectName}
@@ -879,19 +890,23 @@ ${result.decision}
               >
                 <Play size={14} /> Run Review
               </button>
-              <Link to={`/demo/agent?project=${project.id}&scope=fusion`} className="flex-shrink-0">
-                <Button variant="outline" size="sm" className="gap-1.5">
-                  <FileText size={14} /> Agent
-                </Button>
-              </Link>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-1.5 flex-shrink-0"
+                onClick={handleRefineInterpretation}
+              >
+                <FileText size={14} /> Refine Interpretation
+              </Button>
               <Link to={`/workspace/fusion?project=${project.id}`} className="flex-shrink-0">
                 <Button variant="outline" size="sm" className="gap-1.5">
-                  <BookOpen size={14} /> Report
+                  <BookOpen size={14} /> Report Export
                 </Button>
               </Link>
-              <Link to={`/notebook?project=${project.id}&source=fusion`} className="flex-shrink-0">
+              <Link to={`/notebook?project=${project.id}&source=fusion&template=research`} className="flex-shrink-0">
                 <Button variant="outline" size="sm" className="gap-1.5">
-                  <Save size={14} /> Notebook
+                  <Save size={14} /> Notebook Entry
                 </Button>
               </Link>
             </div>
@@ -979,7 +994,7 @@ ${result.decision}
           <div className="space-y-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 180px)' }}>
             {/* Scientific Conclusion */}
             <Card className="p-3">
-              <h2 className="mb-2 text-xs font-bold text-text-main">Scientific Conclusion</h2>
+              <h2 className="mb-2 text-xs font-bold text-text-main">Characterization Conclusion</h2>
               <div className="space-y-2">
                 <div>
                   <div className="text-[9px] font-semibold uppercase tracking-wider text-primary">Conclusion</div>
@@ -988,7 +1003,7 @@ ${result.decision}
                   </p>
                 </div>
                 <div>
-                  <div className="text-[9px] font-semibold uppercase tracking-wider text-primary">Basis</div>
+                  <div className="text-[9px] font-semibold uppercase tracking-wider text-primary">Supporting Data</div>
                   <ul className="mt-1 space-y-0.5 text-[9px] text-text-muted">
                     {reviewOutput ? (
                       reviewOutput.basis.slice(0, 3).map((item, idx) => (
@@ -1040,7 +1055,7 @@ ${result.decision}
                   </ul>
                 </div>
                 <div>
-                  <div className="text-[9px] font-semibold uppercase tracking-wider text-primary">Decision</div>
+                  <div className="text-[9px] font-semibold uppercase tracking-wider text-primary">Conclusion</div>
                   <p className="mt-1 text-[10px] font-semibold text-text-main">
                     {reviewOutput?.decision || 'Proceed with spinel ferrite structural assignment for downstream analysis and reporting.'}
                   </p>
@@ -1048,12 +1063,12 @@ ${result.decision}
               </div>
             </Card>
 
-            {/* Scientific Justification */}
+            {/* Interpretation Basis */}
             <Card className="p-3">
-              <h2 className="mb-2 text-xs font-bold text-text-main">Scientific Justification</h2>
+              <h2 className="mb-2 text-xs font-bold text-text-main">Interpretation Basis</h2>
               <div className="space-y-2">
                 <div>
-                  <div className="text-[9px] font-semibold uppercase tracking-wider text-primary">Claim</div>
+                  <div className="text-[9px] font-semibold uppercase tracking-wider text-primary">Assignment</div>
                   <div className="mt-1 rounded-md border border-border bg-background p-1.5 text-[10px] text-text-main">
                     {selectedClaim?.title || selectedEvidence?.claimId === 'spinel-ferrite' 
                       ? 'Spinel ferrite structure supported by convergent evidence'
@@ -1061,7 +1076,7 @@ ${result.decision}
                   </div>
                 </div>
                 <div>
-                  <div className="text-[9px] font-semibold uppercase tracking-wider text-primary">Observed</div>
+                  <div className="text-[9px] font-semibold uppercase tracking-wider text-primary">Observations</div>
                   <div className="mt-1 space-y-1">
                     {selectedEvidence ? (
                       <div className="rounded-md border border-border bg-background p-1.5 text-[9px]">
@@ -1111,7 +1126,7 @@ ${result.decision}
                 <table className="w-full text-[9px]">
                   <thead>
                     <tr className="border-b border-border">
-                      <th className="p-1.5 text-left font-semibold text-text-main">Claim</th>
+                      <th className="p-1.5 text-left font-semibold text-text-main">Assignment</th>
                       {(['XRD', 'Raman', 'XPS', 'FTIR'] as Technique[]).map((technique) => (
                         <th key={technique} className="p-1.5 text-center font-semibold text-text-main">
                           {technique}

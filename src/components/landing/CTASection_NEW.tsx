@@ -11,7 +11,7 @@ export default function CTASection() {
             Experience autonomous scientific workflow execution
           </h2>
           <p className="mx-auto mb-10 max-w-3xl text-[17px] leading-relaxed text-slate-300">
-            Try DIFARYX's agent demo to see how autonomous execution, agent interpretation, and supporting data work together for traceable characterization conclusions.
+            Try DIFARYX's agent demo to see how autonomous execution, interpretation, and supporting data work together for traceable characterization conclusions.
           </p>
           
           <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-center">

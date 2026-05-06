@@ -9,13 +9,13 @@ const demoFeatures = [
     Icon: Play
   },
   {
-    title: 'Agent Interpretation',
+    title: 'Interpretation',
     desc: 'See candidate comparison, conflict analysis, uncertainty assessment, and evidence synthesis.',
     Icon: Eye
   },
   {
     title: 'Supporting Data',
-    desc: 'View deterministic analysis and agent interpretation with clear source attribution.',
+    desc: 'View deterministic analysis and interpretation with clear source attribution.',
     Icon: FileText
   },
   {

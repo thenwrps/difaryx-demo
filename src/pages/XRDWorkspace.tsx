@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle,
   ArrowRight,
@@ -12,7 +12,7 @@ import { Graph } from '../components/ui/Graph';
 import { ProcessingPipeline } from '../components/workspace/ProcessingPipeline';
 import { ParameterDrawer } from '../components/workspace/ParameterDrawer';
 import { XRD_DEMO_DATASETS, getXrdDemoDataset } from '../data/xrdDemoDatasets';
-import { demoProjects, getAgentPath, getNotebookPath, getProject } from '../data/demoProjects';
+import { demoProjects, getNotebookPath, getProject } from '../data/demoProjects';
 import {
   runXrdPhaseIdentificationAgent,
   xrdAgentToolSchemas,
@@ -24,6 +24,10 @@ import type { XrdParameters } from '../types/parameters';
 import { getWorkspaceEntryMode, getSampleDatasetName } from '../utils/workspaceEntry';
 import { DatasetInfoBar } from '../components/workspace/DatasetInfoBar';
 import { EmptyWorkspaceState } from '../components/workspace/EmptyWorkspaceState';
+import {
+  createProcessingResultFromXrdDemo,
+  saveProcessingResult,
+} from '../data/workflowPipeline';
 
 function statusClass(status: 'complete' | 'warning' | 'error') {
   if (status === 'error') return 'border-red-500/30 bg-red-500/10 text-red-700';
@@ -57,6 +61,7 @@ function topCandidateRows(result: XrdAgentResult) {
 
 export default function XRDWorkspace() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   
   // Entry mode detection
   const entryMode = getWorkspaceEntryMode(searchParams, 'xrd');
@@ -338,6 +343,11 @@ export default function XRDWorkspace() {
     };
   });
   const candidateRows = topCandidateRows(agentResult);
+  const handleRefineInterpretation = () => {
+    const processingResult = createProcessingResultFromXrdDemo(project.id);
+    saveProcessingResult(processingResult);
+    navigate(`/demo/agent?project=${project.id}&processing=${processingResult.id}&template=research`);
+  };
 
   return (
     <DashboardLayout>
@@ -430,12 +440,13 @@ export default function XRDWorkspace() {
             >
               Open Notebook <ArrowRight size={14} />
             </Link>
-            <Link
-              to={getAgentPath(project)}
+            <button
+              type="button"
+              onClick={handleRefineInterpretation}
               className="flex h-9 items-center justify-between rounded-md bg-primary text-white px-3 text-sm font-medium hover:bg-primary/90 transition-colors"
             >
-              Run Agent <ArrowRight size={14} />
-            </Link>
+              Refine Interpretation <ArrowRight size={14} />
+            </button>
           </div>
         </aside>
 
@@ -759,13 +770,14 @@ export default function XRDWorkspace() {
                       </div>
                     </div>
                     <div className="pt-1 border-t border-border/30">
-                      <Link
-                        to={getAgentPath(project)}
+                      <button
+                        type="button"
+                        onClick={handleRefineInterpretation}
                         className="flex items-center justify-center gap-1.5 w-full h-6 rounded bg-primary text-white text-[9px] font-semibold uppercase tracking-wide hover:bg-primary/90 transition-colors"
                       >
                         <Sparkles size={10} />
-                        Agent Mode
-                      </Link>
+                        Refine Interpretation
+                      </button>
                     </div>
                   </div>
                 </div>

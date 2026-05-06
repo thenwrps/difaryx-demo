@@ -48,7 +48,7 @@ export function MainHeader({
         {/* Right Side */}
         <div className="flex items-center gap-3">
           <div className="text-xs text-slate-400">
-            Workflow: <span className="text-slate-300 font-medium">Deterministic + Agent Interpretation</span>
+            Workflow: <span className="text-slate-300 font-medium">Deterministic + Interpretation</span>
           </div>
           
           <button

@@ -28,7 +28,7 @@ const workflowSteps = [
   },
   {
     number: '05',
-    title: 'Agent Interpretation',
+    title: 'Interpretation',
     desc: 'Compare candidates, analyze conflicts, and explain how the evidence leads to the conclusion.',
     color: 'violet'
   },
@@ -86,9 +86,9 @@ export default function ProductFunctionSection() {
 
         <div className="mt-12 rounded-2xl border border-slate-200 bg-white p-8 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
           <div className="text-center">
-            <h3 className="mb-3 text-[20px] font-bold text-slate-900">Agent Interpretation with Traceable Supporting Data</h3>
+            <h3 className="mb-3 text-[20px] font-bold text-slate-900">Interpretation with Traceable Supporting Data</h3>
             <p className="mx-auto max-w-3xl text-[15px] leading-relaxed text-slate-700">
-              DIFARYX combines deterministic analysis with agent interpretation, conflict review, and evidence-linked conclusions. Researchers see the source data and can verify each step.
+              DIFARYX combines deterministic analysis with interpretation, conflict review, and evidence-linked conclusions. Researchers see the source data and can verify each step.
             </p>
           </div>
         </div>

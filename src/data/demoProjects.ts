@@ -588,7 +588,7 @@ export function deriveClaimStatus(
   });
 
   // Reasoning rules based on evidence relationships
-  // Rule 1: Multiple primary + supporting evidence = strongly supported
+  // Rule 1: Multiple primary + supporting evidence = well-supported
   if (primaryEvidence.length >= 1 && supportingEvidence.length >= 2) {
     return 'strongly_supported';
   }

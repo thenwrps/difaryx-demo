@@ -126,8 +126,8 @@ export const TOOL_REGISTRY: Record<ToolName, ToolDefinition> = {
 
   match_scoring: {
     name: 'match_scoring',
-    displayName: 'Match Scoring',
-    description: 'Score and rank candidate matches against detected features',
+    displayName: 'Match Review',
+    description: 'Review candidate matches against detected features',
     inputSchema: {
       type: 'object',
       properties: {
@@ -137,12 +137,12 @@ export const TOOL_REGISTRY: Record<ToolName, ToolDefinition> = {
         },
         candidates: {
           type: 'array',
-          description: 'Candidate matches to score',
+          description: 'Candidate matches to review',
         },
         scoringMethod: {
           type: 'string',
           enum: ['overlap', 'weighted', 'bayesian'],
-          description: 'Scoring algorithm',
+          description: 'Review method',
         },
       },
       required: ['features', 'candidates'],
@@ -152,7 +152,7 @@ export const TOOL_REGISTRY: Record<ToolName, ToolDefinition> = {
       properties: {
         rankedCandidates: {
           type: 'array',
-          description: 'Candidates ranked by match score',
+          description: 'Candidates ordered by match review',
         },
         topScore: {
           type: 'number',

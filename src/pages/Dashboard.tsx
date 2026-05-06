@@ -19,6 +19,16 @@ import {
 } from '../data/demoProjects';
 import { formatChemicalFormula } from '../utils';
 
+const PRODUCT_WORKFLOW_STEPS = [
+  'Project Dashboard',
+  'Analysis Workspace',
+  'Technique Processing',
+  'Cross-Tech Evidence Review',
+  'Agentic Interpretation Refinement',
+  'Notebook Template Entry',
+  'Report Export',
+];
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const [feedback, setFeedback] = useState('');
@@ -56,6 +66,21 @@ export default function Dashboard() {
             >
               <Plus size={16} /> New Experiment
             </Button>
+          </div>
+        </div>
+
+        <div className="mb-4 rounded-lg border border-border bg-surface p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            {PRODUCT_WORKFLOW_STEPS.map((step, index) => (
+              <React.Fragment key={step}>
+                <span className="rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-semibold text-text-muted">
+                  {step}
+                </span>
+                {index < PRODUCT_WORKFLOW_STEPS.length - 1 && (
+                  <span className="text-[11px] font-semibold text-primary">/</span>
+                )}
+              </React.Fragment>
+            ))}
           </div>
         </div>
 
@@ -152,7 +177,7 @@ export default function Dashboard() {
                       onClick={(event) => event.stopPropagation()}
                       className="inline-flex h-8 items-center justify-center text-xs font-medium text-text-muted hover:text-text-main transition-colors whitespace-nowrap"
                     >
-                      Agent
+                      Refine
                     </Link>
                     {project.techniques.length > 1 && (
                       <Link
@@ -160,7 +185,7 @@ export default function Dashboard() {
                         onClick={(event) => event.stopPropagation()}
                         className="inline-flex h-8 items-center justify-center text-xs font-medium text-text-muted hover:text-text-main transition-colors whitespace-nowrap"
                       >
-                        Multi-Tech
+                        Review
                       </Link>
                     )}
                   </div>
@@ -229,7 +254,7 @@ export default function Dashboard() {
                         onClick={(event) => event.stopPropagation()}
                         className="inline-flex h-8 items-center justify-center text-xs font-medium text-text-muted hover:text-text-main transition-colors whitespace-nowrap"
                       >
-                        Agent
+                        Refine
                       </Link>
                       <button
                         type="button"

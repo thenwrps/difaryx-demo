@@ -1,5 +1,11 @@
 import React, { useState } from 'react';
 import { CheckCircle2, Send, XCircle } from 'lucide-react';
+import { DataAvailabilityPanel } from '../../demo/DataAvailabilityPanel';
+import { TechniqueCoveragePanel } from '../../demo/TechniqueCoveragePanel';
+import { EvidenceRequirementsTable } from '../../demo/EvidenceRequirementsTable';
+import { CharacterizationObjectiveCard } from '../../demo/CharacterizationObjectiveCard';
+import { SampleContextCard } from '../../demo/SampleContextCard';
+import { ExecutionStepItem } from '../CenterColumn/ExecutionStepItem';
 
 // Inline chemical formula utility
 function formatChemicalFormula(input: string): React.ReactNode {
@@ -59,7 +65,15 @@ function formatChemicalFormula(input: string): React.ReactNode {
   return <>{parts}</>;
 }
 
-type TabType = 'thinking' | 'evidence' | 'parameters' | 'logs';
+type TabType = 'thinking' | 'evidence' | 'context' | 'parameters' | 'logs';
+
+const RIGHT_PANEL_TABS: Array<{ key: TabType; label: string }> = [
+  { key: 'thinking', label: 'Interpretation' },
+  { key: 'evidence', label: 'Evidence' },
+  { key: 'context', label: 'Context' },
+  { key: 'parameters', label: 'Parameters' },
+  { key: 'logs', label: 'Run Log' },
+];
 
 interface CandidateData {
   phase: string;
@@ -71,6 +85,15 @@ interface CandidateData {
   reason?: string;
 }
 
+interface ExecutionStep {
+  number: number;
+  title: string;
+  description: string;
+  tool: string;
+  time: string;
+  status: 'pending' | 'running' | 'complete' | 'error';
+}
+
 interface RightPanelProps {
   technique?: string;
   projectName?: string;
@@ -79,6 +102,8 @@ interface RightPanelProps {
   totalSteps: number;
   reasoningStream?: any;
   candidates?: CandidateData[];
+  executionSteps?: ExecutionStep[];
+  progressPercent?: number;
   onTabChange?: (tab: TabType) => void;
   onPromptSubmit?: (prompt: string) => void;
 }
@@ -641,6 +666,8 @@ export function RightPanel({
   totalSteps,
   reasoningStream,
   candidates,
+  executionSteps = [],
+  progressPercent = 0,
   onTabChange,
   onPromptSubmit,
 }: RightPanelProps) {
@@ -790,21 +817,21 @@ export function RightPanel({
     <aside className="w-[400px] shrink-0 border-l border-white/[0.08] bg-[#0F172A] flex flex-col">
       {/* Tab Navigation */}
       <div className="shrink-0 border-b border-white/[0.08] px-4">
-        <div className="flex gap-1">
-          {(['thinking', 'evidence', 'parameters', 'logs'] as TabType[]).map((tab) => (
+        <div className="grid grid-cols-3 gap-1 py-3">
+          {RIGHT_PANEL_TABS.map(({ key, label }) => (
             <button
-              key={tab}
+              key={key}
               type="button"
-              onClick={() => handleTabChange(tab)}
-              className={`px-4 py-3 text-sm font-semibold capitalize transition-colors relative ${
-                activeTab === tab
-                  ? 'text-cyan-300'
-                  : 'text-slate-500 hover:text-slate-300'
+              onClick={() => handleTabChange(key)}
+              className={`relative min-h-[34px] rounded-md px-2 text-[11px] font-semibold leading-tight transition-colors ${
+                activeTab === key
+                  ? 'bg-cyan-400/10 text-cyan-300'
+                  : 'text-slate-500 hover:bg-slate-800/50 hover:text-slate-300'
               }`}
             >
-              {tab === 'thinking' ? 'Agent Interpretation' : tab}
-              {activeTab === tab && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400" />
+              {label}
+              {activeTab === key && (
+                <div className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-cyan-400" />
               )}
             </button>
           ))}
@@ -844,7 +871,7 @@ export function RightPanel({
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-semibold shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
                   >
                     <Send size={12} />
-                    Send to Agent
+                    Send Instructions
                   </button>
                 </div>
               </div>
@@ -1004,8 +1031,8 @@ export function RightPanel({
               </div>
             </Section>
 
-            {/* Section 4: Agent Interpretation */}
-            <Section title="Agent Interpretation" badge="Source: Agent" badgeColor="violet">
+            {/* Section 4: Interpretation */}
+            <Section title="Interpretation" badge="Source: Interpretation Run" badgeColor="violet">
               <div className="text-xs text-slate-400 space-y-2">
                 <p>
                   <span className="text-slate-300 font-medium">Crystallographic consistency:</span> The observed d-spacings (d₃₁₁ = 2.53 Å, d₄₄₀ = 1.48 Å) align with cubic spinel lattice within instrumental resolution (±0.02 Å). Peak intensity ratios deviate &lt;8% from powder diffraction file, suggesting minimal preferred orientation.
@@ -1017,7 +1044,7 @@ export function RightPanel({
                   <span className="text-slate-300 font-medium">Competing hypotheses:</span> Fe₃O₄ magnetite rejected due to absence of characteristic (111) reflection at 18.3° and incompatible lattice parameter (a_magnetite = 8.39 Å vs. a_observed = 8.38 Å). CuO tenorite ruled out by missing monoclinic signature at 38.7°.
                 </p>
                 <p className="text-slate-500 text-[10px] pt-2 border-t border-slate-800">
-                  <span className="text-violet-400">Agent interpretation:</span> Cross-validated peak positions against 3 independent databases (ICDD, COD, AMCSD). Multi-technique convergence (XRD + Raman + XPS) supports the spinel assignment.
+                  <span className="text-violet-400">Interpretation:</span> Cross-validated peak positions against 3 independent databases (ICDD, COD, AMCSD). Multi-technique convergence (XRD + Raman + XPS) supports the spinel assignment.
                 </p>
               </div>
             </Section>
@@ -1311,7 +1338,7 @@ export function RightPanel({
                   <div className="flex items-center gap-2 mb-3">
                     <span className="text-sm font-bold uppercase tracking-wider text-slate-300">Supporting Literature</span>
                     <span className="text-[10px] px-2 py-0.5 rounded bg-purple-500/10 text-purple-400">
-                      Source: Agent
+                      Source: Interpretation Run
                     </span>
                   </div>
                   <div className="text-xs text-slate-400 leading-relaxed space-y-2 whitespace-pre-line">
@@ -1321,6 +1348,16 @@ export function RightPanel({
               </div>
             </Section>
           </>
+        )}
+
+        {activeTab === 'context' && (
+          <div className="space-y-4">
+            <CharacterizationObjectiveCard />
+            <SampleContextCard />
+            <DataAvailabilityPanel />
+            <TechniqueCoveragePanel />
+            <EvidenceRequirementsTable compact />
+          </div>
         )}
 
         {activeTab === 'parameters' && (
@@ -1344,7 +1381,7 @@ export function RightPanel({
                 >
                   <div className="flex flex-col items-center gap-1">
                     <span>Hybrid</span>
-                    <span className="text-[9px] opacity-80">Manual + Agent</span>
+                    <span className="text-[9px] opacity-80">Manual + Assisted</span>
                   </div>
                 </button>
                 <button
@@ -1357,7 +1394,7 @@ export function RightPanel({
                   }`}
                 >
                   <div className="flex flex-col items-center gap-1">
-                    <span>Agent 100%</span>
+                    <span>Autonomous</span>
                     <span className="text-[9px] opacity-80">Fully Autonomous</span>
                   </div>
                 </button>
@@ -1366,11 +1403,11 @@ export function RightPanel({
                 <div className="text-[10px] text-slate-500">
                   {parameterMode === 'hybrid' ? (
                     <>
-                      <span className="text-blue-400 font-semibold">Hybrid Mode:</span> You can manually adjust parameters below. Agent provides recommendations and validates changes.
+                      <span className="text-blue-400 font-semibold">Hybrid Mode:</span> You can manually adjust parameters below. The system provides recommendations and validates changes.
                     </>
                   ) : (
                     <>
-                      <span className="text-purple-400 font-semibold">Agent 100% Mode:</span> Agent automatically optimizes all parameters based on data characteristics and analysis goals.
+                      <span className="text-purple-400 font-semibold">Autonomous Mode:</span> The system automatically optimizes all parameters based on data characteristics and analysis goals.
                     </>
                   )}
                 </div>
@@ -1522,15 +1559,15 @@ export function RightPanel({
               </div>
             </Section>
 
-            {/* Agent Interpretation */}
-            <Section title="Agent Interpretation" badge="Source: Agent" badgeColor="violet">
+            {/* Interpretation */}
+            <Section title="Interpretation" badge="Source: Interpretation Run" badgeColor="violet">
               <div className="space-y-3">
                 <div className="rounded-lg bg-purple-500/5 border border-purple-500/20 p-3">
                   <div className="text-xs font-semibold text-slate-300 mb-2">Interpretation Settings</div>
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-slate-400">Mode:</span>
-                      <span className="text-slate-200 font-mono">Agent Interpretation</span>
+                      <span className="text-slate-200 font-mono">Interpretation</span>
                     </div>
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-slate-400">Temperature:</span>
@@ -1553,7 +1590,7 @@ export function RightPanel({
                     <div className="flex items-start gap-2">
                       <CheckCircle2 size={12} className="text-purple-400 mt-0.5 shrink-0" />
                       <div className="text-xs text-slate-400">
-                        <span className="text-slate-300">Agent interpretation:</span> Cross-validate peak assignments against crystallographic databases
+                        <span className="text-slate-300">Interpretation:</span> Cross-validate peak assignments against crystallographic databases
                       </div>
                     </div>
                     <div className="flex items-start gap-2">
@@ -1572,7 +1609,7 @@ export function RightPanel({
                 </div>
 
                 <div className="text-[10px] text-slate-500 bg-slate-800/30 border border-slate-700 rounded p-2">
-                  <span className="text-slate-400">Note:</span> Agent interpretation provides literature context and conflict review. Deterministic algorithms handle peak detection, phase matching, and evidence relation evaluation.
+                  <span className="text-slate-400">Note:</span> Interpretation provides literature context and conflict review. Deterministic algorithms handle peak detection, phase matching, and evidence relation evaluation.
                 </div>
               </div>
             </Section>
@@ -1610,6 +1647,37 @@ export function RightPanel({
 
         {activeTab === 'logs' && (
           <>
+            <Section title="Execution Trace">
+              <div className="space-y-3">
+                {executionSteps.length > 0 ? (
+                  executionSteps.map((step) => (
+                    <ExecutionStepItem key={step.number} {...step} />
+                  ))
+                ) : (
+                  <div className="rounded-lg border border-slate-800 bg-[#070B12] p-4 text-xs text-slate-500">
+                    Execution trace appears when a run is prepared.
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-4">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    Execution Progress
+                  </span>
+                  <span className="text-[10px] font-bold text-cyan-300">
+                    {Math.round(progressPercent)}%
+                  </span>
+                </div>
+                <div className="h-1.5 overflow-hidden rounded-full bg-slate-800">
+                  <div
+                    className="h-full bg-gradient-to-r from-cyan-400 to-blue-500 transition-all duration-300"
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                </div>
+              </div>
+            </Section>
+
             {/* Execution Timeline */}
             <Section title="Execution Timeline">
               <div className="space-y-2">
@@ -1682,13 +1750,13 @@ export function RightPanel({
                 <LogEntry
                   timestamp="00:07.567"
                   level="info"
-                  message="Agent interpretation requested"
+                  message="Interpretation requested"
                   details="Request: analyze phase assignment with XRD, Raman, and XPS supporting data, then explain crystallographic consistency."
                 />
                 <LogEntry
                   timestamp="00:09.891"
                   level="success"
-                  message="Agent interpretation received"
+                  message="Interpretation received"
                   details="Key points: Fd-3m symmetry confirmed, inverse spinel cation distribution validated, multi-technique convergence supports assignment."
                 />
                 <LogEntry
@@ -1746,7 +1814,7 @@ export function RightPanel({
                   <span className="text-slate-200 font-mono">2.343 s</span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-400">Agent interpretation time:</span>
+                  <span className="text-slate-400">Interpretation time:</span>
                   <span className="text-slate-200 font-mono">5.657 s (2 calls)</span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
@@ -1764,7 +1832,7 @@ export function RightPanel({
                   </div>
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-slate-400">External calls:</span>
-                    <span className="text-slate-200 font-mono">3 (Agent x2, Scholar x1)</span>
+                    <span className="text-slate-200 font-mono">3 (Interpretation x2, Scholar x1)</span>
                   </div>
                 </div>
               </div>
@@ -1785,11 +1853,11 @@ export function RightPanel({
                 
                 <div className="rounded-lg bg-purple-400/5 border border-purple-400/20 p-3">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-slate-300">Agent Interpretation</span>
+                    <span className="text-xs font-semibold text-slate-300">Interpretation</span>
                     <span className="text-purple-300 font-mono text-xs">5.657 s (35.3%)</span>
                   </div>
                   <div className="text-[10px] text-slate-400">
-                        Agent interpretation (2.324s), literature synthesis (3.333s)
+                        Interpretation (2.324s), literature synthesis (3.333s)
                   </div>
                 </div>
                 

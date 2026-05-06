@@ -173,7 +173,7 @@
             {/* Reasoning Trace */}
             <div className="rounded-lg border border-slate-800 bg-[#0A0F1A] p-3">
               <div className="mb-2 flex items-center justify-between">
-                <div className="flex items-center gap-2"><Brain size={13} className="text-amber-300" /><span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Agent Interpretation</span></div>
+                <div className="flex items-center gap-2"><Brain size={13} className="text-amber-300" /><span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Interpretation</span></div>
                 <span className="text-[9px] font-bold uppercase text-slate-600">{isRunning ? 'running' : runComplete ? 'done' : 'idle'}</span>
               </div>
               <div className="h-[140px] space-y-1.5 overflow-y-auto pr-1">

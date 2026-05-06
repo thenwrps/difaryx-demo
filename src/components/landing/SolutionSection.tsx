@@ -6,7 +6,7 @@ const solutions = [
   { title: 'Universal file reader', desc: 'Load proprietary formats without manual export or conversion.', Icon: FileInput },
   { title: 'Controlled preprocessing', desc: 'Automated baseline, normalization, and peak detection with full parameter control.', Icon: Sliders },
   { title: 'Cross-technique comparison', desc: 'Compare evidence across techniques in a single view.', Icon: GitCompare },
-  { title: 'Agent interpretation', desc: 'Evidence-linked interpretation as a supporting layer.', Icon: Brain },
+  { title: 'Interpretation', desc: 'Evidence-linked interpretation as a supporting layer.', Icon: Brain },
 ];
 
 export default function SolutionSection() {

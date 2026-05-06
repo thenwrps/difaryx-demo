@@ -551,7 +551,7 @@ export function generate_xrd_interpretation(conflicts: XrdConflictAnalysis, cand
   
   // Enhanced decision with crystallographic context
   const decision = primary.score >= 0.85
-    ? `${primary.phase.name} (${primary.phase.crystalSystem}, space group ${primary.phase.spaceGroup}) is strongly supported by the detected XRD peaks.`
+    ? `${primary.phase.name} (${primary.phase.crystalSystem}, space group ${primary.phase.spaceGroup}) is consistent with the detected XRD peaks.`
     : primary.score >= 0.65
       ? `${primary.phase.name} (${primary.phase.crystalSystem}, space group ${primary.phase.spaceGroup}) is supported, but conflicts or ambiguity reduce confidence.`
       : `No confident phase claim: ${primary.phase.name} is only a low-confidence best match.`;

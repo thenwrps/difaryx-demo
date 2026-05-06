@@ -237,7 +237,7 @@ function generateReviewerRationale(
              `Additional characterization required.`;
     
     default:
-      return `Claim status: ${status}`;
+      return `Status: ${status}`;
   }
 }
 

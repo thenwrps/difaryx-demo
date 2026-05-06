@@ -1005,8 +1005,8 @@ function generateReport(
   }
   report += '\n';
   
-  // Agent Interpretation
-  report += '## Agent Interpretation\n\n';
+  // Interpretation
+  report += '## Interpretation\n\n';
   for (const claim of claims) {
     report += `### ${claim.title} (${formatFusionStatus(claim.confidence)})\n`;
     report += `**Status:** ${formatClaimReviewStatus(claim.status)}\n\n`;

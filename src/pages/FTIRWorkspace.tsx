@@ -188,7 +188,7 @@ export default function FTIRWorkspace() {
     },
     {
       id: 'interpretationSummary',
-      label: 'Agent Interpretation',
+      label: 'Interpretation',
       status: 'complete' as const,
       summary: autoMode ? 'Characterization overview' : 'Characterization overview'
     }

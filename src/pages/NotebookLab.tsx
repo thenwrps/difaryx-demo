@@ -23,6 +23,24 @@ import {
 } from '../data/demoProjects';
 import { DemoExportFormat, exportDemoArtifact } from '../utils/demoExport';
 import { getRun, type AgentRun } from '../data/runModel';
+import {
+  NOTEBOOK_TEMPLATES,
+  createNotebookEntryFromRefinement,
+  createProcessingResultFromXrdDemo,
+  createReportSectionFromNotebookEntry,
+  getLatestAgentDiscussionRefinement,
+  getLatestNotebookEntry,
+  getLatestProcessingResult,
+  getNotebookEntry,
+  normalizeNotebookTemplateMode,
+  refineDiscussionFromProcessing,
+  saveAgentDiscussionRefinement,
+  saveNotebookEntry,
+  saveProcessingResult,
+  type NotebookTemplateMode,
+} from '../data/workflowPipeline';
+
+const NOTEBOOK_TEMPLATE_MODES: NotebookTemplateMode[] = ['research', 'rd', 'analytical'];
 
 function formatClaimStatus(status: string): string {
   switch (status) {
@@ -39,7 +57,11 @@ export default function NotebookLab() {
   const [searchParams] = useSearchParams();
   const project = getProject(searchParams.get('project'));
   const runId = searchParams.get('run');
+  const entryId = searchParams.get('entry');
   const agentRun = runId ? getRun(runId) : null;
+  const [templateMode, setTemplateMode] = useState<NotebookTemplateMode>(
+    () => normalizeNotebookTemplateMode(searchParams.get('template')),
+  );
   const [feedback, setFeedback] = useState('');
   const [experimentModalOpen, setExperimentModalOpen] = useState(false);
   const [localExperiments, setLocalExperiments] = useState(() => getLocalExperiments());
@@ -60,6 +82,29 @@ export default function NotebookLab() {
     [project.id, feedback],
   );
   const attachedRunRecord = useMemo(() => getProcessingRun(attachedRun), [attachedRun]);
+  const notebookTemplate = NOTEBOOK_TEMPLATES[templateMode];
+  const workflowProcessingResult = useMemo(
+    () => getLatestProcessingResult(project.id) ?? createProcessingResultFromXrdDemo(project.id),
+    [project.id, feedback],
+  );
+  const workflowRefinement = useMemo(
+    () =>
+      getLatestAgentDiscussionRefinement(project.id, templateMode) ??
+      refineDiscussionFromProcessing(workflowProcessingResult, templateMode),
+    [project.id, templateMode, workflowProcessingResult, feedback],
+  );
+  const workflowNotebookEntry = useMemo(() => {
+    const entryFromRoute = getNotebookEntry(entryId);
+    if (entryFromRoute?.templateMode === templateMode) return entryFromRoute;
+    return (
+      getLatestNotebookEntry(project.id, templateMode) ??
+      createNotebookEntryFromRefinement(workflowRefinement, templateMode)
+    );
+  }, [entryId, project.id, templateMode, workflowRefinement, feedback]);
+  const workflowReportSection = useMemo(
+    () => createReportSectionFromNotebookEntry(workflowNotebookEntry),
+    [workflowNotebookEntry],
+  );
   const notebook = useMemo(() => {
     // If we have an agent run, use that data
     if (agentRun) {
@@ -76,7 +121,7 @@ export default function NotebookLab() {
           `Mission: ${agentRun.mission}`,
           `Selected datasets: ${agentRun.outputs.selectedDatasets.join(', ')}`,
           `Detected ${agentRun.outputs.detectedPeaks?.length ?? 0} peaks`,
-          'Generated autonomous decision with evidence chain',
+          'Prepared evidence-linked interpretation with traceable decision context',
         ],
         peakDetection: `${agentRun.outputs.detectedPeaks?.length ?? 0} peaks detected by agent`,
         phaseInterpretation: `${agentRun.outputs.phase} - ${formatClaimStatus(agentRun.outputs.claimStatus || 'supported')}`,
@@ -123,7 +168,7 @@ export default function NotebookLab() {
       return 'Report prepared: Conclusion, supporting data, limitations, and source provenance included.';
     }
     if (format === 'docx') {
-      return 'DOCX report prepared with agent summary, evidence table, and next actions.';
+      return 'DOCX report prepared with analysis summary, evidence table, and next actions.';
     }
     if (format === 'csv') {
       return 'CSV evidence table prepared for export.';
@@ -135,7 +180,7 @@ export default function NotebookLab() {
   };
 
   const copyShareLink = async () => {
-    const url = `${window.location.origin}/notebook?project=${project.id}${workspaceRun ? `&run=${workspaceRun.id}` : ''}`;
+    const url = `${window.location.origin}/notebook?project=${project.id}&template=${templateMode}&entry=${workflowNotebookEntry.id}${workspaceRun ? `&run=${workspaceRun.id}` : ''}`;
     try {
       await navigator.clipboard.writeText(url);
       showFeedback('Share link copied');
@@ -150,15 +195,17 @@ export default function NotebookLab() {
       title: `${notebook.title} Report`,
       sections: [
         { heading: 'Summary', lines: [notebook.summary] },
+        { heading: workflowReportSection.heading, lines: workflowReportSection.lines },
         { heading: 'Conclusion', lines: [notebook.decision, formatClaimStatus(notebook.claimStatus)] },
         { heading: 'Pipeline', lines: notebook.processingPipeline },
         { heading: 'Evidence', lines: notebook.evidence },
-        { heading: 'Observations', lines: observations.length > 0 ? observations : ['No added observations.'] },
+        ...workflowNotebookEntry.sections.filter((section) => section.heading !== workflowReportSection.heading),
+        { heading: 'Added Observations', lines: observations.length > 0 ? observations : ['No added observations.'] },
         {
-          heading: 'Attached run',
+          heading: 'Attached data',
           lines: attachedRunRecord
             ? [`${attachedRunRecord.technique} run`, new Date(attachedRunRecord.timestamp).toLocaleString(), `${attachedRunRecord.detectedFeatures.length} features`]
-            : ['No attached run.'],
+            : ['No attached data.'],
         },
       ],
       csvRows: notebook.evidence.map((item, index) => ({
@@ -179,22 +226,31 @@ export default function NotebookLab() {
 
   const addObservation = () => {
     const text = observationDraft.trim() || `${project.name} evidence reviewed in notebook.`;
-    const nextObservation = `Observation ${observations.length + 1}: ${text}`;
+    const nextObservation = `Added observation ${observations.length + 1}: ${text}`;
     setObservations((current) => [nextObservation, ...current]);
     setObservationDraft('');
     setObservationOpen(false);
-    showFeedback('Observation added');
+    showFeedback('Added observation saved');
   };
 
   const attachRunToNotebook = (run: ProcessingRun) => {
     setAttachedRun(run.id);
     setAttachRunOpen(false);
-    showFeedback(`${run.technique} run attached`);
+    showFeedback(`${run.technique} data attached`);
+  };
+
+  const saveWorkflowNotebookEntry = () => {
+    saveProcessingResult(workflowProcessingResult);
+    const refinement = refineDiscussionFromProcessing(workflowProcessingResult, templateMode);
+    saveAgentDiscussionRefinement(refinement);
+    const entry = createNotebookEntryFromRefinement(refinement, templateMode);
+    saveNotebookEntry(entry);
+    showFeedback(`${NOTEBOOK_TEMPLATES[templateMode].label} entry saved`);
   };
 
   const copyAgentSummary = async () => {
     const summary =
-      'Ferrite spinel formation is supported. Catalytic activation is supported but requires XPS oxidation-state validation.';
+      'The analysis used XRD and Raman evidence to evaluate whether the sample is consistent with a CuFe\u2082O\u2084 spinel ferrite assignment. The available diffraction and vibrational evidence support the phase assignment, while XPS oxidation-state validation remains required before stronger surface-chemistry or catalytic-activation claims.';
     try {
       await navigator.clipboard.writeText(summary);
       showFeedback('Summary copied');
@@ -248,7 +304,7 @@ export default function NotebookLab() {
               <div className="flex items-center gap-2 text-[11px] text-text-muted mb-1">
                 <span>Created: {project.createdDate}</span>
                 <span>|</span>
-                <span>{workspaceRun ? 'Generated from workspace run' : runResult ? 'Generated from latest characterization run' : 'Generated from analysis pipeline'}</span>
+                <span>{workspaceRun || runResult ? 'Source: processing + interpretation refinement' : 'Created from characterization workflow'}</span>
               </div>
               <h1 className="text-lg font-bold">{notebook.title}</h1>
             </div>
@@ -278,16 +334,16 @@ export default function NotebookLab() {
                   </div>
                 )}
               </div>
-              <Button variant="outline" size="sm" className="gap-2" onClick={() => setObservationOpen(true)}><Plus size={14} /> Observation</Button>
-              <Button variant="outline" size="sm" className="gap-2" onClick={() => setAttachRunOpen(true)}><FileText size={14} /> Attach Run</Button>
-              <Button variant="primary" size="sm" className="gap-2" onClick={() => showFeedback('Notebook saved')}><Save size={14} /> Save Entry</Button>
+              <Button variant="outline" size="sm" className="gap-2" onClick={() => setObservationOpen(true)}><Plus size={14} /> Add Observation</Button>
+              <Button variant="outline" size="sm" className="gap-2" onClick={() => setAttachRunOpen(true)}><FileText size={14} /> Attach Data</Button>
+              <Button variant="primary" size="sm" className="gap-2" onClick={saveWorkflowNotebookEntry}><Save size={14} /> Save Entry</Button>
             </div>
           </div>
 
           {observationOpen && (
             <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/30 p-4">
               <div className="w-full max-w-lg rounded-xl border border-border bg-white p-5 shadow-2xl">
-                <h2 className="text-base font-bold text-text-main">Add observation</h2>
+                <h2 className="text-base font-bold text-text-main">Add Observation</h2>
                 <p className="mt-1 text-sm text-text-muted">Add a demo notebook note tied to the current project context.</p>
                 <textarea
                   value={observationDraft}
@@ -306,12 +362,12 @@ export default function NotebookLab() {
           {attachRunOpen && (
             <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/30 p-4">
               <div className="w-full max-w-2xl rounded-xl border border-border bg-white p-5 shadow-2xl">
-                <h2 className="text-base font-bold text-text-main">Attach saved run</h2>
-                <p className="mt-1 text-sm text-text-muted">Select a saved workspace run to link into this notebook.</p>
+                <h2 className="text-base font-bold text-text-main">Attach Data</h2>
+                <p className="mt-1 text-sm text-text-muted">Select saved processing data to link into this notebook.</p>
                 <div className="mt-4 max-h-72 space-y-2 overflow-y-auto">
                   {availableRuns.length === 0 && (
                     <p className="rounded-md border border-border bg-background p-3 text-sm text-text-muted">
-                      No saved runs yet. Use Save Run in a workspace, then attach it here.
+                      No saved data yet. Save processing output in a workspace, then attach it here.
                     </p>
                   )}
                   {availableRuns.slice().reverse().map((run) => {
@@ -344,6 +400,143 @@ export default function NotebookLab() {
             </section>
 
             <section className="space-y-4">
+              <div className="rounded-xl border border-border bg-surface p-5">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <h3 className="text-base font-bold text-text-main">Notebook Template Selector</h3>
+                    <p className="mt-1 text-sm text-text-muted">
+                      Choose the experiment mode before creating the notebook entry.
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-right">
+                    <div className="text-[11px] font-semibold uppercase tracking-wider text-primary">Report template</div>
+                    <div className="mt-1 text-sm font-bold capitalize text-text-main">
+                      {notebookTemplate.reportTemplate.replace('_', ' ')}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-3">
+                  {NOTEBOOK_TEMPLATE_MODES.map((mode) => {
+                    const template = NOTEBOOK_TEMPLATES[mode];
+                    const isSelected = templateMode === mode;
+
+                    return (
+                      <button
+                        key={mode}
+                        type="button"
+                        aria-pressed={isSelected}
+                        onClick={() => setTemplateMode(mode)}
+                        className={`rounded-lg border p-3 text-left transition-colors ${
+                          isSelected
+                            ? 'border-primary/50 bg-primary/10 text-primary'
+                            : 'border-border bg-background text-text-muted hover:border-primary/30 hover:text-text-main'
+                        }`}
+                      >
+                        <div className="text-sm font-bold text-text-main">{template.label}</div>
+                        <div className="mt-1 text-xs capitalize">{template.reportTemplate.replace('_', ' ')}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-1.5">
+                  {notebookTemplate.stepperLabels.map((step) => (
+                    <span key={step} className="rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-semibold text-text-muted">
+                      {step}
+                    </span>
+                  ))}
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                  <div className="rounded-lg border border-border bg-background p-3">
+                    <div className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">Tabs</div>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {notebookTemplate.tabs.map((tab) => (
+                        <span key={tab} className="rounded-md border border-border bg-surface px-2 py-1 text-xs font-medium text-text-main">
+                          {tab}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-border bg-background p-3">
+                    <div className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">Statuses</div>
+                    <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                      {workflowNotebookEntry.statusSummary.map((status) => (
+                        <div key={status.label} className="rounded-md border border-border bg-surface px-2 py-1.5">
+                          <div className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">{status.label}</div>
+                          <div className="text-xs font-bold text-text-main">{status.value}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-primary/20 bg-surface p-5">
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-primary">REFINED DISCUSSION</div>
+                    <p className="mt-1 text-sm font-medium text-text-muted">
+                      Sharpened from processing output and evidence review
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-text-muted">
+                    {workflowRefinement.microFlow.map((step, index) => (
+                      <React.Fragment key={step}>
+                        <span className="rounded-full border border-border bg-background px-2.5 py-1">{step}</span>
+                        {index < workflowRefinement.microFlow.length - 1 && <ArrowRight size={13} className="text-primary" />}
+                      </React.Fragment>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-4 rounded-lg border border-border bg-background p-4">
+                  <div className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">Discussion Draft</div>
+                  <p className="mt-2 text-sm leading-relaxed text-text-main">{workflowRefinement.discussionDraft}</p>
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-3">
+                  <div className="rounded-lg border border-border bg-background p-3">
+                    <div className="text-xs font-bold text-primary">Supported</div>
+                    <div className="mt-2 space-y-2">
+                      {workflowRefinement.claimBoundary.supported.map((item) => (
+                        <p key={item} className="text-xs leading-relaxed text-text-muted">{item}</p>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-border bg-background p-3">
+                    <div className="text-xs font-bold text-amber-600">Requires validation</div>
+                    <div className="mt-2 space-y-2">
+                      {workflowRefinement.claimBoundary.requiresValidation.map((item) => (
+                        <p key={item} className="text-xs leading-relaxed text-text-muted">{item}</p>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-border bg-background p-3">
+                    <div className="text-xs font-bold text-text-main">Not supported yet</div>
+                    <div className="mt-2 space-y-2">
+                      {workflowRefinement.claimBoundary.notSupportedYet.map((item) => (
+                        <p key={item} className="text-xs leading-relaxed text-text-muted">{item}</p>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 rounded-lg border border-border bg-background p-3">
+                  <div className="text-xs font-bold text-text-main">Validation Notes</div>
+                  <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {workflowRefinement.validationNotes.map((note) => (
+                      <p key={note} className="rounded-md border border-border bg-surface p-2 text-xs leading-relaxed text-text-muted">
+                        {note}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section className="space-y-4">
               <div className="rounded-xl border border-primary/20 bg-surface p-5">
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                   <div>
@@ -364,7 +557,7 @@ export default function NotebookLab() {
                     ['Conclusion', 'Ready for spinel formation / Ready for catalytic activation'],
                     ['Run ID', 'AG-RUN-CF-042'],
                     ['Timestamp', '2026-04-29 17:30'],
-                    ['Source', 'DIFARYX Agent Demo'],
+                    ['Source', 'DIFARYX Characterization Run'],
                   ].map(([label, value]) => (
                     <div key={label} className="rounded-md border border-border bg-background p-3">
                       <div className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">{label}</div>
@@ -373,7 +566,7 @@ export default function NotebookLab() {
                   ))}
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  {['Agent-attached', 'Evidence-linked', 'Report-ready', 'Provenance preserved'].map((badge) => (
+                  {['Data-attached', 'Evidence-linked', 'Report-ready', 'Provenance preserved'].map((badge) => (
                     <span key={badge} className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
                       {badge}
                     </span>
@@ -431,15 +624,15 @@ export default function NotebookLab() {
             </section>
 
             <section className="space-y-3">
-              <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted border-b border-border pb-2">Agent Interpretation</h3>
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted border-b border-border pb-2">Interpretation</h3>
               <div className="rounded-lg border border-border bg-surface p-4">
                 <p className="text-sm leading-relaxed text-text-main">
-                  XRD and Raman evidence support ferrite spinel formation. FTIR confirms support-related bonding signatures. XPS remains required for stronger claims regarding surface oxidation-state distribution and catalytic activation.
+                  The analysis used XRD and Raman evidence to evaluate whether the sample is consistent with a CuFe{'\u2082'}O{'\u2084'} spinel ferrite assignment. The available diffraction and vibrational evidence support the phase assignment, while XPS oxidation-state validation remains required before stronger surface-chemistry or catalytic-activation claims.
                 </p>
                 <div className="mt-4 rounded-md border border-primary/20 bg-primary/5 p-3">
                   <div className="text-[11px] font-semibold uppercase tracking-wider text-primary">Conclusion</div>
                   <p className="mt-1 text-sm font-semibold text-text-main">
-                    Ferrite spinel formation is supported. Catalytic activation is supported but requires XPS oxidation-state validation.
+                    The available XRD-centered evidence is consistent with a CuFe{'\u2082'}O{'\u2084'} spinel ferrite phase assignment. XPS validation remains required before making stronger claims about surface oxidation-state distribution or catalytic activation.
                   </p>
                 </div>
               </div>
@@ -462,7 +655,7 @@ export default function NotebookLab() {
                   ))}
                 </div>
                 <div className="mt-4 rounded-md border border-primary/20 bg-primary/5 p-3 text-center text-xs font-semibold uppercase tracking-wider text-primary">
-                  {'Goal -> Plan -> Execute -> Evidence -> Reason -> Decision -> Report'}
+                  {'Objective -> Evidence -> Interpretation -> Conclusion -> Report'}
                 </div>
               </div>
             </section>
@@ -487,7 +680,7 @@ export default function NotebookLab() {
             </section>
 
             <section className="space-y-3">
-              <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted border-b border-border pb-2">Agent Report Exports</h3>
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted border-b border-border pb-2">Report Exports</h3>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {(['pdf', 'docx', 'csv'] as DemoExportFormat[]).map((format) => (
                   <Button key={format} variant="outline" className="gap-2" onClick={() => exportNotebook(format)}>
@@ -528,7 +721,7 @@ export default function NotebookLab() {
 
             {workspaceRun && (
               <section className="space-y-3">
-                <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted border-b border-border pb-2">Workspace Run</h3>
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted border-b border-border pb-2">Workspace Data</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="bg-surface p-4 rounded-md border border-border">
                     <div className="text-xs text-text-muted mb-1">Dataset</div>
@@ -560,7 +753,7 @@ export default function NotebookLab() {
                 {attachedRun && (
                   <div className="rounded-md border border-primary/20 bg-primary/5 p-3 text-sm text-text-muted">
                     <div className="font-semibold text-text-main">
-                      Linked run: {attachedRunRecord?.technique ?? 'Workspace'} analysis
+                      Linked data: {attachedRunRecord?.technique ?? 'Workspace'} analysis
                     </div>
                     <div className="mt-1">
                       {attachedRunRecord
@@ -644,7 +837,7 @@ export default function NotebookLab() {
                 {workspaceRun ? `Open ${workspaceRun.technique} Analysis` : 'Open Workspace'} <ArrowRight size={14} className="inline ml-1" />
               </Link>
               <Link to={getAgentPath(project)} className="rounded-md border border-cyan/40 bg-surface p-3 text-sm font-semibold text-cyan hover:bg-cyan/10 transition-colors">
-                Run Agent <ArrowRight size={14} className="inline ml-1" />
+                Open Refinement <ArrowRight size={14} className="inline ml-1" />
               </Link>
               <button
                 onClick={() => exportNotebook('pdf')}
