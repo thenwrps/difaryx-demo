@@ -16,26 +16,26 @@ const workflowSteps = [
   },
   {
     number: '03',
-    title: 'Agent Execution',
-    desc: 'Agent plans analysis steps, executes tools (peak matching, database search, hypothesis evaluation), and collects evidence.',
+    title: 'Workflow Execution',
+    desc: 'The workflow plans analysis steps, executes tools (peak matching, reference review, hypothesis evaluation), and collects evidence.',
     color: 'purple'
   },
   {
     number: '04',
     title: 'Supporting Data',
-    desc: 'Combine technique evidence, flag anomalies, and keep every conclusion linked to its source signals.',
+    desc: 'Combine technique evidence, flag anomalies, and keep every interpretation linked to its source signals.',
     color: 'emerald'
   },
   {
     number: '05',
     title: 'Interpretation',
-    desc: 'Compare candidates, analyze conflicts, and explain how the evidence leads to the conclusion.',
+    desc: 'Compare candidates, analyze conflicts, and explain how the evidence supports the interpretation.',
     color: 'violet'
   },
   {
     number: '06',
-    title: 'Conclusion',
-    desc: 'Finalize the characterization conclusion, generate a report with evidence provenance, and export results.',
+    title: 'Report-ready Discussion',
+    desc: 'Prepare the characterization discussion, generate a report section with evidence provenance, and export results.',
     color: 'amber'
   }
 ];
@@ -55,10 +55,10 @@ export default function ProductFunctionSection() {
       <div className="mx-auto max-w-[1200px] px-6">
         <div className="mb-12 text-center">
           <h2 className="mb-4 text-[32px] font-bold leading-[1.2] text-slate-900 lg:text-[40px]">
-            How DIFARYX works: from signal to conclusion
+            How DIFARYX works: from signal to report-ready discussion
           </h2>
           <p className="mx-auto max-w-3xl text-[16px] leading-relaxed text-slate-600">
-            A structured workflow that combines deterministic preprocessing, autonomous agent execution, and traceable interpretation for characterization conclusions.
+            A structured workflow that combines deterministic preprocessing, guided execution, and traceable interpretation for characterization discussions.
           </p>
         </div>
 
@@ -88,7 +88,7 @@ export default function ProductFunctionSection() {
           <div className="text-center">
             <h3 className="mb-3 text-[20px] font-bold text-slate-900">Interpretation with Traceable Supporting Data</h3>
             <p className="mx-auto max-w-3xl text-[15px] leading-relaxed text-slate-700">
-              DIFARYX combines deterministic analysis with interpretation, conflict review, and evidence-linked conclusions. Researchers see the source data and can verify each step.
+              DIFARYX combines deterministic analysis with interpretation, conflict review, and evidence-linked claim boundaries. Researchers see the source data and can verify each step.
             </p>
           </div>
         </div>

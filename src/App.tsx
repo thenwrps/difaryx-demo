@@ -11,6 +11,7 @@ import HistoryPage from "./pages/History";
 import SettingsPage from "./pages/Settings";
 import SignIn from "./pages/SignIn";
 import AuthCallback from "./pages/AuthCallback";
+import XRDWorkspace from "./pages/XRDWorkspace";
 import XPSWorkspace from "./pages/XPSWorkspace";
 import FTIRWorkspace from "./pages/FTIRWorkspace";
 import RamanWorkspace from "./pages/RamanWorkspace";
@@ -53,6 +54,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <MultiTechWorkspace />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/workspace/xrd"
+            element={
+              <ProtectedRoute>
+                <XRDWorkspace />
               </ProtectedRoute>
             }
           />

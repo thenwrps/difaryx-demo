@@ -51,6 +51,8 @@ export interface AgentDiscussionRefinement {
     supported: string[];
     requiresValidation: string[];
     notSupportedYet: string[];
+    contextual?: string[];
+    pending?: string[];
   };
   validationNotes: string[];
   statusSummary: Array<{ label: string; value: string }>;
@@ -124,7 +126,7 @@ export const NOTEBOOK_TEMPLATES: Record<NotebookTemplateMode, NotebookTemplate> 
 };
 
 const TEMPLATE_MICRO_FLOWS: Record<NotebookTemplateMode, string[]> = {
-  research: ['Processed Result', 'Evidence Review', 'Discussion Draft'],
+  research: ['Processing Result', 'Interpretation Refinement', 'Notebook Entry', 'Report Section'],
   rd: ['Test Result', 'Risk Review', 'Go/No-Go Rationale'],
   analytical: ['Analytical Run', 'QA/QC Review', 'Validated Result'],
 };
@@ -136,11 +138,14 @@ const TEMPLATE_STATUS_VALUES: Record<NotebookTemplateMode, string[]> = {
 };
 
 export const RESEARCH_DISCUSSION_DRAFT =
-  'The processed XRD pattern supports assignment of the sample to a CuFe2O4 spinel ferrite structure, with the major reflections aligning with the expected cubic spinel reference pattern. Supporting Raman evidence strengthens the interpretation by indicating local spinel symmetry through the A1g mode. However, unresolved weak reflections and the surface-sensitive nature of XPS limit the strength of phase-purity and bulk-composition claims. The current notebook interpretation should therefore be framed as a supported CuFe2O4 spinel assignment with remaining validation requirements, rather than a final publication-level phase-pure confirmation.';
+  'The processed XRD pattern supports assignment of the sample to a CuFe₂O₄ spinel ferrite structure, with the major reflections aligning with the expected cubic spinel reference pattern. Supporting Raman evidence strengthens the interpretation by indicating local spinel symmetry through the A1g mode. However, unresolved weak reflections and the surface-sensitive nature of XPS limit the strength of phase-purity and bulk-composition claims. The current notebook interpretation should therefore be framed as a supported CuFe₂O₄ spinel assignment with remaining validation requirements, rather than a publication-level phase-pure confirmation.';
+
+const SBA15_RESEARCH_DISCUSSION_DRAFT =
+  'The processed evidence supports CuFe₂O₄ spinel ferrite reflections in the CuFe₂O₄/SBA-15 sample, consistent with dispersed copper ferrite on mesoporous SBA-15. Supporting Raman evidence is consistent with ferrite-like local symmetry, while FTIR contextualizes the silica support environment. Phase distribution, loading uniformity, surface oxidation state, and support interaction remain validation-limited.';
 
 export const CLAIM_BOUNDARY = {
   supported: [
-    'CuFe2O4 spinel phase assignment',
+    'CuFe₂O₄ spinel phase assignment',
     'Literature-consistent lattice relation',
     'Cross-technique convergence with Raman/XPS context',
   ],
@@ -151,9 +156,11 @@ export const CLAIM_BOUNDARY = {
     'Crystallite size and strain separation',
   ],
   notSupportedYet: [
-    'Final phase-pure confirmation',
-    'Definitive bulk oxidation-state distribution',
+    'Publication-level phase-pure confirmation',
+    'Validated bulk oxidation-state distribution',
   ],
+  contextual: [] as string[],
+  pending: [] as string[],
 };
 
 export const VALIDATION_NOTES = [
@@ -162,6 +169,104 @@ export const VALIDATION_NOTES = [
   'Use TEM to validate morphology and crystallite-size assumptions.',
   'Use ICP-OES if bulk Cu/Fe composition is required.',
 ];
+
+function isSba15Project(projectId: string) {
+  return projectId === 'cufe2o4-sba15';
+}
+
+function getProjectClaimBoundary(projectId: string): typeof CLAIM_BOUNDARY {
+  if (!isSba15Project(projectId)) return CLAIM_BOUNDARY;
+
+  return {
+    supported: [
+      'CuFe₂O₄ spinel ferrite reflections in the supported CuFe₂O₄/SBA-15 sample',
+      'Mesoporous SBA-15 context included in the interpretation',
+    ],
+    requiresValidation: [
+      'Phase distribution across the support',
+      'Loading uniformity',
+      'Surface oxidation-state assignment',
+      'Support interaction and dispersion',
+    ],
+    notSupportedYet: [
+      'Pure bulk CuFe₂O₄ phase-purity assignment',
+      'Publication-level loading-uniformity and dispersion claims',
+    ],
+    contextual: [
+      'Raman/FTIR support features',
+    ],
+    pending: [
+      'XPS surface-state validation',
+    ],
+  };
+}
+
+function getProjectValidationNotes(projectId: string) {
+  if (!isSba15Project(projectId)) return VALIDATION_NOTES;
+
+  return [
+    'Quantify CuFe₂O₄ loading and distribution across SBA-15.',
+    'Review XPS Cu/Fe oxidation state and surface enrichment.',
+    'Compare FTIR silica bands and metal-oxygen bands under the support matrix.',
+    'Use microscopy or mapping evidence to validate dispersion and support interaction.',
+  ];
+}
+
+function getProcessingResultCopy(projectId: string) {
+  if (!isSba15Project(projectId)) {
+    return {
+      processedResult: 'CuFe₂O₄ spinel ferrite assignment from XRD-centered processing',
+      summary:
+        'Processed XRD reflections align with a CuFe₂O₄ spinel ferrite reference pattern while surface and bulk-composition validation remain open.',
+      evidenceReview: [
+        'Major XRD reflections align with the expected cubic spinel pattern.',
+        'Raman context supports local spinel symmetry through the A1g mode.',
+        'XPS remains required for surface oxidation-state validation.',
+        'FTIR provides bonding and surface context but is not definitive for phase assignment.',
+      ],
+      limitations: [
+        'Weak unresolved reflections limit phase-purity strength.',
+        'XPS is surface-sensitive and cannot establish bulk stoichiometry alone.',
+        'Crystallite size and strain separation require additional refinement.',
+      ],
+      materialSystem: canonicalDemoScenario.materialSystem,
+    };
+  }
+
+  return {
+    processedResult: 'Dispersed CuFe₂O₄ reflections in CuFe₂O₄/SBA-15 XRD-centered processing',
+    summary:
+      'Processed evidence supports CuFe₂O₄ spinel ferrite reflections in the supported CuFe₂O₄/SBA-15 sample while support interaction, loading uniformity, and surface oxidation-state assignment remain validation-limited.',
+    evidenceReview: [
+      'CuFe₂O₄-assigned XRD reflections remain visible in the supported CuFe₂O₄/SBA-15 sample.',
+      'Raman context supports ferrite-like local structure but does not establish loading uniformity.',
+      'FTIR silica/support features contextualize the SBA-15 matrix.',
+      'XPS remains required for surface oxidation-state and enrichment review.',
+    ],
+    limitations: [
+      'The result should not be framed as pure or bulk CuFe₂O₄ phase confirmation.',
+      'Phase distribution and loading uniformity across SBA-15 remain validation-limited.',
+      'Support interaction and surface oxidation state require additional validation.',
+    ],
+    materialSystem: 'CuFe₂O₄ on mesoporous SBA-15',
+  };
+}
+
+function getDiscussionDraft(projectId: string, templateMode: NotebookTemplateMode) {
+  if (templateMode === 'research') {
+    return isSba15Project(projectId) ? SBA15_RESEARCH_DISCUSSION_DRAFT : RESEARCH_DISCUSSION_DRAFT;
+  }
+
+  if (templateMode === 'rd') {
+    return isSba15Project(projectId)
+      ? 'The processed characterization result supports continued R&D review of dispersed CuFe₂O₄ on mesoporous SBA-15. The evidence is suitable for optimization planning around loading uniformity, dispersion, support interaction, and surface-state validation, but it should not yet be treated as a scale-up-ready material decision.'
+      : 'The processed characterization result indicates that the CuFe₂O₄ spinel ferrite candidate is structurally plausible for continued prototype review. The evidence is strong enough to continue optimization around synthesis reproducibility and surface-state validation, but it should not yet be treated as a scale-up-ready material decision. The next R&D decision should focus on closing phase-purity, oxidation-state, and bulk-composition risks before go/no-go review.';
+  }
+
+  return isSba15Project(projectId)
+    ? 'The processed evidence is consistent with CuFe₂O₄ spinel ferrite reflections in the supported CuFe₂O₄/SBA-15 sample within the current method scope. Additional validation of phase distribution, loading uniformity, support interaction, and surface oxidation state remains required before issuing a stronger analytical specification statement.'
+    : 'The processed XRD result is consistent with a CuFe₂O₄ spinel ferrite assignment for the submitted sample. The result is valid for a characterization report when it is framed with the current method scope and pending QA/QC requirements. Additional XPS review, quantitative phase assessment, and composition validation remain required before issuing a stronger specification statement.';
+}
 
 export function normalizeNotebookTemplateMode(value?: string | null): NotebookTemplateMode {
   if (value === 'rd' || value === 'r-and-d' || value === 'rnd') return 'rd';
@@ -172,6 +277,7 @@ export function normalizeNotebookTemplateMode(value?: string | null): NotebookTe
 export function createProcessingResultFromXrdDemo(projectId = DEFAULT_PROJECT_ID): ProcessingResult {
   const project = getProject(projectId);
   const sourceRoute = `/workspace/xrd?project=${project.id}`;
+  const copy = getProcessingResultCopy(project.id);
 
   return {
     id: `processing-${project.id}-xrd-demo`,
@@ -181,23 +287,13 @@ export function createProcessingResultFromXrdDemo(projectId = DEFAULT_PROJECT_ID
     processedAt: DEMO_TIMESTAMP,
     title: `${project.name} XRD processing result`,
     sampleId: canonicalDemoScenario.sampleId,
-    materialSystem: canonicalDemoScenario.materialSystem,
-    processedResult: 'CuFe2O4 spinel ferrite assignment from XRD-centered processing',
-    summary:
-      'Processed XRD reflections align with a CuFe2O4 spinel ferrite reference pattern while surface and bulk-composition validation remain open.',
+    materialSystem: copy.materialSystem,
+    processedResult: copy.processedResult,
+    summary: copy.summary,
     detectedFeatures: project.xrdPeaks,
-    evidenceReview: [
-      'Major XRD reflections align with the expected cubic spinel pattern.',
-      'Raman context supports local spinel symmetry through the A1g mode.',
-      'XPS remains required for surface oxidation-state validation.',
-      'FTIR provides bonding and surface context but is not definitive for phase assignment.',
-    ],
-    limitations: [
-      'Weak unresolved reflections limit phase-purity strength.',
-      'XPS is surface-sensitive and cannot establish bulk stoichiometry alone.',
-      'Crystallite size and strain separation require additional refinement.',
-    ],
-    followUpValidation: VALIDATION_NOTES,
+    evidenceReview: copy.evidenceReview,
+    limitations: copy.limitations,
+    followUpValidation: getProjectValidationNotes(project.id),
     metrics: [
       { label: 'Primary Technique', value: canonicalDemoScenario.primaryTechnique },
       { label: 'Supporting Context', value: canonicalDemoScenario.supportingTechniques.join(', ') },
@@ -212,12 +308,9 @@ export function refineDiscussionFromProcessing(
   templateMode: NotebookTemplateMode,
 ): AgentDiscussionRefinement {
   const template = NOTEBOOK_TEMPLATES[templateMode];
-  const discussionDraft =
-    templateMode === 'research'
-      ? RESEARCH_DISCUSSION_DRAFT
-      : templateMode === 'rd'
-        ? 'The processed characterization result indicates that the CuFe2O4 spinel ferrite candidate is structurally plausible for continued prototype review. The evidence is strong enough to continue optimization around synthesis reproducibility and surface-state validation, but it should not yet be treated as a scale-up-ready material decision. The next R&D decision should focus on closing phase-purity, oxidation-state, and bulk-composition risks before go/no-go review.'
-        : 'The processed XRD result is consistent with a CuFe2O4 spinel ferrite assignment for the submitted sample. The result is valid for a characterization report when it is framed with the current method scope and pending QA/QC requirements. Additional XPS review, quantitative phase assessment, and composition validation remain required before issuing a stronger final specification statement.';
+  const discussionDraft = getDiscussionDraft(processingResult.projectId, templateMode);
+  const claimBoundary = getProjectClaimBoundary(processingResult.projectId);
+  const validationNotes = getProjectValidationNotes(processingResult.projectId);
 
   return {
     id: `refinement-${processingResult.id}-${templateMode}`,
@@ -226,11 +319,11 @@ export function refineDiscussionFromProcessing(
     templateMode,
     sourceRoute: `/demo/agent?project=${processingResult.projectId}&processing=${processingResult.id}&template=${templateMode}`,
     title: 'Refined Discussion',
-    subtitle: 'Sharpened from processing output and evidence review',
+    subtitle: 'Refined from XRD processing result and evidence review',
     microFlow: TEMPLATE_MICRO_FLOWS[templateMode],
     discussionDraft,
-    claimBoundary: CLAIM_BOUNDARY,
-    validationNotes: VALIDATION_NOTES,
+    claimBoundary,
+    validationNotes,
     statusSummary: template.statusLabels.map((label, index) => ({
       label,
       value: TEMPLATE_STATUS_VALUES[templateMode][index] ?? 'Review-ready',
@@ -256,7 +349,7 @@ export function createNotebookEntryFromRefinement(
     createdAt: DEMO_TIMESTAMP,
     title: `${template.label}: ${getTemplateEntryTitle(templateMode)}`,
     subtitle: refinement.subtitle,
-    sourceLabel: 'Source: XRD processing + interpretation refinement',
+    sourceLabel: 'Source: Processing Result -> Interpretation Refinement -> Notebook Entry',
     stepperLabels: template.stepperLabels,
     tabs: template.tabs,
     requiredSections: template.requiredSections,
@@ -340,7 +433,7 @@ function getTemplateSections(
       {
         heading: 'Sample Context',
         lines: [
-          'Sample: CuFe2O4 spinel ferrite characterization specimen.',
+          'Sample: CuFe₂O₄ spinel ferrite characterization specimen.',
           'Analytical Run: XRD-centered method execution with supporting Raman, XPS, and FTIR context.',
         ],
       },
@@ -361,7 +454,7 @@ function getTemplateSections(
       {
         heading: 'Analytical Result',
         lines: [
-          'Analytical Result: result validity supports a CuFe2O4 spinel ferrite assignment within the current method scope.',
+          'Analytical Result: result validity supports a CuFe₂O₄ spinel ferrite assignment within the current method scope.',
           'Result Validity: pass for screening report; retest or complementary validation required for stronger specification claims.',
         ],
       },
@@ -379,7 +472,9 @@ function getTemplateSections(
       heading: 'Claim Boundary',
       lines: [
         ...refinement.claimBoundary.supported.map((item) => `Supported: ${item}`),
+        ...(refinement.claimBoundary.contextual?.map((item) => `Contextual: ${item}`) ?? []),
         ...refinement.claimBoundary.requiresValidation.map((item) => `Requires validation: ${item}`),
+        ...(refinement.claimBoundary.pending?.map((item) => `Pending: ${item}`) ?? []),
         ...refinement.claimBoundary.notSupportedYet.map((item) => `Not supported yet: ${item}`),
       ],
     },

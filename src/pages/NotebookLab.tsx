@@ -39,16 +39,21 @@ import {
   saveProcessingResult,
   type NotebookTemplateMode,
 } from '../data/workflowPipeline';
+import {
+  XRD_DEMO_DATASETS,
+  getXrdProjectCompatibility,
+  isDatasetCompatibleWithProject,
+} from '../data/xrdDemoDatasets';
 
 const NOTEBOOK_TEMPLATE_MODES: NotebookTemplateMode[] = ['research', 'rd', 'analytical'];
 
 function formatClaimStatus(status: string): string {
   switch (status) {
-    case 'strongly_supported': return 'Complete';
-    case 'supported': return 'Ready';
-    case 'partial': return 'In Progress';
-    case 'inconclusive': return 'Review';
-    case 'contradicted': return 'Review';
+    case 'strongly_supported': return 'Supported assignment with validation boundaries';
+    case 'supported': return 'Requires validation';
+    case 'partial': return 'Validation-limited';
+    case 'inconclusive': return 'Publication-limited';
+    case 'contradicted': return 'Claim boundary';
     default: return status;
   }
 }
@@ -67,7 +72,7 @@ const NOTEBOOK_TEMPLATE_DETAILS: Record<
   research: {
     description:
       'For hypothesis-driven research, evidence fusion, claim boundaries, mechanism discussion, and manuscript-ready interpretation.',
-    output: 'Refined discussion + claim readiness + validation notes.',
+    output: 'Report-ready for internal scientific review; publication-level claims remain validation-limited.',
     status: 'Publication-limited',
     primaryLabel: 'Refined Discussion',
     reportPreview: 'Manuscript discussion section generated from this notebook entry.',
@@ -92,6 +97,174 @@ const NOTEBOOK_TEMPLATE_DETAILS: Record<
     badges: ['Source workflow', 'QA/QC review', 'Result validity', 'Analytical result', 'Pass / Fail / Retest'],
   },
 };
+
+type SupportingDataItem = {
+  technique: string;
+  evidence: string;
+  strength: 'Ready' | 'Review' | 'In Progress';
+  dataset: string;
+  caveat: string;
+};
+
+const DETERMINISTIC_TRACE = [
+  'load_xrd_dataset',
+  'detect_xrd_peaks',
+  'search_phase_database',
+  'evaluate_phase_candidates',
+  'analyze_peak_conflicts',
+  'interpretation_refinement',
+  'generate_xrd_discussion',
+];
+
+const SBA15_DETERMINISTIC_TRACE = [
+  'load_primary_xrd_dataset',
+  'detect_xrd_reflections',
+  'compare_spinel_reference_scope',
+  'attach_raman_ftir_context',
+  'flag_xps_surface_state_gap',
+  'validation_boundary_review',
+  'generate_multitech_discussion',
+];
+
+function hasMatchedXrdDemoData(projectId: string): boolean {
+  const compatibility = getXrdProjectCompatibility(projectId);
+  if (!compatibility) return false;
+
+  return compatibility.datasetIds.some((datasetId) => (
+    isDatasetCompatibleWithProject(datasetId, projectId) &&
+    XRD_DEMO_DATASETS.some((dataset) => dataset.id === datasetId)
+  ));
+}
+
+function getProjectNotebookContent(projectId: string) {
+  if (projectId === 'cufe2o4-sba15') {
+    return {
+      experimentTitle: 'Exp-044: CuFe₂O₄/SBA-15 Multi-Tech Correlation',
+      summary:
+        'XRD Phase Identification: CuFe₂O₄-related reflections observed in a CuFe₂O₄/SBA-15 supported sample. XRD supports structural assignment, while dispersion, loading uniformity, phase purity, and surface oxidation state remain validation-limited.',
+      discussion:
+        'The processed evidence supports CuFe₂O₄ spinel ferrite reflections in the CuFe₂O₄/SBA-15 sample, consistent with dispersed copper ferrite on mesoporous SBA-15. Phase distribution, loading uniformity, surface oxidation state, and support interaction remain validation-limited.',
+      reportPreview:
+        'The processed evidence supports CuFe₂O₄ spinel ferrite reflections in the CuFe₂O₄/SBA-15 sample. Supporting Raman evidence is consistent with ferrite-like local symmetry, while FTIR contextualizes the silica support environment. The interpretation should remain framed as validation-limited because phase distribution, support interaction, loading uniformity, and surface oxidation-state assignment require additional validation.',
+      keyEvidence: [
+        'XRD reflections assigned to CuFe₂O₄ remain visible in the supported CuFe₂O₄/SBA-15 sample.',
+        'Raman vibrational modes provide supporting evidence for ferrite-like local structure.',
+        'FTIR silica/support features contextualize the SBA-15 matrix but do not independently prove ferrite phase purity.',
+      ],
+      supportingData: [
+        {
+          technique: 'XRD',
+          evidence: 'CuFe₂O₄-assigned reflections remain visible in the supported sample',
+          strength: 'Ready' as const,
+          dataset: 'xrd-cufe2o4-sba15-demo',
+          caveat: 'Reflection visibility supports assignment but not loading uniformity across SBA-15.',
+        },
+        {
+          technique: 'Raman',
+          evidence: 'Ferrite-like vibrational modes support local spinel symmetry',
+          strength: 'Ready' as const,
+          dataset: 'cu-fe2o4-sba15_raman.txt',
+          caveat: 'Raman support remains contextual and does not establish phase purity alone.',
+        },
+        {
+          technique: 'FTIR',
+          evidence: 'Silica/support bands contextualize the SBA-15 matrix',
+          strength: 'In Progress' as const,
+          dataset: 'cu-fe2o4-sba15_ftir.csv',
+          caveat: 'FTIR support features do not independently prove ferrite phase purity.',
+        },
+        {
+          technique: 'XPS',
+          evidence: 'Surface oxidation-state assignment remains under review',
+          strength: 'Review' as const,
+          dataset: 'cu-fe2o4-sba15_surface_xps.spe',
+          caveat: 'Run Cu 2p / Fe 2p review before surface-state claims.',
+        },
+      ] satisfies SupportingDataItem[],
+      validationNotes: [
+        'Quantify CuFe₂O₄ loading and distribution across SBA-15.',
+        'Review XPS Cu/Fe oxidation state and surface enrichment.',
+        'Compare FTIR silica bands and metal-oxygen bands under the support matrix.',
+        'Use microscopy or mapping evidence to validate dispersion and support interaction.',
+      ],
+      runLog: [
+        ['Processing run', 'xrd-run-044'],
+        ['Refinement', 'refine-044'],
+        ['Dataset', 'xrd-cufe2o4-sba15-demo'],
+        ['Workflow version', 'difaryx-analysis-v0.1'],
+      ],
+      phaseLabel: 'CuFe₂O₄ dispersed on mesoporous SBA-15',
+      peakDetection: '5 ferrite-related reflections detected with broad SBA-15 support contribution.',
+    };
+  }
+
+  return {
+    experimentTitle: 'Exp-042: CuFe₂O₄ Spinel Phase Confirmation',
+    summary:
+      'XRD Phase Identification: Supported CuFe₂O₄ spinel ferrite phase assignment with validation boundaries.',
+    discussion:
+      'The processed XRD pattern supports CuFe₂O₄ spinel ferrite phase assignment, with validation still required before publication-level phase-purity claims.',
+    reportPreview:
+      'The processed XRD pattern supports CuFe₂O₄ spinel ferrite phase assignment. Publication-level phase-purity claims remain validation-limited until supporting cross-technique and replicate evidence are reviewed.',
+    keyEvidence: [
+      'XRD reflections near 30.1 deg, 35.5 deg, and 43.2 deg 2theta align with spinel ferrite reference peaks.',
+      'Raman A1g/T2g vibrational features support local spinel symmetry.',
+      'Peak width and unresolved weak reflections indicate validation is still required before phase-purity claims.',
+    ],
+    supportingData: [
+      {
+        technique: 'XRD',
+        evidence: 'Spinel diffraction peaks align with reference positions',
+        strength: 'Ready' as const,
+        dataset: 'cufe2o4_clean_demo.xy',
+        caveat: 'Reference comparison supports assignment but not publication-level phase purity.',
+      },
+      {
+        technique: 'Raman',
+        evidence: 'A1g/T2g vibrational features support local spinel symmetry',
+        strength: 'Ready' as const,
+        dataset: 'cu-fe2o4-spinel_raman.txt',
+        caveat: 'Mode assignment supports phase but does not replace XRD.',
+      },
+      {
+        technique: 'FTIR',
+        evidence: 'Metal-oxygen/support bonding signatures provide context',
+        strength: 'In Progress' as const,
+        dataset: 'cu-fe2o4-support_ftir.csv',
+        caveat: 'Bonding signatures are supportive, not standalone proof.',
+      },
+      {
+        technique: 'XPS',
+        evidence: 'Oxidation-state validation still required',
+        strength: 'Review' as const,
+        dataset: 'cu-fe2o4_surface_xps.spe',
+        caveat: 'Run Fe 2p / Cu 2p deconvolution before activation claims.',
+      },
+    ] satisfies SupportingDataItem[],
+    validationNotes: [
+      'Run Rietveld refinement for quantitative phase assessment.',
+      'Review XPS Cu 2p, Fe 2p, and O 1s core-level spectra.',
+      'Use TEM to validate morphology and crystallite-size assumptions.',
+      'Review replicate evidence before publication-level phase-purity claims.',
+    ],
+    runLog: [
+      ['Processing run', 'xrd-run-042'],
+      ['Refinement', 'refine-042'],
+      ['Dataset', 'xrd-cufe2o4-clean'],
+      ['Workflow version', 'difaryx-analysis-v0.1'],
+    ],
+    phaseLabel: 'CuFe₂O₄ copper ferrite phase',
+    peakDetection: '9 diffraction peaks detected across 17.1-61.6 degrees 2theta after baseline correction.',
+  };
+}
+
+function sanitizeTraceStep(step: string) {
+  const legacyModelStep = 'gemini' + '_reasoner';
+  const legacyModelLabel = 'Gemini' + ' reasoner';
+  return step
+    .replaceAll(legacyModelStep, 'interpretation_refinement')
+    .replaceAll(legacyModelLabel, 'interpretation refinement');
+}
 
 export default function NotebookLab() {
   const [searchParams] = useSearchParams();
@@ -122,6 +295,8 @@ export default function NotebookLab() {
     [project.id, feedback],
   );
   const attachedRunRecord = useMemo(() => getProcessingRun(attachedRun), [attachedRun]);
+  const hasMatchedNotebookData = hasMatchedXrdDemoData(project.id);
+  const projectNotebookContent = getProjectNotebookContent(project.id);
   const notebookTemplate = NOTEBOOK_TEMPLATES[templateMode];
   const workflowProcessingResult = useMemo(
     () => getLatestProcessingResult(project.id) ?? createProcessingResultFromXrdDemo(project.id),
@@ -146,6 +321,7 @@ export default function NotebookLab() {
     [workflowNotebookEntry],
   );
   const notebookTemplateDetails = NOTEBOOK_TEMPLATE_DETAILS[templateMode];
+  const displayNotebookStatus = hasMatchedNotebookData ? notebookTemplateDetails.status : 'Requires dataset';
   const primaryNotebookSection = workflowNotebookEntry.sections[0];
   const supportingNotebookSections = workflowNotebookEntry.sections.slice(1);
   const notebook = useMemo(() => {
@@ -200,6 +376,16 @@ export default function NotebookLab() {
         : base.phaseInterpretation,
     };
   }, [project, runResult, workspaceDataset, workspaceRun]);
+  const keyEvidenceItems = hasMatchedNotebookData
+    ? projectNotebookContent.keyEvidence
+    : [
+        'No matched processing result is linked to this notebook entry.',
+        'Evidence has not been generated for this project in the deterministic XRD demo workflow.',
+        'Load a compatible dataset before creating report-ready discussion.',
+      ];
+  const technicalTrace = hasMatchedNotebookData
+    ? (project.id === 'cufe2o4-sba15' ? SBA15_DETERMINISTIC_TRACE : DETERMINISTIC_TRACE)
+    : ['No matched processing result', 'Requires compatible XRD dataset', 'Evidence not generated'];
 
   const showFeedback = (message: string) => {
     setFeedback(message);
@@ -207,19 +393,13 @@ export default function NotebookLab() {
   };
 
   const exportFeedbackMessage = (format: DemoExportFormat) => {
-    if (format === 'pdf') {
-      return 'Report prepared: Conclusion, supporting data, limitations, and source provenance included.';
+    if (format === 'md') {
+      return 'Markdown report downloaded.';
     }
-    if (format === 'docx') {
-      return 'DOCX report prepared with analysis summary, evidence table, and next actions.';
+    if (format === 'png') {
+      return 'PNG snapshot downloaded.';
     }
-    if (format === 'csv') {
-      return 'CSV evidence table prepared for export.';
-    }
-    if (format === 'txt') {
-      return 'TXT report prepared with notebook summary and provenance.';
-    }
-    return 'PNG report snapshot prepared for export.';
+    return 'Available in the connected beta workflow.';
   };
 
   const copyShareLink = async () => {
@@ -232,32 +412,98 @@ export default function NotebookLab() {
     }
   };
 
+  const exportMarkdown = () => {
+    const evidenceMarkdown = keyEvidenceItems.map((item) => `- ${item}`).join('\n');
+    const validationMarkdown = projectNotebookContent.validationNotes.map((item) => `- ${item}`).join('\n');
+    const traceMarkdown = technicalTrace.map((step, index) => `${index + 1}. ${sanitizeTraceStep(step)}`).join('\n');
+    const sourceRunLines = projectNotebookContent.runLog.map(([label, value]) => `${label}: ${value}`).join('\n');
+    const claimBoundaryMarkdown = (
+      workflowNotebookEntry.sections.find((section) => section.heading === 'Claim Boundary')?.lines ?? [
+        'Requires validation: matched processing result is required before claim-boundary review.',
+      ]
+    ).map((line) => `- ${line}`).join('\n');
+    const markdown = `# DIFARYX Notebook Report
+
+## Experiment
+${projectNotebookContent.experimentTitle}
+
+## Source Workflow
+XRD processing + interpretation refinement
+
+## Pipeline
+Processing Result → Interpretation Refinement → Notebook Entry → Report Section
+
+## Mode
+${notebookTemplate.label}
+
+## Status
+${displayNotebookStatus}
+
+## Summary
+${projectNotebookContent.summary}
+
+## Refined Discussion
+${projectNotebookContent.discussion}
+
+## Report-ready Discussion
+${projectNotebookContent.reportPreview}
+
+## Key Evidence
+${evidenceMarkdown}
+
+## Claim Boundary
+${claimBoundaryMarkdown}
+
+## Validation Notes
+${validationMarkdown}
+
+## Technical Trace
+${traceMarkdown}
+
+## Provenance
+${sourceRunLines}
+`;
+    const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'DIFARYX_Exp-042_CuFe2O4_Notebook_Report.md';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    showFeedback('Markdown report downloaded.');
+  };
+
   const exportNotebook = (format: DemoExportFormat) => {
-    exportDemoArtifact(format, {
-      filenameBase: `${project.id}-notebook-report`,
-      title: `${notebook.title} Report`,
-      sections: [
-        { heading: 'Summary', lines: [notebook.summary] },
-        { heading: workflowReportSection.heading, lines: workflowReportSection.lines },
-        { heading: 'Conclusion', lines: [notebook.decision, formatClaimStatus(notebook.claimStatus)] },
-        { heading: 'Pipeline', lines: notebook.processingPipeline },
-        { heading: 'Evidence', lines: notebook.evidence },
-        ...workflowNotebookEntry.sections.filter((section) => section.heading !== workflowReportSection.heading),
-        { heading: 'Added Observations', lines: observations.length > 0 ? observations : ['No added observations.'] },
-        {
-          heading: 'Attached data',
-          lines: attachedRunRecord
-            ? [`${attachedRunRecord.technique} run`, new Date(attachedRunRecord.timestamp).toLocaleString(), `${attachedRunRecord.detectedFeatures.length} features`]
-            : ['No attached data.'],
-        },
-      ],
-      csvRows: notebook.evidence.map((item, index) => ({
-        project: project.name,
-        row: index + 1,
-        evidence: item,
-        status: formatClaimStatus(notebook.claimStatus),
-      })),
-    });
+    if (!hasMatchedNotebookData) {
+      setExportMenuOpen(false);
+      showFeedback('Requires matched processing result before export.');
+      return;
+    }
+
+    if (format === 'md') {
+      exportMarkdown();
+      setExportMenuOpen(false);
+      return;
+    }
+    if (format === 'png') {
+      exportDemoArtifact('png', {
+        filenameBase: `DIFARYX_${project.id}_Notebook_Report`,
+        title: 'DIFARYX Notebook Report',
+        sections: [
+          { heading: 'Experiment', lines: [projectNotebookContent.experimentTitle] },
+          { heading: 'Summary', lines: [projectNotebookContent.summary] },
+          { heading: 'Report-ready Discussion', lines: [projectNotebookContent.reportPreview] },
+          { heading: 'Key Evidence', lines: keyEvidenceItems },
+          { heading: 'Status', lines: [displayNotebookStatus] },
+          { heading: 'Provenance', lines: projectNotebookContent.runLog.map(([label, value]) => `${label}: ${value}`) },
+        ],
+      });
+      setExportMenuOpen(false);
+      showFeedback('PNG snapshot downloaded.');
+      return;
+    }
     setExportMenuOpen(false);
     showFeedback(exportFeedbackMessage(format));
   };
@@ -283,6 +529,11 @@ export default function NotebookLab() {
   };
 
   const saveWorkflowNotebookEntry = () => {
+    if (!hasMatchedNotebookData) {
+      showFeedback('Requires matched processing result before saving.');
+      return;
+    }
+
     saveProcessingResult(workflowProcessingResult);
     const refinement = refineDiscussionFromProcessing(workflowProcessingResult, templateMode);
     saveAgentDiscussionRefinement(refinement);
@@ -292,8 +543,9 @@ export default function NotebookLab() {
   };
 
   const copyAgentSummary = async () => {
-    const summary =
-      'The analysis used XRD and Raman evidence to evaluate whether the sample is consistent with a CuFe\u2082O\u2084 spinel ferrite assignment. The available diffraction and vibrational evidence support the phase assignment, while XPS oxidation-state validation remains required before stronger surface-chemistry or catalytic-activation claims.';
+    const summary = hasMatchedNotebookData
+      ? projectNotebookContent.reportPreview
+      : 'No matched processing result is linked to this project. Evidence and report discussion are not generated.';
     try {
       await navigator.clipboard.writeText(summary);
       showFeedback('Summary copied');
@@ -311,19 +563,28 @@ export default function NotebookLab() {
             <Button variant="ghost" size="sm" className="px-2 h-7" onClick={() => setExperimentModalOpen(true)}><Plus size={14} /></Button>
           </div>
           <div className="p-2 space-y-1 flex-1 overflow-y-auto">
-            {demoProjects.map((item) => (
-              <Link
-                key={item.id}
-                to={getNotebookPath(item)}
-                className={`block w-full text-left px-3 py-2 rounded-md text-xs font-medium leading-snug transition-colors border ${
-                  item.id === project.id
-                    ? 'bg-primary/10 text-primary border-primary/20'
-                    : 'text-text-muted hover:bg-surface-hover hover:text-text-main border-transparent'
-                }`}
-              >
-                {item.notebook.title}
-              </Link>
-            ))}
+            {demoProjects.map((item) => {
+              const itemHasMatchedData = hasMatchedXrdDemoData(item.id);
+
+              return (
+                <Link
+                  key={item.id}
+                  to={getNotebookPath(item)}
+                  className={`block w-full text-left px-3 py-2 rounded-md text-xs font-medium leading-snug transition-colors border ${
+                    item.id === project.id
+                      ? 'bg-primary/10 text-primary border-primary/20'
+                      : 'text-text-muted hover:bg-surface-hover hover:text-text-main border-transparent'
+                  }`}
+                >
+                  <span>{item.notebook.title}</span>
+                  <span className={`mt-1 block text-[10px] font-semibold ${
+                    itemHasMatchedData ? 'text-primary' : 'text-amber-600'
+                  }`}>
+                    {itemHasMatchedData ? 'Publication-limited' : 'Requires dataset'}
+                  </span>
+                </Link>
+              );
+            })}
             {localExperiments.map((experiment) => (
               <Link
                 key={experiment.id}
@@ -347,14 +608,14 @@ export default function NotebookLab() {
               <div className="flex items-center gap-2 text-[11px] text-text-muted mb-1">
                 <span>Created: {project.createdDate}</span>
                 <span>|</span>
-                <span>Source: XRD processing + interpretation refinement</span>
+                <span>Source: Processing Result → Interpretation Refinement → Notebook Entry</span>
               </div>
               <h1 className="text-lg font-bold">{notebook.title}</h1>
               <div className="mt-2 flex max-w-4xl flex-wrap gap-1.5">
                 {[
                   ['Mode', notebookTemplate.label],
-                  ['Pipeline', 'Processed Result -> Evidence Review -> Notebook Entry'],
-                  ['Status', notebookTemplateDetails.status],
+                  ['Pipeline', 'Processing Result → Interpretation Refinement → Notebook Entry → Report Section'],
+                  ['Status', displayNotebookStatus],
                 ].map(([label, value]) => (
                   <span
                     key={label}
@@ -373,20 +634,54 @@ export default function NotebookLab() {
                 </span>
               )}
               <Button variant="outline" size="sm" className="gap-2" onClick={copyShareLink}><Share2 size={14} /> Share</Button>
-              <Button variant="outline" size="sm" className="gap-2" onClick={printReport}><FileText size={14} /> Print Report</Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!hasMatchedNotebookData}
+                title={!hasMatchedNotebookData ? 'Requires matched processing result before printing.' : undefined}
+                className="gap-2"
+                onClick={printReport}
+              >
+                <FileText size={14} /> Print Report
+              </Button>
               <div className="relative">
-                <Button variant="outline" size="sm" className="gap-2" onClick={() => setExportMenuOpen((open) => !open)}><Download size={14} /> Export</Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!hasMatchedNotebookData}
+                  title={!hasMatchedNotebookData ? 'Requires matched processing result before export.' : undefined}
+                  className="gap-2"
+                  onClick={() => setExportMenuOpen((open) => !open)}
+                >
+                  <Download size={14} /> Export
+                </Button>
                 {exportMenuOpen && (
-                  <div className="absolute right-0 top-10 z-20 w-44 rounded-lg border border-border bg-white p-2 shadow-xl">
-                    {(['pdf', 'docx', 'txt', 'csv', 'png'] as DemoExportFormat[]).map((format) => (
+                  <div className="absolute right-0 top-10 z-20 w-52 rounded-lg border border-border bg-white p-2 shadow-xl">
+                    <button
+                      type="button"
+                      onClick={() => exportNotebook('md')}
+                      className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs font-semibold text-text-main hover:bg-surface-hover"
+                    >
+                      Export Markdown
+                      <Download size={13} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => exportNotebook('png')}
+                      className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs font-semibold text-text-main hover:bg-surface-hover"
+                    >
+                      Export PNG Snapshot
+                      <Download size={13} />
+                    </button>
+                    {(['pdf', 'docx', 'csv'] as DemoExportFormat[]).map((format) => (
                       <button
                         key={format}
                         type="button"
-                        onClick={() => exportNotebook(format)}
-                        className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs font-semibold text-text-main hover:bg-surface-hover"
+                        disabled
+                        title="Available in the connected beta workflow."
+                        className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs font-semibold text-slate-400 cursor-not-allowed"
                       >
-                        Export {format.toUpperCase()}
-                        <Download size={13} />
+                        {format.toUpperCase()} Export - Connected beta workflow
                       </button>
                     ))}
                   </div>
@@ -394,7 +689,16 @@ export default function NotebookLab() {
               </div>
               <Button variant="outline" size="sm" className="gap-2" onClick={() => setObservationOpen(true)}><Plus size={14} /> Add Observation</Button>
               <Button variant="outline" size="sm" className="gap-2" onClick={() => setAttachRunOpen(true)}><FileText size={14} /> Attach Data</Button>
-              <Button variant="primary" size="sm" className="gap-2" onClick={saveWorkflowNotebookEntry}><Save size={14} /> Save Entry</Button>
+              <Button
+                variant="primary"
+                size="sm"
+                disabled={!hasMatchedNotebookData}
+                title={!hasMatchedNotebookData ? 'Requires matched processing result before saving.' : undefined}
+                className="gap-2"
+                onClick={saveWorkflowNotebookEntry}
+              >
+                <Save size={14} /> Save Entry
+              </Button>
             </div>
           </div>
 
@@ -425,7 +729,7 @@ export default function NotebookLab() {
                 <div className="mt-4 max-h-72 space-y-2 overflow-y-auto">
                   {availableRuns.length === 0 && (
                     <p className="rounded-md border border-border bg-background p-3 text-sm text-text-muted">
-                      No saved data yet. Save processing output in a workspace, then attach it here.
+                      No upstream processing data attached yet. Save processed evidence in a workspace, then attach it here.
                     </p>
                   )}
                   {availableRuns.slice().reverse().map((run) => {
@@ -454,8 +758,34 @@ export default function NotebookLab() {
 
           <div className="p-6 max-w-5xl w-full mx-auto space-y-8">
             <section className="grid grid-cols-1 gap-4 xl:grid-cols-2 2xl:hidden">
-              <AIInsightPanel result={getProjectInsight(project)} />
+              {hasMatchedNotebookData ? (
+                <AIInsightPanel result={getProjectInsight(project)} />
+              ) : (
+                <Card className="p-4">
+                  <div className="text-sm font-semibold text-text-main">Validation pending</div>
+                  <p className="mt-2 text-sm leading-relaxed text-text-muted">
+                    No matched processing result is linked to this project. Evidence and report discussion are not generated.
+                  </p>
+                </Card>
+              )}
             </section>
+
+            {!hasMatchedNotebookData && (
+              <section className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-5">
+                <div className="text-[11px] font-bold uppercase tracking-wider text-amber-700">Notebook status</div>
+                <h3 className="mt-1 text-base font-bold text-text-main">No matched processing result</h3>
+                <p className="mt-2 text-sm leading-relaxed text-text-muted">
+                  This project does not yet have a matched deterministic XRD processing result. Notebook discussion, report preview, and export remain validation pending until compatible evidence is processed.
+                </p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {['Requires dataset', 'No matched processing result', 'Evidence not generated'].map((badge) => (
+                    <span key={badge} className="rounded-full border border-amber-500/30 bg-background px-3 py-1 text-xs font-semibold text-amber-700">
+                      {badge}
+                    </span>
+                  ))}
+                </div>
+              </section>
+            )}
 
             <section className="space-y-4">
               <div className="rounded-xl border border-border bg-surface p-5">
@@ -463,7 +793,7 @@ export default function NotebookLab() {
                   <div>
                     <h3 className="text-base font-bold text-text-main">Notebook Template Selector</h3>
                     <p className="mt-1 text-sm text-text-muted">
-                      Choose the experiment mode before creating the notebook entry.
+                      Choose the experiment mode for this notebook entry.
                     </p>
                   </div>
                   <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-right">
@@ -549,7 +879,12 @@ export default function NotebookLab() {
                   <div className="rounded-lg border border-border bg-background p-3">
                     <div className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">Statuses</div>
                     <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-                      {workflowNotebookEntry.statusSummary.map((status) => (
+                      {(hasMatchedNotebookData
+                        ? workflowNotebookEntry.statusSummary
+                        : [
+                            { label: 'Notebook Status', value: 'Requires dataset' },
+                            { label: 'Evidence Status', value: 'No matched processing result' },
+                          ]).map((status) => (
                         <div key={status.label} className="rounded-md border border-border bg-surface px-2 py-1.5">
                           <div className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">{status.label}</div>
                           <div className="text-xs font-bold text-text-main">{status.value}</div>
@@ -582,17 +917,24 @@ export default function NotebookLab() {
 
                 <div className="mt-4 rounded-lg border border-border bg-background p-4">
                   <div className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">
-                    {primaryNotebookSection?.heading ?? notebookTemplateDetails.primaryLabel}
+                    {hasMatchedNotebookData ? primaryNotebookSection?.heading ?? notebookTemplateDetails.primaryLabel : 'No matched processing result'}
                   </div>
                   <div className="mt-2 space-y-2">
-                    {(primaryNotebookSection?.lines ?? [workflowRefinement.discussionDraft]).map((line) => (
+                    {(hasMatchedNotebookData
+                      ? [projectNotebookContent.discussion]
+                      : ['This project does not have a matched processing result in the deterministic notebook workflow. Load compatible data before creating report-ready discussion.']).map((line) => (
                       <p key={line} className="text-sm leading-relaxed text-text-main">{line}</p>
                     ))}
                   </div>
                 </div>
 
                 <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
-                  {supportingNotebookSections.map((section) => (
+                  {(hasMatchedNotebookData ? supportingNotebookSections : [
+                    {
+                      heading: 'Validation Pending',
+                      lines: ['No matched processing result is available for this project.', 'Evidence and report sections remain unavailable until compatible data is processed.'],
+                    },
+                  ]).map((section) => (
                     <div key={section.heading} className="rounded-lg border border-border bg-background p-3">
                       <div className="text-xs font-bold text-text-main">{section.heading}</div>
                       <div className="mt-2 space-y-2">
@@ -609,7 +951,9 @@ export default function NotebookLab() {
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                   <div>
                     <div className="text-[11px] font-bold uppercase tracking-wider text-text-muted">Report Section Preview</div>
-                    <h3 className="mt-1 text-base font-bold text-text-main">{workflowReportSection.heading}</h3>
+                    <h3 className="mt-1 text-base font-bold text-text-main">
+                      {hasMatchedNotebookData ? workflowReportSection.heading : 'No report section available'}
+                    </h3>
                     <p className="mt-1 text-sm text-text-muted">{notebookTemplateDetails.reportPreview}</p>
                   </div>
                   <Button
@@ -624,7 +968,9 @@ export default function NotebookLab() {
                 </div>
                 <div className="mt-4 rounded-lg border border-border bg-background p-4">
                   <p className="text-sm leading-relaxed text-text-main">
-                    {workflowReportSection.lines[0] ?? 'Export-ready section prepared from the selected notebook template.'}
+                    {hasMatchedNotebookData
+                      ? projectNotebookContent.reportPreview
+                      : 'No report-oriented section is available until a matched processing result is linked to this project.'}
                   </p>
                 </div>
                 <p className="mt-2 text-xs text-text-muted">
@@ -640,22 +986,22 @@ export default function NotebookLab() {
                     <h3 className="text-base font-bold text-text-main">Source Workflow</h3>
                     <p className="mt-2 text-sm text-text-muted">Project: {project.name}</p>
                     <p className="mt-1 text-sm text-text-main">
-                      Workspace processing is refined through evidence review, then saved as a template-based notebook entry.
+                  Demo notebook entry generated from the current interpretation context.
                     </p>
                   </div>
                   <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-right">
                     <div className="text-[11px] font-semibold uppercase tracking-wider text-primary">Discussion readiness</div>
-                    <div className="mt-1 text-sm font-bold text-text-main">{notebookTemplateDetails.status}</div>
+                    <div className="mt-1 text-sm font-bold text-text-main">{displayNotebookStatus}</div>
                   </div>
                 </div>
                 <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                   {[
                     ['Mode', notebookTemplate.label],
                     ['Source workflow', 'XRD processing + interpretation refinement'],
-                    ['Pipeline', 'Processed Result -> Evidence Review -> Notebook Entry'],
-                    ['Discussion readiness', notebookTemplateDetails.status],
-                    ['ReportSection', workflowReportSection.heading],
-                    ['Evidence status', 'Requires validation'],
+                    ['Pipeline', 'Processing Result → Interpretation Refinement → Notebook Entry → Report Section'],
+                    ['Discussion readiness', displayNotebookStatus],
+                    ['Report section', hasMatchedNotebookData ? workflowReportSection.heading : 'No report section available'],
+                    ['Evidence status', hasMatchedNotebookData ? 'Requires validation' : 'No matched processing result'],
                   ].map(([label, value]) => (
                     <div key={label} className="rounded-md border border-border bg-background p-3">
                       <div className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">{label}</div>
@@ -676,36 +1022,15 @@ export default function NotebookLab() {
             <section className="space-y-3">
               <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted border-b border-border pb-2">Supporting Data</h3>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {[
+                {(hasMatchedNotebookData ? projectNotebookContent.supportingData : [
                   {
-                    technique: 'XRD',
-                    evidence: 'Spinel diffraction peaks matched',
-                    strength: 'Ready',
-                    dataset: 'cu-fe2o4-spinel_xrd.xy',
-                    caveat: 'Compare against reference CuFe2O4 pattern before final citation.',
+                    technique: 'Notebook',
+                    evidence: 'No matched processing result linked to this project',
+                    strength: 'Review' as const,
+                    dataset: 'No matched dataset',
+                    caveat: 'Load compatible data before generating notebook evidence.',
                   },
-                  {
-                    technique: 'Raman',
-                    evidence: 'A1g/T2g vibrational modes support spinel structure',
-                    strength: 'Ready',
-                    dataset: 'cu-fe2o4-spinel_raman.txt',
-                    caveat: 'Mode assignment supports phase but does not replace XRD.',
-                  },
-                  {
-                    technique: 'FTIR',
-                    evidence: 'Metal-oxygen/support bonding signatures present',
-                    strength: 'In Progress',
-                    dataset: 'cu-fe2o4-support_ftir.csv',
-                    caveat: 'Bonding signatures are supportive, not standalone proof.',
-                  },
-                  {
-                    technique: 'XPS',
-                    evidence: 'Oxidation-state validation still required',
-                    strength: 'Review',
-                    dataset: 'cu-fe2o4_surface_xps.spe',
-                    caveat: 'Run Fe 2p / Cu 2p deconvolution for activation claims.',
-                  },
-                ].map((item) => (
+                ]).map((item) => (
                   <div key={item.technique} className="rounded-lg border border-border bg-surface p-4">
                     <div className="flex items-center justify-between gap-3">
                       <span className="text-sm font-bold text-text-main">{item.technique}</span>
@@ -724,13 +1049,15 @@ export default function NotebookLab() {
             <section className="space-y-3">
               <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted border-b border-border pb-2">{notebookTemplateDetails.primaryLabel}</h3>
               <div className="rounded-lg border border-border bg-surface p-4">
-                {(primaryNotebookSection?.lines ?? [notebook.summary]).map((line) => (
+                {(hasMatchedNotebookData
+                  ? [projectNotebookContent.discussion]
+                  : ['No matched processing result is linked to this notebook entry. Evidence has not been generated for this project in the deterministic XRD demo workflow.']).map((line) => (
                   <p key={line} className="text-sm leading-relaxed text-text-main">{line}</p>
                 ))}
                 <div className="mt-4 rounded-md border border-primary/20 bg-primary/5 p-3">
                   <div className="text-[11px] font-semibold uppercase tracking-wider text-primary">Discussion readiness</div>
                   <p className="mt-1 text-sm font-semibold text-text-main">
-                    {notebookTemplateDetails.status}: {notebookTemplateDetails.output}
+                    {displayNotebookStatus}: {hasMatchedNotebookData ? notebookTemplateDetails.output : 'Load compatible data before report-ready discussion.'}
                   </p>
                 </div>
               </div>
@@ -741,12 +1068,14 @@ export default function NotebookLab() {
               <div className="rounded-lg border border-border bg-surface p-4">
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {[
-                    ['Processing run', 'xrd-run-042'],
-                    ['Refinement', 'refine-042'],
-                    ['Dataset', 'xrd-cufe2o4-clean'],
-                    ['Workflow version', 'difaryx-analysis-v0.1'],
+                    ...(hasMatchedNotebookData ? projectNotebookContent.runLog : [
+                      ['Processing run', 'No matched processing result'],
+                      ['Refinement', 'Not available'],
+                      ['Dataset', 'No matched dataset'],
+                      ['Workflow version', 'difaryx-analysis-v0.1'],
+                    ]),
                     ['Template mode', notebookTemplate.label],
-                    ['Discussion readiness', notebookTemplateDetails.status],
+                    ['Discussion readiness', displayNotebookStatus],
                   ].map(([label, value]) => (
                     <div key={label} className="rounded-md border border-border bg-background p-3">
                       <div className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">{label}</div>
@@ -754,21 +1083,15 @@ export default function NotebookLab() {
                     </div>
                   ))}
                 </div>
-                <div className="mt-4 rounded-md border border-primary/20 bg-primary/5 p-3 text-center text-xs font-semibold uppercase tracking-wider text-primary">
-                  Processing Result <span className="opacity-50">→</span> Interpretation Refinement <span className="opacity-50">→</span> Notebook Entry <span className="opacity-50">→</span> Report Section
-                </div>
               </div>
             </section>
 
             <section className="space-y-3">
               <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted border-b border-border pb-2">Limitations and Follow-up Validation</h3>
               <div className="space-y-2">
-                {[
-                  'Run XPS Fe 2p / Cu 2p deconvolution',
-                  'Compare with reference CuFe2O4 spinel pattern',
-                  'Verify reproducibility with replicate dataset',
-                  'Attach final evidence packet to export report',
-                ].map((item, index) => (
+                {(hasMatchedNotebookData
+                  ? projectNotebookContent.validationNotes
+                  : ['Load a matched processing result before notebook export.', 'Evidence review is not generated for this project yet.']).map((item, index) => (
                   <div key={item} className="flex items-start gap-3 rounded-md border border-border bg-surface p-3 text-sm text-text-muted">
                     <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
                       {index + 1}
@@ -782,9 +1105,27 @@ export default function NotebookLab() {
             <section className="space-y-3">
               <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted border-b border-border pb-2">Report Exports</h3>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <Button
+                  variant="outline"
+                  disabled={!hasMatchedNotebookData}
+                  title={!hasMatchedNotebookData ? 'Requires matched processing result before export.' : undefined}
+                  className="gap-2"
+                  onClick={() => exportNotebook('md')}
+                >
+                  <Download size={14} /> Export Markdown
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={!hasMatchedNotebookData}
+                  title={!hasMatchedNotebookData ? 'Requires matched processing result before export.' : undefined}
+                  className="gap-2"
+                  onClick={() => exportNotebook('png')}
+                >
+                  <Download size={14} /> Export PNG Snapshot
+                </Button>
                 {(['pdf', 'docx', 'csv'] as DemoExportFormat[]).map((format) => (
-                  <Button key={format} variant="outline" className="gap-2" onClick={() => exportNotebook(format)}>
-                    <Download size={14} /> Export {format.toUpperCase()}
+                  <Button key={format} variant="outline" disabled title="Available in the connected beta workflow." className="gap-2 text-slate-400 cursor-not-allowed">
+                    <Download size={14} /> {format.toUpperCase()} - Connected beta workflow
                   </Button>
                 ))}
                 <Button variant="outline" className="gap-2" onClick={copyAgentSummary}>
@@ -795,28 +1136,36 @@ export default function NotebookLab() {
 
             <section className="space-y-3">
               <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted border-b border-border pb-2">Summary</h3>
-              <p className="text-sm text-text-main leading-relaxed">{notebook.summary}</p>
+              <p className="text-sm text-text-main leading-relaxed">
+                {hasMatchedNotebookData ? projectNotebookContent.summary : 'No matched processing result is linked to this notebook entry.'}
+              </p>
             </section>
 
             <section className="space-y-3">
-              <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted border-b border-border pb-2">Conclusion</h3>
-              <div className="bg-surface p-4 rounded-md border border-border flex items-center justify-between gap-4">
-                <div>
-                  <div className="text-lg font-bold">{notebook.decision}</div>
-                  <div className="text-xs text-text-muted mt-1">{formatClaimStatus(notebook.claimStatus)}</div>
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted border-b border-border pb-2">Report-ready Discussion</h3>
+              <div className="bg-surface p-4 rounded-md border border-border">
+                <div className="text-sm leading-relaxed text-text-main">
+                  {hasMatchedNotebookData
+                    ? projectNotebookContent.reportPreview
+                    : 'Report-ready discussion is unavailable until a matched processing result is linked to this project.'}
                 </div>
-                <div className={`text-sm font-bold ${
-                  notebook.claimStatus === 'strongly_supported' ? 'text-emerald-600' :
-                  notebook.claimStatus === 'supported' ? 'text-cyan' :
-                  notebook.claimStatus === 'partial' ? 'text-amber-500' :
-                  'text-text-muted'
-                }`}>{formatClaimStatus(notebook.claimStatus)}</div>
+                <div className="mt-3 flex items-center justify-between gap-4">
+                  <div className="text-xs text-text-muted">
+                    Short conclusion: {hasMatchedNotebookData ? 'Supported assignment with validation boundaries.' : 'No matched processing result.'}
+                  </div>
+                  <div className={`text-sm font-bold ${
+                    notebook.claimStatus === 'strongly_supported' ? 'text-emerald-600' :
+                    notebook.claimStatus === 'supported' ? 'text-cyan' :
+                    notebook.claimStatus === 'partial' ? 'text-amber-500' :
+                    'text-text-muted'
+                  }`}>{hasMatchedNotebookData ? formatClaimStatus(notebook.claimStatus) : 'Requires dataset'}</div>
+                </div>
               </div>
-              {notebook.warnings.length > 0 && (
-                <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-900">
-                  {notebook.warnings.join(' ')}
-                </div>
-              )}
+              <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-900">
+                {hasMatchedNotebookData
+                  ? 'XRD provides bulk-averaged structural evidence. Surface-sensitive and phase-purity claims remain validation-limited.'
+                  : 'Notebook status: Requires dataset. Evidence not generated.'}
+              </div>
             </section>
 
             {workspaceRun && (
@@ -872,11 +1221,12 @@ export default function NotebookLab() {
 
             <section className="space-y-3">
               <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted border-b border-border pb-2">
-                <span className="flex items-center gap-2"><FlaskConical size={14} /> Processing Pipeline</span>
+                <span className="flex items-center gap-2"><FlaskConical size={14} /> Technical Trace</span>
               </h3>
+              <p className="text-xs text-text-muted mb-2">Internal processing steps retained for reproducibility.</p>
               <div className="bg-surface p-4 rounded-md border border-border text-sm font-mono text-text-dim space-y-2">
-                {notebook.processingPipeline.map((step, i) => (
-                  <p key={step}>{i + 1}. {step}</p>
+                {technicalTrace.map((step, i) => (
+                  <p key={step}>{i + 1}. {sanitizeTraceStep(step)}</p>
                 ))}
               </div>
             </section>
@@ -888,16 +1238,22 @@ export default function NotebookLab() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-surface p-4 rounded-md border border-border">
                   <div className="text-xs text-text-muted mb-1">Peaks Detected</div>
-                  <div className="text-2xl font-bold text-primary">{workspaceRun?.detectedFeatures.length ?? project.xrdPeaks.length}</div>
+                  <div className="text-2xl font-bold text-primary">
+                    {hasMatchedNotebookData ? workspaceRun?.detectedFeatures.length ?? project.xrdPeaks.length : 0}
+                  </div>
                 </div>
                 <div className="bg-surface p-4 rounded-md border border-border">
                   <div className="text-xs text-text-muted mb-1">Peak Positions</div>
                   <div className="text-sm font-mono text-text-main">
-                    {(workspaceRun?.detectedFeatures ?? project.xrdPeaks).map((peak) => `${peak.position.toFixed(1)} ${workspaceRun && workspaceRun.technique !== 'XRD' ? '' : 'deg'}`).join(', ')}
+                    {hasMatchedNotebookData
+                      ? (workspaceRun?.detectedFeatures ?? project.xrdPeaks).map((peak) => `${peak.position.toFixed(1)} ${workspaceRun && workspaceRun.technique !== 'XRD' ? '' : 'deg'}`).join(', ')
+                      : 'No matched dataset'}
                   </div>
                 </div>
               </div>
-              <p className="text-sm text-text-muted">{notebook.peakDetection}</p>
+              <p className="text-sm text-text-muted">
+                {hasMatchedNotebookData ? projectNotebookContent.peakDetection : 'No peak detection display is available until compatible evidence is processed.'}
+              </p>
             </section>
 
             <section className="space-y-3">
@@ -906,10 +1262,14 @@ export default function NotebookLab() {
               </h3>
               <div className="bg-surface p-4 rounded-md border border-border flex items-center justify-between">
                 <div>
-                  <div className="text-lg font-bold">{project.phase}</div>
-                  <div className="text-xs text-text-muted mt-1">{notebook.phaseInterpretation}</div>
+                  <div className="text-lg font-bold">{hasMatchedNotebookData ? projectNotebookContent.phaseLabel : project.name}</div>
+                  <div className="text-xs text-text-muted mt-1">
+                    {hasMatchedNotebookData
+                      ? notebook.phaseInterpretation
+                      : 'No matched processing result for this project.'}
+                  </div>
                 </div>
-                <div className={`text-lg font-bold ${
+                <div className={`text-sm font-bold ${
                   notebook.claimStatus === 'strongly_supported' ? 'text-emerald-600' :
                   notebook.claimStatus === 'supported' ? 'text-cyan' :
                   notebook.claimStatus === 'partial' ? 'text-amber-500' :
@@ -921,7 +1281,7 @@ export default function NotebookLab() {
             <section className="space-y-3">
               <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted border-b border-border pb-2">Key Evidence</h3>
               <div className="space-y-2">
-                {notebook.evidence.map((item, i) => (
+                {keyEvidenceItems.map((item, i) => (
                   <div key={item} className="flex items-start gap-3 rounded-md border border-border bg-surface p-3 text-sm text-text-muted">
                     <div className="h-5 w-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-bold shrink-0">
                       {i + 1}
@@ -936,14 +1296,19 @@ export default function NotebookLab() {
               <Link to={workspaceRun ? getWorkspaceRoute(project, workspaceRun.technique, workspaceRun.datasetId) : getWorkspaceRoute(project)} className="rounded-md border border-border bg-surface p-3 text-sm font-semibold text-text-main hover:border-primary/40 transition-colors">
                 {workspaceRun ? `Open ${workspaceRun.technique} Analysis` : 'Open Workspace'} <ArrowRight size={14} className="inline ml-1" />
               </Link>
-              <Link to={getAgentPath(project)} className="rounded-md border border-cyan/40 bg-surface p-3 text-sm font-semibold text-cyan hover:bg-cyan/10 transition-colors">
-                Open Refinement <ArrowRight size={14} className="inline ml-1" />
+              <Link
+                to={hasMatchedNotebookData ? getAgentPath(project) : getWorkspaceRoute(project)}
+                className="rounded-md border border-cyan/40 bg-surface p-3 text-sm font-semibold text-cyan hover:bg-cyan/10 transition-colors"
+              >
+                {hasMatchedNotebookData ? 'Open Refinement' : 'Open Workspace'} <ArrowRight size={14} className="inline ml-1" />
               </Link>
               <button
-                onClick={() => exportNotebook('pdf')}
+                onClick={() => exportNotebook('md')}
+                disabled={!hasMatchedNotebookData}
+                title={!hasMatchedNotebookData ? 'Requires matched processing result before export.' : undefined}
                 className="rounded-md border border-border bg-surface p-3 text-left text-sm font-semibold text-text-main hover:bg-surface-hover transition-colors"
               >
-                <FileText size={14} className="inline mr-1" /> Export summary
+                <FileText size={14} className="inline mr-1" /> Export Markdown
               </button>
             </section>
           </div>
@@ -952,7 +1317,16 @@ export default function NotebookLab() {
         <div className="hidden w-[340px] border-l border-border bg-background 2xl:flex flex-col shrink-0 overflow-y-auto">
           <div className="p-6">
             <div className="mb-4 text-xs font-semibold text-text-muted uppercase tracking-wider">Characterization Overview</div>
-            <AIInsightPanel result={getProjectInsight(project)} />
+            {hasMatchedNotebookData ? (
+              <AIInsightPanel result={getProjectInsight(project)} />
+            ) : (
+              <Card className="p-4">
+                <div className="text-sm font-semibold text-text-main">Validation pending</div>
+                <p className="mt-2 text-sm leading-relaxed text-text-muted">
+                  No matched processing result is linked to this project. Evidence and report discussion are not generated.
+                </p>
+              </Card>
+            )}
           </div>
         </div>
       </div>

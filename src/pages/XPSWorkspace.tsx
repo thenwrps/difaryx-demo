@@ -87,7 +87,7 @@ export default function XPSWorkspace() {
 
   const handleUploadDataset = () => {
     // Upload functionality placeholder
-    alert('File upload functionality coming soon. Please use "Load Sample Dataset" to try the workspace.');
+    alert('Available in the connected beta workflow. Load the demo dataset to try the workspace.');
   };
   
   // Run XPS processing with current parameters
@@ -175,10 +175,10 @@ export default function XPSWorkspace() {
     'Peak overlap requires careful deconvolution',
   ];
   
-  const reviewStatus = claimStatus === 'strongly_supported' ? 'Complete'
-    : claimStatus === 'supported' ? 'Ready'
-    : claimStatus === 'partial' ? 'In Progress'
-    : 'Review';
+  const reviewStatus = claimStatus === 'strongly_supported' ? 'Supported'
+    : claimStatus === 'supported' ? 'Requires validation'
+    : claimStatus === 'partial' ? 'Validation-limited'
+    : 'Claim boundary';
   
   // Handle Auto Mode toggle
   const handleAutoModeChange = (enabled: boolean) => {
@@ -609,9 +609,9 @@ export default function XPSWorkspace() {
               <div className="flex items-start justify-between gap-2 mb-1">
                 <h3 className="text-[10px] font-semibold uppercase tracking-wide">Characterization Overview</h3>
                 <span className={`rounded-full border px-1.5 py-0.5 text-[8px] font-semibold uppercase ${
-                  reviewStatus === 'Complete' 
+                  reviewStatus === 'Supported'
                     ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700'
-                    : reviewStatus === 'Ready'
+                    : reviewStatus === 'Requires validation'
                     ? 'border-amber-500/30 bg-amber-500/10 text-amber-700'
                     : 'border-red-500/30 bg-red-500/10 text-red-700'
                 }`}>

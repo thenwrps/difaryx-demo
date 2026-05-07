@@ -119,11 +119,11 @@ function dSpacing(twoTheta: number) {
 }
 
 function formatClaimStatus(status: string) {
-  if (status === 'strongly_supported') return 'Complete';
-  if (status === 'supported') return 'Ready';
-  if (status === 'partial') return 'In Progress';
-  if (status === 'inconclusive') return 'Pending';
-  return 'Review';
+  if (status === 'strongly_supported') return 'Supported';
+  if (status === 'supported') return 'Requires validation';
+  if (status === 'partial') return 'Validation-limited';
+  if (status === 'inconclusive') return 'Publication-limited';
+  return 'Claim boundary';
 }
 
 function smoothData(data: SpectrumPoint[]) {
@@ -327,7 +327,7 @@ export default function TechniqueWorkspace() {
     return nextData;
   }, [activeTechnique, baseline, cropMax, cropMin, ftirOffset, ftirSlope, normalize, rawData, smoothing, xpsBackground, xpsRegion]);
 
-  if (activeTechnique === 'XRD') {
+  if (normalizedTechnique === 'XRD') {
     return <XRDWorkspace />;
   }
 
@@ -867,11 +867,7 @@ export default function TechniqueWorkspace() {
                         agentRun.outputs.claimStatus === 'partial' ? 'border-amber-500/30 bg-amber-500/10 text-amber-500' :
                         'border-text-muted/30 bg-text-muted/10 text-text-muted'
                       }`}>
-                        {agentRun.outputs.claimStatus === 'strongly_supported' ? 'Complete' :
-                         agentRun.outputs.claimStatus === 'supported' ? 'Ready' :
-                         agentRun.outputs.claimStatus === 'partial' ? 'In Progress' :
-                         agentRun.outputs.claimStatus === 'inconclusive' ? 'Review' :
-                         'Review'}
+                        {formatClaimStatus(agentRun.outputs.claimStatus)}
                       </span>
                     </div>
                     <div className="space-y-2">
@@ -887,11 +883,7 @@ export default function TechniqueWorkspace() {
                           agentRun.outputs.claimStatus === 'partial' ? 'text-amber-500' :
                           'text-text-muted'
                         }`}>
-                          {agentRun.outputs.claimStatus === 'strongly_supported' ? 'Complete' :
-                           agentRun.outputs.claimStatus === 'supported' ? 'Ready' :
-                           agentRun.outputs.claimStatus === 'partial' ? 'In Progress' :
-                           agentRun.outputs.claimStatus === 'inconclusive' ? 'Review' :
-                           'Review'}
+                          {formatClaimStatus(agentRun.outputs.claimStatus)}
                         </p>
                       </div>
                       <div>
@@ -1207,11 +1199,7 @@ export default function TechniqueWorkspace() {
                       project.claimStatus === 'partial' ? 'border-amber-500/20 bg-amber-500/10 text-amber-500' :
                       'border-text-muted/20 bg-text-muted/10 text-text-muted'
                     }`}>
-                      {project.claimStatus === 'strongly_supported' ? 'Complete' :
-                       project.claimStatus === 'supported' ? 'Ready' :
-                       project.claimStatus === 'partial' ? 'In Progress' :
-                       project.claimStatus === 'inconclusive' ? 'Review' :
-                       'Review'}
+                      {formatClaimStatus(project.claimStatus)}
                     </span>
                   </div>
                   <p className="mt-2 text-xs text-text-muted">

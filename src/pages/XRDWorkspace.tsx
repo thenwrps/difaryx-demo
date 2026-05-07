@@ -11,7 +11,12 @@ import { DashboardLayout } from '../components/layout/DashboardLayout';
 import { Graph } from '../components/ui/Graph';
 import { ProcessingPipeline } from '../components/workspace/ProcessingPipeline';
 import { ParameterDrawer } from '../components/workspace/ParameterDrawer';
-import { XRD_DEMO_DATASETS, getXrdDemoDataset } from '../data/xrdDemoDatasets';
+import {
+  XRD_DEMO_DATASETS,
+  getXrdDemoDataset,
+  getXrdProjectCompatibility,
+  type XrdDemoDataset,
+} from '../data/xrdDemoDatasets';
 import { demoProjects, getNotebookPath, getProject } from '../data/demoProjects';
 import {
   runXrdPhaseIdentificationAgent,
@@ -59,35 +64,62 @@ function topCandidateRows(result: XrdAgentResult) {
   }));
 }
 
+function getCompatibleXrdDatasets(projectId: string): XrdDemoDataset[] {
+  const compatibility = getXrdProjectCompatibility(projectId);
+  if (!compatibility) return [];
+
+  return compatibility.datasetIds
+    .map((datasetId) => XRD_DEMO_DATASETS.find((dataset) => dataset.id === datasetId))
+    .filter((dataset): dataset is XrdDemoDataset => Boolean(dataset));
+}
+
+function normalizeXrdProjectId(projectId?: string | null) {
+  if (projectId === 'fe3o4') return 'fe3o4-nanoparticles';
+  return projectId;
+}
+
 export default function XRDWorkspace() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  
+
   // Entry mode detection
   const entryMode = getWorkspaceEntryMode(searchParams, 'xrd');
-  
+
   // Dataset state
   const [hasDatasetLoaded, setHasDatasetLoaded] = useState(false);
   const [datasetSource, setDatasetSource] = useState<'sample' | 'upload' | 'project' | null>(null);
   const [datasetName, setDatasetName] = useState<string>('');
-  
-  const project = getProject(searchParams.get('project'));
+
+  const project = getProject(normalizeXrdProjectId(searchParams.get('project')));
   const [selectedProjectId, setSelectedProjectId] = useState(project.id);
-  const datasetFromQuery = getXrdDemoDataset(searchParams.get('dataset') ?? searchParams.get('xrdDataset'));
-  const [selectedDatasetId, setSelectedDatasetId] = useState(datasetFromQuery.id);
-  
+  const requestedDatasetId = searchParams.get('dataset') ?? searchParams.get('xrdDataset');
+  const datasetFromQuery = getXrdDemoDataset(requestedDatasetId);
+  const [selectedDatasetId, setSelectedDatasetId] = useState(requestedDatasetId ?? datasetFromQuery.id);
+
+  // Project-dataset compatibility guard
+  const projectCompatibility = getXrdProjectCompatibility(selectedProjectId);
+  const compatibleDatasets = useMemo(
+    () => getCompatibleXrdDatasets(selectedProjectId),
+    [selectedProjectId],
+  );
+  const selectedDataset = useMemo(
+    () => compatibleDatasets.find((dataset) => dataset.id === selectedDatasetId) ?? compatibleDatasets[0] ?? null,
+    [compatibleDatasets, selectedDatasetId],
+  );
+  const hasValidData = Boolean(projectCompatibility && compatibleDatasets.length > 0 && selectedDataset);
+
   // Tab state for graph section
   const [activeTab, setActiveTab] = useState<'pattern' | 'peakList' | 'referenceOverlay' | 'residual' | 'rietveld'>('pattern');
-  
+
   // Parameter state management
   const [autoMode, setAutoMode] = useState(true);
   const [parameters, setParameters] = useParameterPersistence('xrd', XRD_DEFAULT_PARAMETERS);
-  
+
   // Drawer state management
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [activeStep, setActiveStep] = useState<string | null>(null);
   const [workflowFeedback, setWorkflowFeedback] = useState('');
-  
+
   // Handle Auto Mode toggle
   const handleAutoModeChange = (enabled: boolean) => {
     setAutoMode(enabled);
@@ -98,18 +130,18 @@ export default function XRDWorkspace() {
       setDrawerOpen(false);
     }
   };
-  
+
   // Handle opening drawer for a specific step
   const handleOpenDrawer = (stepId: string) => {
     setActiveStep(stepId);
     setDrawerOpen(true);
   };
-  
+
   // Handle closing drawer
   const handleCloseDrawer = () => {
     setDrawerOpen(false);
   };
-  
+
   // Handle applying parameter changes
   const handleApplyParameters = () => {
     // Close the drawer after applying
@@ -117,7 +149,7 @@ export default function XRDWorkspace() {
     // Parameters are already updated in state via handleParameterChange
     // The agentResult useMemo will recompute automatically due to parameters dependency
   };
-  
+
   // Handle resetting parameters to defaults
   const handleResetParameters = () => {
     if (activeStep) {
@@ -127,7 +159,7 @@ export default function XRDWorkspace() {
       });
     }
   };
-  
+
   // Handle parameter changes
   const handleParameterChange = (paramId: string, value: any) => {
     if (activeStep) {
@@ -140,26 +172,57 @@ export default function XRDWorkspace() {
       });
     }
   };
-  
+
   // Handle project change
   const handleProjectChange = (newProjectId: string) => {
     setSelectedProjectId(newProjectId);
     const newParams = new URLSearchParams(searchParams);
     newParams.set('project', newProjectId);
+    const nextDatasets = getCompatibleXrdDatasets(newProjectId);
+    const nextDataset = nextDatasets[0] ?? null;
+
+    if (nextDataset) {
+      newParams.set('dataset', nextDataset.id);
+      setSelectedDatasetId(nextDataset.id);
+      setDatasetName(nextDataset.fileName);
+    } else {
+      newParams.delete('dataset');
+      newParams.delete('xrdDataset');
+      setSelectedDatasetId('');
+      setDatasetName('No matched dataset');
+      setDrawerOpen(false);
+      setActiveStep(null);
+    }
+    setHasDatasetLoaded(true);
+    setDatasetSource('project');
     setSearchParams(newParams);
   };
 
   useEffect(() => {
-    setSelectedDatasetId(datasetFromQuery.id);
-  }, [datasetFromQuery.id]);
-  
+    setSelectedProjectId(project.id);
+  }, [project.id]);
+
+  useEffect(() => {
+    if (entryMode?.mode === 'sample') return;
+
+    if (compatibleDatasets.length === 0) {
+      setSelectedDatasetId('');
+      return;
+    }
+
+    const requestedCompatibleDataset = requestedDatasetId
+      ? compatibleDatasets.find((dataset) => dataset.id === requestedDatasetId)
+      : null;
+    setSelectedDatasetId((requestedCompatibleDataset ?? compatibleDatasets[0]).id);
+  }, [compatibleDatasets, entryMode?.mode, requestedDatasetId]);
+
   // Entry mode initialization
   useEffect(() => {
     if (!entryMode) {
       // Project mode - use existing behavior
       setHasDatasetLoaded(true);
       setDatasetSource('project');
-      setDatasetName(datasetFromQuery.fileName);
+      setDatasetName(selectedDataset?.fileName ?? 'No matched dataset');
       return;
     }
 
@@ -180,10 +243,15 @@ export default function XRDWorkspace() {
       setHasDatasetLoaded(false);
       setDatasetSource(null);
     }
-  }, [entryMode, datasetFromQuery.fileName, datasetFromQuery.id]);
+  }, [entryMode, selectedDataset?.fileName]);
 
-  const selectedDataset = getXrdDemoDataset(selectedDatasetId);
-  
+  useEffect(() => {
+    if (!hasValidData) {
+      setDrawerOpen(false);
+      setActiveStep(null);
+    }
+  }, [hasValidData]);
+
   // Handlers for empty state
   const handleLoadSample = () => {
     const sampleName = getSampleDatasetName('xrd');
@@ -194,6 +262,21 @@ export default function XRDWorkspace() {
     setDatasetName(sampleName);
   };
 
+  const handleOpenCuFeDemo = () => {
+    const sampleDataset = getXrdDemoDataset('xrd-cufe2o4-clean');
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('mode');
+    nextParams.delete('xrdDataset');
+    nextParams.set('project', 'cu-fe2o4-spinel');
+    nextParams.set('dataset', sampleDataset.id);
+    setSelectedProjectId('cu-fe2o4-spinel');
+    setSelectedDatasetId(sampleDataset.id);
+    setHasDatasetLoaded(true);
+    setDatasetSource('project');
+    setDatasetName(sampleDataset.fileName);
+    setSearchParams(nextParams);
+  };
+
   const handleUploadDataset = () => {
     // Upload functionality placeholder
     // In a real implementation, this would:
@@ -201,13 +284,14 @@ export default function XRDWorkspace() {
     // 2. Parse CSV/TXT/XY file
     // 3. Validate data format
     // 4. Load into workspace
-    // For now, show coming soon message
-    alert('File upload functionality coming soon. Please use "Load Sample Dataset" to try the workspace.');
+    alert('Available in the connected beta workflow. Load the demo dataset to try the workspace.');
   };
-  
+
   // Agent result (recomputes when dataset or parameters change in manual mode)
   const agentResult = useMemo(
     () => {
+      if (!hasValidData || !selectedDataset) return null;
+
       // Convert user parameters to processing params format
       // Only use custom parameters when Auto Mode is OFF
       const processingParams = autoMode ? undefined : {
@@ -220,131 +304,155 @@ export default function XRDWorkspace() {
         // - baselineFraction: percentile fraction (0-1)
         //   Maps directly to 'p' asymmetry parameter
         baselineFraction: parameters.baselineCorrection.p,
-        
+
         // Smoothing parameters
         // Note: Implementation uses moving average, not Savitzky-Golay
         // - smoothingRadius: half-window size for moving average
         //   Directly use half of window_size
         smoothingRadius: Math.floor(parameters.smoothing.window_size / 2),
-        
+
         // Peak detection parameters
         // - minProminence: minimum peak prominence in normalized intensity units (0-100)
         //   User prominence is 0-1 scale, convert to 0-100 scale
         minProminence: parameters.peakDetection.prominence * 100,
-        // - minDistance: minimum peak separation in 2θ degrees
+        // - minDistance: minimum peak separation in 2theta degrees
         //   Direct mapping (already in correct units)
         minDistance: parameters.peakDetection.min_distance,
         // - minHeight: minimum peak height in normalized intensity units (0-100)
         //   Optional parameter, convert from 0-1 to 0-100 scale
-        minHeight: parameters.peakDetection.height_threshold !== null 
-          ? parameters.peakDetection.height_threshold * 100 
+        minHeight: parameters.peakDetection.height_threshold !== null
+          ? parameters.peakDetection.height_threshold * 100
           : undefined,
       };
-      
+
       const result = runXrdPhaseIdentificationAgent({
         datasetId: selectedDataset.id,
         sampleName: selectedDataset.sampleName,
         sourceLabel: selectedDataset.fileName,
         dataPoints: selectedDataset.dataPoints,
       }, processingParams);
-      
+
       // Log parameter impact for debugging (only when custom params applied)
       if (result.parameterImpact) {
         console.log('[XRD Parameter Impact]', result.parameterImpact);
       }
-      
+
       return result;
     },
-    [selectedDataset, autoMode, parameters],
+    [hasValidData, selectedDataset, autoMode, parameters],
   );
-  
+
   // Processing status for XRD steps (updates based on parameters)
   const processingStatus = useMemo(() => {
-    const peakCount = agentResult.detectedPeaks.length;
-    const candidateCount = agentResult.candidates.length;
-    
+    const peakCount = agentResult?.detectedPeaks.length ?? 0;
+    const candidateCount = agentResult?.candidates.length ?? 0;
+
     // Build detailed method-aware labels
-    const baselineLabel = autoMode 
-      ? 'Auto (ALS, λ=1e6, p=0.01, iter=10)'
-      : `${parameters.baselineCorrection.method} (λ=${parameters.baselineCorrection.lambda.toExponential(0)}, p=${parameters.baselineCorrection.p}, iter=${parameters.baselineCorrection.iterations})`;
-    
+    const baselineLabel = autoMode
+      ? 'Auto ALS baseline, lambda=1e6'
+      : `${parameters.baselineCorrection.method}, lambda=${parameters.baselineCorrection.lambda.toExponential(0)}, p=${parameters.baselineCorrection.p}`;
+
     const smoothingLabel = autoMode
-      ? 'Auto (Savitzky-Golay, window=5, order=2)'
-      : `${parameters.smoothing.method} (window=${parameters.smoothing.window_size}, order=${parameters.smoothing.polynomial_order})`;
-    
+      ? 'Savitzky-Golay window=5'
+      : `${parameters.smoothing.method}, window=${parameters.smoothing.window_size}, order=${parameters.smoothing.polynomial_order}`;
+
     const peakDetectionLabel = autoMode
-      ? `${peakCount} peaks (prominence=0.1, Δ2θ=0.2°)`
-      : `${peakCount} peaks (prominence=${parameters.peakDetection.prominence}, Δ2θ=${parameters.peakDetection.min_distance}°)`;
-    
+      ? `${peakCount} peaks, prominence=0.1`
+      : `${peakCount} peaks, prominence=${parameters.peakDetection.prominence}, min gap=${parameters.peakDetection.min_distance} deg`;
+
     const peakFittingLabel = autoMode
-      ? 'Auto (Pseudo-Voigt, tol=1e-4, iter=100)'
-      : `${parameters.peakFitting.model} (tol=${parameters.peakFitting.tolerance.toExponential(0)}, iter=${parameters.peakFitting.max_iterations})`;
-    
+      ? 'Pseudo-Voigt fit, tol=1e-4'
+      : `${parameters.peakFitting.model}, tol=${parameters.peakFitting.tolerance.toExponential(0)}`;
+
     const referenceLabel = autoMode
-      ? `${candidateCount} candidates (ICDD, Δ2θ=±0.1°, review≥0.7)`
-      : `${candidateCount} candidates (${parameters.referenceMatching.database}, Δ2θ=±${parameters.referenceMatching.delta_tolerance}°, review≥${parameters.referenceMatching.min_match_score})`;
-    
+      ? `${candidateCount} candidates, ICDD match`
+      : `${candidateCount} candidates, ${parameters.referenceMatching.database}, tolerance=${parameters.referenceMatching.delta_tolerance} deg`;
+
     return [
       {
         id: 'baselineCorrection',
-        label: 'Baseline Correction',
+        label: 'Baseline',
         status: 'complete' as const,
         summary: baselineLabel
       },
       {
         id: 'smoothing',
-        label: 'Smoothing',
+        label: 'Smooth',
         status: 'complete' as const,
         summary: smoothingLabel
       },
       {
         id: 'peakDetection',
-        label: 'Peak Detection',
+        label: 'Peaks',
         status: 'complete' as const,
         summary: peakDetectionLabel
       },
       {
         id: 'peakFitting',
-        label: 'Peak Fitting',
+        label: 'Fit',
         status: 'complete' as const,
         summary: peakFittingLabel
       },
       {
         id: 'referenceMatching',
-        label: 'Reference Matching',
+        label: 'Match',
         status: 'complete' as const,
         summary: referenceLabel
       }
     ];
-  }, [autoMode, parameters, agentResult.detectedPeaks.length, agentResult.candidates.length]);
-  
-  const primaryCandidate = agentResult.conflicts.primaryCandidate;
-  
+  }, [autoMode, parameters, agentResult?.detectedPeaks.length, agentResult?.candidates.length]);
+
+  const primaryCandidate = agentResult?.conflicts.primaryCandidate ?? null;
+
   // Use FusionResult if available, otherwise fall back to interpretation
-  const useFusionResult = agentResult.fusionResult !== undefined;
-  const decisionStatus = useFusionResult 
-    ? agentResult.fusionResult.decision 
-    : agentResult.interpretation.primaryPhase;
-  const evidenceBasis = useFusionResult
-    ? agentResult.fusionResult.basis
-    : agentResult.interpretation.evidence;
-  const limitations = useFusionResult
-    ? agentResult.fusionResult.limitations
-    : agentResult.interpretation.caveats;
-  
-  const graphPeakMarkers = agentResult.detectedPeaks.map((peak) => {
+  const useFusionResult = agentResult?.fusionResult !== undefined;
+  const decisionStatus = agentResult
+    ? useFusionResult
+      ? agentResult.fusionResult?.decision ?? 'No assignment'
+      : agentResult.interpretation.primaryPhase
+    : 'No assignment';
+  const evidenceBasis = agentResult
+    ? useFusionResult
+      ? agentResult.fusionResult?.basis ?? []
+      : agentResult.interpretation.evidence
+    : [];
+  const limitations = agentResult
+    ? useFusionResult
+      ? agentResult.fusionResult?.limitations ?? []
+      : agentResult.interpretation.caveats
+    : [];
+  const evidenceStatus =
+    agentResult?.interpretation.confidenceLevel === 'high'
+      ? 'Supported assignment with validation boundaries'
+      : agentResult?.interpretation.confidenceLevel === 'medium'
+        ? 'Requires validation'
+        : 'Validation-limited';
+  const evidenceStatusBadge =
+    agentResult?.interpretation.confidenceLevel === 'high'
+      ? 'Validation boundaries'
+      : evidenceStatus;
+  const claimBoundaryText =
+    'The observed XRD pattern supports CuFe2O4 spinel phase assignment, with validation still required before publication-level phase-purity claims.';
+
+  const graphPeakMarkers = (agentResult?.detectedPeaks ?? []).map((peak) => {
     // Find HKL assignment from primary candidate
     const match = primaryCandidate?.matches.find(m => m.observedPeak.id === peak.id);
     const hklLabel = match?.referencePeak.hkl || '';
-    
+
     return {
       position: peak.position,
       intensity: peak.intensity,
       label: hklLabel, // Use HKL label instead of generic peak label
     };
   });
-  const candidateRows = topCandidateRows(agentResult);
+  const canRenderXrdData = Boolean(hasValidData && selectedDataset && agentResult);
   const handleSaveProcessingResult = () => {
+    if (!hasValidData || !selectedDataset) {
+      setWorkflowFeedback('Requires matched dataset');
+      window.setTimeout(() => setWorkflowFeedback(''), 1800);
+      return;
+    }
+
     const processingResult = createProcessingResultFromXrdDemo(project.id);
     saveProcessingResult(processingResult);
     setWorkflowFeedback('Processing result saved');
@@ -352,6 +460,12 @@ export default function XRDWorkspace() {
   };
 
   const handleRefineInterpretation = () => {
+    if (!hasValidData || !selectedDataset) {
+      setWorkflowFeedback('Requires matched dataset');
+      window.setTimeout(() => setWorkflowFeedback(''), 1800);
+      return;
+    }
+
     const processingResult = createProcessingResultFromXrdDemo(project.id);
     saveProcessingResult(processingResult);
     navigate(`/demo/agent?project=${project.id}&processing=${processingResult.id}&template=research`);
@@ -367,7 +481,7 @@ export default function XRDWorkspace() {
           onUploadDataset={handleUploadDataset}
         />
       )}
-      
+
       {/* Show workspace when dataset is loaded or in project mode */}
       {(hasDatasetLoaded || !entryMode) && (
       <div className="flex-1 h-full flex flex-col overflow-hidden bg-background">
@@ -380,210 +494,292 @@ export default function XRDWorkspace() {
             projectName={datasetSource === 'project' ? project.name : undefined}
           />
         )}
-        
+
         <div className="flex-1 flex overflow-hidden">
         {/* LEFT SIDEBAR */}
-        <aside className="w-72 border-r border-border bg-surface flex flex-col shrink-0">
-          <div className="p-4 border-b border-border">
-            <label className="text-[10px] font-semibold uppercase tracking-wider text-text-muted" htmlFor="xrd-project-select">
-              XRD Project
-            </label>
-            <select
-              id="xrd-project-select"
-              value={selectedProjectId}
-              onChange={(event) => handleProjectChange(event.target.value)}
-              className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-text-main focus:outline-none focus:border-primary"
-            >
-              {demoProjects.map((proj) => (
-                <option key={proj.id} value={proj.id}>
-                  {proj.name}
-                </option>
-              ))}
-            </select>
-            <p className="mt-2 text-[10px] text-text-muted">{project.material}</p>
-          </div>
-
-          <div className="p-4 border-b border-border">
-            <label className="text-[10px] font-semibold uppercase tracking-wider text-text-muted" htmlFor="xrd-dataset-select">
-              Dataset
-            </label>
-            <select
-              id="xrd-dataset-select"
-              value={selectedDatasetId}
-              onChange={(event) => setSelectedDatasetId(event.target.value)}
-              className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-text-main focus:outline-none focus:border-primary"
-            >
-              {XRD_DEMO_DATASETS.map((dataset) => (
-                <option key={dataset.id} value={dataset.id}>
-                  {dataset.label}
-                </option>
-              ))}
-            </select>
-            
-            {/* Input file info */}
-            <div className="mt-3 flex items-center gap-2 text-[10px] text-text-muted">
-              <Database size={14} className="shrink-0" />
-              <span className="truncate">{selectedDataset.fileName}</span>
-            </div>
-          </div>
-
-          {/* New Parameter-Enabled Processing Pipeline - Flexible Height */}
-          <div className="flex-1 min-h-0 border-b border-border overflow-y-auto">
-            <div className="p-3">
-              <ProcessingPipeline
-                technique="xrd"
-                autoMode={autoMode}
-                onAutoModeChange={handleAutoModeChange}
-                parameters={parameters}
-                onOpenDrawer={handleOpenDrawer}
-                processingStatus={processingStatus}
-              />
-            </div>
-          </div>
-
-          <div className="p-4 border-t border-border space-y-2">
-            <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 p-3">
-              <div className="text-xs font-bold text-emerald-700">Processing Result Ready</div>
-              <div className="mt-2 space-y-1 text-[11px] text-text-muted">
-                <div>Detected peaks: {agentResult.detectedPeaks.length}</div>
-                <div>Preliminary assignment: {decisionStatus}</div>
-                <div className="font-semibold text-text-main">Next: Refine Interpretation</div>
+        <aside className="w-[280px] shrink-0 border-r border-border bg-surface flex flex-col overflow-y-auto">
+          {/* Setup: Title + Project + Dataset */}
+          <div className="border-b border-border px-3 py-2">
+            <h1 className="text-xs font-bold text-text-main leading-tight">XRD Workspace</h1>
+            <p className="text-[9px] text-text-muted leading-tight">Graph-first phase review</p>
+            <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+              <div>
+                <label className="text-[9px] font-semibold uppercase tracking-wider text-text-muted" htmlFor="xrd-project-select">
+                  Project
+                </label>
+                <select
+                  id="xrd-project-select"
+                  value={selectedProjectId}
+                  onChange={(event) => handleProjectChange(event.target.value)}
+                  className="mt-0.5 h-6 w-full rounded border border-border bg-background px-1.5 text-[10px] font-medium text-text-main focus:outline-none focus:border-primary"
+                >
+                  {demoProjects.map((proj) => (
+                    <option key={proj.id} value={proj.id}>
+                      {proj.name}
+                    </option>
+                  ))}
+                </select>
               </div>
-              {workflowFeedback && (
-                <div className="mt-2 text-[11px] font-semibold text-primary">{workflowFeedback}</div>
+              <div>
+                <label className="text-[9px] font-semibold uppercase tracking-wider text-text-muted" htmlFor="xrd-dataset-select">
+                  Dataset
+                </label>
+                <select
+                  id="xrd-dataset-select"
+                  value={selectedDataset?.id ?? ''}
+                  onChange={(event) => setSelectedDatasetId(event.target.value)}
+                  disabled={!canRenderXrdData}
+                  className="mt-0.5 h-6 w-full rounded border border-border bg-background px-1.5 text-[10px] font-medium text-text-main focus:outline-none focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {compatibleDatasets.length > 0 ? (
+                    compatibleDatasets.map((dataset) => (
+                      <option key={dataset.id} value={dataset.id}>
+                        {dataset.label}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="">No matched dataset</option>
+                  )}
+                </select>
+              </div>
+            </div>
+            <div className="mt-1 flex items-center gap-1 text-[9px] text-text-muted">
+              <Database size={10} className="shrink-0" />
+              {canRenderXrdData ? (
+                <>
+                  <span className="truncate">{selectedDataset?.fileName}</span>
+                  <span className="text-text-muted/60">/</span>
+                  <span className="truncate">{project.material}</span>
+                </>
+              ) : (
+                <span className="text-amber-600">No matched XRD dataset for this project</span>
               )}
             </div>
-            <button
-              type="button"
-              onClick={handleSaveProcessingResult}
-              className="flex h-9 items-center justify-between rounded-md border border-border px-3 text-sm font-medium text-text-main hover:bg-surface-hover transition-colors"
-            >
-              Save Processing Result <CheckCircle2 size={14} />
-            </button>
-            <Link
-              to={getNotebookPath(project)}
-              className="flex h-9 items-center justify-between rounded-md border border-border px-3 text-sm font-medium text-text-main hover:bg-surface-hover transition-colors"
-            >
-              Add to Notebook <ArrowRight size={14} />
-            </Link>
-            <button
-              type="button"
-              onClick={handleRefineInterpretation}
-              className="flex h-9 items-center justify-between rounded-md bg-primary text-white px-3 text-sm font-medium hover:bg-primary/90 transition-colors"
-            >
-              Send to Evidence Review <ArrowRight size={14} />
-            </button>
           </div>
+
+          {canRenderXrdData ? (
+            <>
+              {/* Processing Status: single-line inline chips */}
+              <div className="border-b border-border px-3 py-1">
+                <div className="flex items-center gap-1 flex-wrap">
+                  <span className="text-[8px] font-bold uppercase tracking-wider text-primary">Status:</span>
+                  {processingStatus.map((step) => (
+                    <span key={step.id} className="inline-flex items-center gap-0.5 rounded border border-emerald-500/30 bg-emerald-500/10 px-1 py-px text-[8px] font-medium text-emerald-700">
+                      <CheckCircle2 size={8} className="shrink-0" />
+                      {step.label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Manual Processing: compact variant */}
+              <div className="border-b border-border px-2.5 py-1.5">
+                <ProcessingPipeline
+                  technique="xrd"
+                  autoMode={autoMode}
+                  onAutoModeChange={handleAutoModeChange}
+                  parameters={parameters}
+                  onOpenDrawer={handleOpenDrawer}
+                  processingStatus={processingStatus}
+                  compact
+                />
+              </div>
+
+              {/* Evidence: compact summary */}
+              <div className="border-b border-border px-3 py-1.5">
+                <div className="text-[10px] font-bold text-emerald-700">Evidence Ready</div>
+                <div className="mt-0.5 text-[9px] text-text-muted leading-snug">
+                  <span>Peaks: {agentResult?.detectedPeaks.length ?? 0}</span>
+                  <span className="mx-1">/</span>
+                  <span>{decisionStatus}</span>
+                </div>
+                <div className="text-[9px] text-text-muted">{evidenceStatus}</div>
+                <div className="text-[9px] font-semibold text-text-main">Next: Refine</div>
+                {workflowFeedback && (
+                  <div className="mt-0.5 text-[10px] font-semibold text-primary">{workflowFeedback}</div>
+                )}
+              </div>
+
+              {/* Actions: compact row */}
+              <div className="px-2.5 py-1.5 space-y-1 shrink-0">
+                <div className="grid grid-cols-2 gap-1">
+                  <button
+                    type="button"
+                    onClick={handleSaveProcessingResult}
+                    className="flex h-6 items-center justify-center rounded border border-border px-1.5 text-[10px] font-medium text-text-main transition-colors hover:bg-surface-hover"
+                  >
+                    Save
+                  </button>
+                  <Link
+                    to={getNotebookPath(project)}
+                    className="flex h-6 items-center justify-center rounded border border-border px-1.5 text-[10px] font-medium text-text-main transition-colors hover:bg-surface-hover"
+                  >
+                    Notebook
+                  </Link>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleRefineInterpretation}
+                  className="flex h-6 w-full items-center justify-center rounded bg-primary px-2 text-[10px] font-medium text-white transition-colors hover:bg-primary/90"
+                >
+                  Refine Interpretation <ArrowRight size={11} className="ml-1" />
+                </button>
+              </div>
+            </>
+          ) : (
+            /* No valid data: disabled left rail */
+            <div className="flex-1 flex flex-col items-center justify-center px-3 py-4 text-center">
+              <AlertTriangle size={18} className="text-amber-500 mb-2" />
+              <p className="text-[10px] font-semibold text-text-main leading-tight">Status: Requires dataset</p>
+              <p className="mt-1 text-[9px] text-text-muted leading-snug">
+                Evidence: No evidence generated. Manual processing requires a matched XRD dataset.
+              </p>
+              <div className="mt-2 grid w-full grid-cols-2 gap-1">
+                <button
+                  type="button"
+                  disabled
+                  title="Requires matched dataset before saving."
+                  className="flex h-6 items-center justify-center rounded border border-border px-1.5 text-[9px] font-medium text-text-muted opacity-50"
+                >
+                  Save disabled
+                </button>
+                <button
+                  type="button"
+                  disabled
+                  title="Requires matched dataset before refinement."
+                  className="flex h-6 items-center justify-center rounded border border-border px-1.5 text-[9px] font-medium text-text-muted opacity-50"
+                >
+                  Refine disabled
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={handleOpenCuFeDemo}
+                className="mt-2 flex h-6 items-center justify-center rounded bg-primary px-2.5 text-[10px] font-medium text-white transition-colors hover:bg-primary/90"
+              >
+                Open CuFe2O4 demo
+              </button>
+            </div>
+          )}
         </aside>
 
         {/* CENTER COLUMN */}
         <main className="flex-1 flex flex-col min-w-0 overflow-hidden border-r border-border">
-          <div className="flex-1 overflow-y-auto p-4">
+          <div className="flex-1 overflow-y-auto p-3">
             <div className="space-y-3">
+              {canRenderXrdData ? (
+                <>
                 {/* XRD PATTERN - GRAPH FIRST (PRIMARY) */}
                 <div className="border border-border/50 bg-surface/30">
                   {/* Tabs */}
-                  <div className="flex items-center gap-4 px-3 py-1.5 border-b border-border/50 bg-surface/40">
-                    <button 
-                      onClick={() => setActiveTab('pattern')}
-                      className={`px-2 py-1 text-[10px] font-semibold uppercase tracking-wider transition-colors ${
-                        activeTab === 'pattern' 
-                          ? 'text-primary border-b-2 border-primary -mb-px' 
-                          : 'text-text-muted hover:text-text-main'
-                      }`}
-                    >
-                      Pattern
-                    </button>
-                    <button 
-                      onClick={() => setActiveTab('peakList')}
-                      className={`px-2 py-1 text-[10px] font-semibold uppercase tracking-wider transition-colors flex items-center gap-1.5 ${
-                        activeTab === 'peakList' 
-                          ? 'text-primary border-b-2 border-primary -mb-px' 
-                          : 'text-text-muted hover:text-text-main'
-                      }`}
-                    >
-                      Peak List
-                      <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-primary/10 text-primary text-[9px] font-bold px-1">
-                        {agentResult.detectedPeaks.length}
-                      </span>
-                    </button>
-                    <button 
-                      onClick={() => setActiveTab('referenceOverlay')}
-                      className={`px-2 py-1 text-[10px] font-semibold uppercase tracking-wider transition-colors flex items-center gap-1.5 ${
-                        activeTab === 'referenceOverlay' 
-                          ? 'text-primary border-b-2 border-primary -mb-px' 
-                          : 'text-text-muted hover:text-text-main'
-                      }`}
-                    >
-                      Reference
-                      <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-primary/10 text-primary text-[9px] font-bold px-1">
-                        {primaryCandidate?.matches.length ?? 0}/{primaryCandidate?.phase.peaks.length ?? 0}
-                      </span>
-                    </button>
-                    <button 
-                      onClick={() => setActiveTab('residual')}
-                      className={`px-2 py-1 text-[10px] font-semibold uppercase tracking-wider transition-colors ${
-                        activeTab === 'residual' 
-                          ? 'text-primary border-b-2 border-primary -mb-px' 
-                          : 'text-text-muted hover:text-text-main'
-                      }`}
-                      disabled
-                    >
-                      Residual
-                    </button>
-                    <button 
-                      onClick={() => setActiveTab('rietveld')}
-                      className={`px-2 py-1 text-[10px] font-semibold uppercase tracking-wider transition-colors ${
-                        activeTab === 'rietveld' 
-                          ? 'text-primary border-b-2 border-primary -mb-px' 
-                          : 'text-text-muted hover:text-text-main'
-                      }`}
-                      disabled
-                    >
-                      Rietveld
-                    </button>
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 bg-surface/40 px-3 py-1.5">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <button
+                        onClick={() => setActiveTab('pattern')}
+                        className={`px-2 py-1 text-[10px] font-semibold uppercase tracking-wider transition-colors ${
+                          activeTab === 'pattern'
+                            ? 'text-primary border-b-2 border-primary -mb-px'
+                            : 'text-text-muted hover:text-text-main'
+                        }`}
+                      >
+                        Pattern
+                      </button>
+                      <button
+                        onClick={() => setActiveTab('peakList')}
+                        className={`flex items-center gap-1.5 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider transition-colors ${
+                          activeTab === 'peakList'
+                            ? 'text-primary border-b-2 border-primary -mb-px'
+                            : 'text-text-muted hover:text-text-main'
+                        }`}
+                      >
+                        Peaks
+                        <span className="inline-flex h-[17px] min-w-[18px] items-center justify-center rounded-full bg-primary/10 px-1 text-[9px] font-bold text-primary">
+                          {agentResult?.detectedPeaks.length ?? 0}
+                        </span>
+                      </button>
+                      <button
+                        onClick={() => setActiveTab('referenceOverlay')}
+                        className={`flex items-center gap-1.5 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider transition-colors ${
+                          activeTab === 'referenceOverlay'
+                            ? 'text-primary border-b-2 border-primary -mb-px'
+                            : 'text-text-muted hover:text-text-main'
+                        }`}
+                      >
+                        Match
+                        <span className="inline-flex h-[17px] min-w-[18px] items-center justify-center rounded-full bg-primary/10 px-1 text-[9px] font-bold text-primary">
+                          {primaryCandidate?.matches.length ?? 0}/{primaryCandidate?.phase.peaks.length ?? 0}
+                        </span>
+                      </button>
+                      <button
+                        onClick={() => setActiveTab('residual')}
+                        className={`px-2 py-1 text-[10px] font-semibold uppercase tracking-wider transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                          activeTab === 'residual'
+                            ? 'text-primary border-b-2 border-primary -mb-px'
+                            : 'text-text-muted hover:text-text-main'
+                        }`}
+                        disabled
+                        title="Requires processed residual evidence before export."
+                      >
+                        Residual
+                      </button>
+                      <button
+                        onClick={() => setActiveTab('rietveld')}
+                        className={`px-2 py-1 text-[10px] font-semibold uppercase tracking-wider transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                          activeTab === 'rietveld'
+                            ? 'text-primary border-b-2 border-primary -mb-px'
+                            : 'text-text-muted hover:text-text-main'
+                        }`}
+                        disabled
+                        title="Rietveld refinement is available in the connected beta workflow."
+                      >
+                        Rietveld
+                      </button>
+                    </div>
+                    <span className="inline-flex max-w-full items-center rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-700">
+                      {evidenceStatusBadge}
+                    </span>
                   </div>
-                  
+
                   {/* Tab Content */}
                   {activeTab === 'pattern' && (
                     <>
-                      <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2 bg-surface/20">
+                      <div className="flex flex-wrap items-center justify-between gap-2 bg-surface/20 px-3 py-2">
                         <div>
                           <h3 className="text-[10px] font-semibold uppercase tracking-wider text-text-main">XRD Diffraction Pattern</h3>
-                          <p className="text-[9px] text-text-muted mt-0.5">Intensity vs. 2θ with baseline correction and peak identification</p>
+                          <p className="mt-0.5 text-[9px] text-text-muted">Intensity vs. 2theta with baseline and peak markers</p>
                         </div>
-                        <span className="text-[9px] font-mono text-text-muted tabular-nums">λ = 1.5406 Å (Cu Kα)</span>
+                        <span className="text-[9px] font-mono text-text-muted tabular-nums">lambda = 1.5406 A (Cu K-alpha)</span>
                       </div>
-                      
+
                       {/* Graph */}
-                      <div className="h-[420px] w-full min-w-0 px-2 py-2">
+                      <div className="h-[clamp(340px,50vh,460px)] w-full min-w-0 px-2 py-2">
                         <Graph
                           type="xrd"
                           height="100%"
-                          externalData={selectedDataset.dataPoints}
-                          baselineData={agentResult.baselineData}
+                          externalData={selectedDataset?.dataPoints ?? []}
+                          baselineData={agentResult?.baselineData ?? []}
                           peakMarkers={graphPeakMarkers}
                           showBackground
                           showCalculated={false}
                           showResidual={false}
                         />
                       </div>
-                      
+
                       {/* Info strip under graph */}
-                      <div className="mx-3 mb-2 flex items-center gap-2 text-[10px] text-text-muted bg-surface/40 rounded px-2 py-1.5 border border-border/50">
+                      <div className="mx-3 mb-2 flex items-start gap-2 rounded border border-border/50 bg-surface/40 px-2 py-1.5 text-[10px] text-text-muted">
                         <CheckCircle2 size={12} className="text-primary shrink-0" />
-                        <span>{agentResult.detectedPeaks.length} peaks detected and indexed to {agentResult.interpretation.primaryPhase} spinel structure.</span>
+                        <span>{claimBoundaryText}</span>
                       </div>
                     </>
                   )}
-                  
+
                   {activeTab === 'peakList' && (
                     <div className="p-3">
-                      <div className="grid grid-cols-[1fr_300px] gap-3">
+                      <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_260px]">
                         {/* Detected Peaks Table */}
                         <div className="border border-border/40 bg-surface/50 rounded">
                           <div className="px-3 py-2 border-b border-border/30 bg-surface/20">
-                            <h3 className="text-sm font-semibold text-text-main">Detected Peaks ({agentResult.detectedPeaks.length})</h3>
+                            <h3 className="text-sm font-semibold text-text-main">Detected Peaks ({agentResult?.detectedPeaks.length ?? 0})</h3>
                             <p className="text-[10px] text-text-muted mt-0.5">Peak positions, d-spacings, intensities, and Miller indices</p>
                           </div>
                           <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
@@ -591,14 +787,14 @@ export default function XRDWorkspace() {
                               <thead className="text-[10px] uppercase tracking-wide text-text-muted bg-surface/10 sticky top-0">
                                 <tr>
                                   <th className="text-center px-3 py-2 font-medium">#</th>
-                                  <th className="text-right px-3 py-2 font-medium">2θ <span className="text-[8px]">(°)</span></th>
-                                  <th className="text-right px-3 py-2 font-medium">d <span className="text-[8px]">(Å)</span></th>
+                                  <th className="text-right px-3 py-2 font-medium">2theta <span className="text-[8px]">(deg)</span></th>
+                                  <th className="text-right px-3 py-2 font-medium">d <span className="text-[8px]">(A)</span></th>
                                   <th className="text-right px-3 py-2 font-medium">Intensity</th>
                                   <th className="text-right px-3 py-2 font-medium">hkl</th>
                                 </tr>
                               </thead>
                               <tbody>
-                                {agentResult.detectedPeaks.map((peak, index) => (
+                                {(agentResult?.detectedPeaks ?? []).map((peak, index) => (
                                   <tr key={peak.id} className="border-t border-border/20 hover:bg-surface/10">
                                     <td className="px-3 py-2 text-center text-text-muted text-sm tabular-nums">{index + 1}</td>
                                     <td className="px-3 py-2 font-mono text-right text-text-main text-sm font-medium tabular-nums">{peak.position.toFixed(2)}</td>
@@ -611,7 +807,7 @@ export default function XRDWorkspace() {
                             </table>
                           </div>
                         </div>
-                        
+
                         {/* Quality Metrics */}
                         <div className="border border-border/40 bg-surface/50 rounded">
                           <div className="px-3 py-2 border-b border-border/30 bg-surface/20">
@@ -621,7 +817,7 @@ export default function XRDWorkspace() {
                           <div className="px-3 py-3 space-y-2">
                             <div className="flex items-center justify-between">
                               <span className="text-[10px] uppercase tracking-wide text-text-muted">PEAKS</span>
-                              <span className="text-sm font-semibold text-text-main tabular-nums">{agentResult.detectedPeaks.length}</span>
+                              <span className="text-sm font-semibold text-text-main tabular-nums">{agentResult?.detectedPeaks.length ?? 0}</span>
                             </div>
                             <div className="flex items-center justify-between">
                               <span className="text-[10px] uppercase tracking-wide text-text-muted">MATCHED</span>
@@ -633,23 +829,23 @@ export default function XRDWorkspace() {
                             </div>
                             <div className="flex items-center justify-between">
                               <span className="text-[10px] uppercase tracking-wide text-text-muted">UNEXPLAINED</span>
-                              <span className={`text-sm font-semibold tabular-nums ${agentResult.conflicts.unexplainedPeaks.length > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>{agentResult.conflicts.unexplainedPeaks.length}</span>
+                              <span className={`text-sm font-semibold tabular-nums ${(agentResult?.conflicts.unexplainedPeaks.length ?? 0) > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>{agentResult?.conflicts.unexplainedPeaks.length ?? 0}</span>
                             </div>
                             <div className="flex items-center justify-between">
                               <span className="text-[10px] uppercase tracking-wide text-text-muted">DATA POINTS</span>
-                              <span className="text-sm font-semibold text-text-main tabular-nums">{agentResult.validation.pointCount}</span>
+                              <span className="text-sm font-semibold text-text-main tabular-nums">{agentResult?.validation.pointCount ?? 0}</span>
                             </div>
                             <div className="pt-2 border-t border-border/30">
                               <div className="flex items-center justify-between">
-                                <span className="text-[10px] uppercase tracking-wide text-text-muted">CONCLUSION</span>
+                                <span className="text-[10px] uppercase tracking-wide text-text-muted">EVIDENCE STATUS</span>
                                 <span className={`text-sm font-semibold tabular-nums ${
-                                  agentResult.interpretation.confidenceLevel === 'high' ? 'text-emerald-600' : 
-                                  agentResult.interpretation.confidenceLevel === 'medium' ? 'text-amber-600' : 
+                                  agentResult?.interpretation.confidenceLevel === 'high' ? 'text-emerald-600' :
+                                  agentResult?.interpretation.confidenceLevel === 'medium' ? 'text-amber-600' :
                                   'text-red-600'
                                 }`}>
-                                  {agentResult.interpretation.confidenceLevel === 'high' ? 'Complete' : 
-                                   agentResult.interpretation.confidenceLevel === 'medium' ? 'Ready' : 
-                                   'Review'}
+                                  {agentResult?.interpretation.confidenceLevel === 'high' ? 'Supported' :
+                                   agentResult?.interpretation.confidenceLevel === 'medium' ? 'Requires validation' :
+                                   'Validation-limited'}
                                 </span>
                               </div>
                             </div>
@@ -658,7 +854,7 @@ export default function XRDWorkspace() {
                       </div>
                     </div>
                   )}
-                  
+
                   {activeTab === 'referenceOverlay' && (
                     <div className="p-3">
                       <div className="border border-border/40 bg-surface/50 rounded">
@@ -670,9 +866,9 @@ export default function XRDWorkspace() {
                           <table className="w-full">
                             <thead className="text-[10px] uppercase tracking-wide text-text-muted bg-surface/10 sticky top-0">
                               <tr>
-                                <th className="text-right px-3 py-2 font-medium">2θ obs <span className="text-[8px]">(°)</span></th>
-                                <th className="text-right px-3 py-2 font-medium">2θ ref <span className="text-[8px]">(°)</span></th>
-                                <th className="text-right px-3 py-2 font-medium">Δ2θ <span className="text-[8px]">(°)</span></th>
+                                <th className="text-right px-3 py-2 font-medium">2theta obs <span className="text-[8px]">(deg)</span></th>
+                                <th className="text-right px-3 py-2 font-medium">2theta ref <span className="text-[8px]">(deg)</span></th>
+                                <th className="text-right px-3 py-2 font-medium">delta 2theta <span className="text-[8px]">(deg)</span></th>
                                 <th className="text-right px-3 py-2 font-medium">hkl</th>
                               </tr>
                             </thead>
@@ -696,29 +892,60 @@ export default function XRDWorkspace() {
                     </div>
                   )}
                 </div>
+                </>
+              ) : (
+                /* No valid data: empty center state */
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <AlertTriangle size={28} className="text-amber-500 mb-3" />
+                  <h2 className="text-sm font-semibold text-text-main">No processed XRD dataset for this project</h2>
+                  <p className="mt-1 max-w-sm text-[11px] text-text-muted leading-relaxed">
+                    This project does not yet have a matched XRD processing result. Load a compatible dataset or open the CuFe2O4 demo sample to review the full workflow.
+                  </p>
+                  <div className="mt-3 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleOpenCuFeDemo}
+                      className="flex h-7 items-center justify-center rounded bg-primary px-3 text-[11px] font-medium text-white transition-colors hover:bg-primary/90"
+                    >
+                      Open CuFe2O4 demo
+                    </button>
+                    <Link
+                      to="/dashboard"
+                      className="flex h-7 items-center justify-center rounded border border-border px-3 text-[11px] font-medium text-text-main transition-colors hover:bg-surface-hover"
+                    >
+                      Back to Dashboard
+                    </Link>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </main>
 
         {/* RIGHT SIDEBAR */}
-        <aside className="w-[380px] bg-surface border-r border-border flex flex-col shrink-0 overflow-y-auto">
-          <div className="p-4 space-y-2">
+        <aside className="w-[320px] shrink-0 overflow-y-auto border-r border-border bg-surface flex flex-col">
+          <div className="space-y-2 p-3">
+            {canRenderXrdData ? (
+              <>
                 {/* CHARACTERIZATION OVERVIEW (COMPRESSED) */}
                 <div className="border border-border/40 bg-surface/50 px-2 py-1.5">
                   <div className="flex items-start justify-between gap-2 mb-1">
-                    <h3 className="text-[10px] font-semibold uppercase tracking-wide">Characterization Overview</h3>
-                    <span className={`rounded-full border px-1.5 py-0.5 text-[8px] font-semibold uppercase ${statusClass(agentResult.interpretation.confidenceLevel === 'low' ? 'warning' : 'complete')}`}>
-                      {agentResult.interpretation.confidenceLevel === 'high' ? 'Complete' : 
-                       agentResult.interpretation.confidenceLevel === 'medium' ? 'Ready' : 
-                       'Review'}
+                    <h3 className="text-[10px] font-semibold uppercase tracking-wide">Interpretation</h3>
+                    <span className={`rounded-full border px-1.5 py-0.5 text-[8px] font-semibold uppercase ${statusClass(agentResult?.interpretation.confidenceLevel === 'low' ? 'warning' : 'complete')}`}>
+                      {evidenceStatusBadge}
                     </span>
                   </div>
 
                   <div className="space-y-1.5">
                     {/* Phase Identification */}
                     <div>
-                      <p className="text-[9px] font-semibold uppercase tracking-wide text-text-muted mb-0.5">Phase</p>
+                      <p className="text-[9px] font-semibold uppercase tracking-wide text-text-muted mb-0.5">Working assignment</p>
                       <p className="text-xs font-bold text-text-main">{decisionStatus}</p>
+                    </div>
+
+                    <div>
+                      <p className="text-[9px] font-semibold uppercase tracking-wide text-text-muted mb-0.5">Claim boundary</p>
+                      <p className="text-[10px] leading-tight text-text-main">{claimBoundaryText}</p>
                     </div>
 
                     {/* Key Findings */}
@@ -727,7 +954,7 @@ export default function XRDWorkspace() {
                       <div className="space-y-0.5">
                         {evidenceBasis.slice(0, 2).map((item) => (
                           <div key={item} className="flex gap-1 text-[10px] leading-tight text-text-main">
-                            <span className="text-primary mt-0.5">•</span>
+                            <span className="text-primary mt-0.5">-</span>
                             <span>{item}</span>
                           </div>
                         ))}
@@ -738,7 +965,7 @@ export default function XRDWorkspace() {
                     <div>
                       <p className="text-[9px] font-semibold uppercase tracking-wide text-text-muted mb-0.5">Reliability</p>
                       <p className="text-[10px] text-text-main tabular-nums">
-                        {primaryCandidate?.matches.length ?? 0}/{primaryCandidate?.phase.peaks.length ?? 0} matched, {agentResult.conflicts.unexplainedPeaks.length} unexplained
+                        {primaryCandidate?.matches.length ?? 0}/{primaryCandidate?.phase.peaks.length ?? 0} matched, {agentResult?.conflicts.unexplainedPeaks.length ?? 0} unexplained
                       </p>
                     </div>
                   </div>
@@ -756,12 +983,12 @@ export default function XRDWorkspace() {
                         </div>
                         <div className="grid grid-cols-3 gap-1 text-[10px]">
                           <div>
-                            <span className="text-text-muted text-[8px] uppercase">2θ</span>
-                            <div className="font-mono font-semibold text-text-main tabular-nums">{match.observedPeak.position.toFixed(2)}°</div>
+                            <span className="text-text-muted text-[8px] uppercase">2theta</span>
+                            <div className="font-mono font-semibold text-text-main tabular-nums">{match.observedPeak.position.toFixed(2)} deg</div>
                           </div>
                           <div>
-                            <span className="text-text-muted text-[8px] uppercase">Δ</span>
-                            <div className="font-mono font-semibold text-text-main tabular-nums">{match.delta.toFixed(3)}°</div>
+                            <span className="text-text-muted text-[8px] uppercase">Delta</span>
+                            <div className="font-mono font-semibold text-text-main tabular-nums">{match.delta.toFixed(3)} deg</div>
                           </div>
                           <div>
                             <span className="text-text-muted text-[8px] uppercase">Int</span>
@@ -779,16 +1006,16 @@ export default function XRDWorkspace() {
 
                 {/* RECOMMENDED VALIDATION (COMPRESSED) */}
                 <div className="border border-border/40 bg-surface/50 px-2 py-1.5">
-                  <h3 className="text-[10px] font-semibold uppercase tracking-wide mb-1">Validation</h3>
+                  <h3 className="text-[10px] font-semibold uppercase tracking-wide mb-1">Validation Required</h3>
                   <div className="space-y-1">
                     <div className="space-y-0.5">
                       <div className="flex items-start gap-1 text-[10px]">
                         <CheckCircle2 size={10} className="mt-0.5 shrink-0 text-emerald-600" />
-                        <span className="text-text-main leading-tight">Raman A1g at 690 cm⁻¹</span>
+                        <span className="text-text-main leading-tight">Raman A1g at 690 cm-1</span>
                       </div>
                       <div className="flex items-start gap-1 text-[10px]">
                         <CheckCircle2 size={10} className="mt-0.5 shrink-0 text-emerald-600" />
-                        <span className="text-text-main leading-tight">XPS Cu²⁺/Fe³⁺ states</span>
+                        <span className="text-text-main leading-tight">XPS Cu2+/Fe3+ states</span>
                       </div>
                       <div className="flex items-start gap-1 text-[10px]">
                         <CheckCircle2 size={10} className="mt-0.5 shrink-0 text-emerald-600" />
@@ -812,23 +1039,34 @@ export default function XRDWorkspace() {
                 <div className="border border-border/40 bg-surface/50 px-2 py-1.5">
                   <div className="flex items-center gap-1.5 mb-1">
                     <AlertTriangle size={11} className="text-amber-600" />
-                    <h3 className="text-[10px] font-semibold uppercase tracking-wide">Limitations</h3>
+                    <h3 className="text-[10px] font-semibold uppercase tracking-wide">Validation Limits</h3>
                   </div>
                   <div className="space-y-0.5">
                     {limitations.map((item) => (
                       <div key={item} className="flex gap-1.5 text-[10px] leading-tight text-text-muted">
-                        <span className="mt-0.5">•</span>
+                        <span className="mt-0.5">-</span>
                         <span>{item}</span>
                       </div>
                     ))}
                   </div>
                 </div>
+              </>
+            ) : (
+              /* No valid data: empty right sidebar */
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <AlertTriangle size={18} className="text-amber-500 mb-2" />
+                <p className="text-[10px] font-semibold text-text-main leading-tight">No interpretation available</p>
+                <p className="mt-1 text-[9px] text-text-muted leading-snug">
+                  No matched processing result for this project.
+                </p>
+              </div>
+            )}
           </div>
         </aside>
       </div>
       </div>
       )}
-      
+
       {/* Parameter Drawer */}
       <ParameterDrawer
         isOpen={drawerOpen}

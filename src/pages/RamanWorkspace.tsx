@@ -81,7 +81,7 @@ export default function RamanWorkspace() {
 
   const handleUploadDataset = () => {
     // Upload functionality placeholder
-    alert('File upload functionality coming soon. Please use "Load Sample Dataset" to try the workspace.');
+    alert('Available in the connected beta workflow. Load the demo dataset to try the workspace.');
   };
   
   // Run Raman processing with current parameters
@@ -118,7 +118,7 @@ export default function RamanWorkspace() {
   const matchedPeaks = uniqueMatchedPeakIds.size;
   
   const confidenceBadge = processingResult.interpretation.confidenceLevel;
-  const reviewStatus = confidenceBadge === 'high' ? 'Complete' : confidenceBadge === 'medium' ? 'Ready' : 'Review';
+  const reviewStatus = confidenceBadge === 'high' ? 'Supported' : confidenceBadge === 'medium' ? 'Requires validation' : 'Validation-limited';
   
   // Create ranked evidence list with strict hierarchy:
   // 1. A1g first

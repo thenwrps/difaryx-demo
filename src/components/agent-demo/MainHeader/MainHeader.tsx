@@ -11,6 +11,7 @@ interface MainHeaderProps {
   onNewAnalysis: () => void;
   onExportReport: () => void;
   isRunning: boolean;
+  showActions?: boolean;
 }
 
 export function MainHeader({
@@ -20,13 +21,14 @@ export function MainHeader({
   onNewAnalysis,
   onExportReport,
   isRunning,
+  showActions = true,
 }: MainHeaderProps) {
   const isLiveExecution = executionStatus === 'running';
   const buttonsDisabled = isRunning;
 
   return (
     <header className="shrink-0 border-b border-white/[0.08] bg-[#0F172A] px-6 py-2.5">
-      <div className="flex items-center justify-between gap-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         {/* Left Side */}
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-3">
@@ -46,30 +48,36 @@ export function MainHeader({
         </div>
 
         {/* Right Side */}
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="text-xs text-slate-400">
             Workflow: <span className="text-slate-300 font-medium">Deterministic + Interpretation</span>
           </div>
-          
-          <button
-            type="button"
-            onClick={onNewAnalysis}
-            disabled={buttonsDisabled}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-semibold shadow-md shadow-blue-600/20 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
-          >
-            <Plus size={14} />
-            New Analysis
-          </button>
 
-          <button
-            type="button"
-            onClick={onExportReport}
-            disabled={buttonsDisabled}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800/50 text-slate-300 text-xs font-semibold hover:bg-slate-800 hover:border-slate-600 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Download size={14} />
-            Export
-          </button>
+          {showActions && (
+            <>
+              <button
+                type="button"
+                onClick={onNewAnalysis}
+                disabled={buttonsDisabled}
+                title={buttonsDisabled ? 'Controls are locked while the deterministic run is active.' : undefined}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-semibold shadow-md shadow-blue-600/20 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+              >
+                <Plus size={14} />
+                New Analysis
+              </button>
+
+              <button
+                type="button"
+                onClick={onExportReport}
+                disabled={buttonsDisabled}
+                title={buttonsDisabled ? 'Controls are locked while the deterministic run is active.' : undefined}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800/50 text-slate-300 text-xs font-semibold hover:bg-slate-800 hover:border-slate-600 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Download size={14} />
+                Export
+              </button>
+            </>
+          )}
         </div>
       </div>
     </header>

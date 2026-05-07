@@ -88,10 +88,10 @@ export default function HeroSection() {
           {/* Left: Content */}
           <div className="max-w-[640px]">
             <h1 className="mb-6 text-[36px] font-extrabold leading-[1.05] tracking-[-0.04em] text-[#0B1220] sm:text-[44px] lg:text-[56px] xl:text-[64px]">
-              From experimental signal to scientific decision automatically
+              From experimental signal to evidence-linked interpretation
             </h1>
             <p className="mb-6 max-w-[620px] text-[16px] leading-[30px] text-slate-600 lg:text-[18px]">
-              DIFARYX unifies characterization data, executes structured analysis workflows, and turns experimental evidence into traceable scientific decisions.
+              DIFARYX unifies characterization data, executes structured analysis workflows, and turns experimental evidence into traceable scientific interpretation.
             </p>
             <p className="mb-8 max-w-[620px] text-[15px] leading-[28px] text-slate-500">
               Built for cross-technique comparison, controllable preprocessing, reproducible reporting, and autonomous agent execution.
@@ -194,7 +194,7 @@ export default function HeroSection() {
                   <div className="flex items-center gap-2">
                     <span className="text-[9px] text-slate-600">Review status:</span>
                     <span className="rounded bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
-                      Complete
+                      Supported
                     </span>
                   </div>
                 </div>
@@ -209,7 +209,7 @@ export default function HeroSection() {
                 {/* Status Bar - Desktop App Style */}
                 <div className="mt-3 flex items-center justify-between rounded border border-slate-300 bg-white px-3 py-1.5 text-[9px] text-slate-600 shadow-sm">
                   <div className="flex items-center gap-4">
-                    <span>Status: Analysis complete</span>
+                    <span>Status: Interpretation ready</span>
                     <span>•</span>
                     <span>Phase: CuFe₂O₄ inverse spinel</span>
                   </div>

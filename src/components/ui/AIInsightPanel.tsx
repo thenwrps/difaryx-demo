@@ -10,23 +10,35 @@ interface ScientificReasoningPanelProps {
     interpretation: string;
     keyEvidence: string[];
     warnings: string[];
-    uncertainty: string;
+    uncertainty?: string;
     recommendedNextStep: string[];
+    claimStatus?: string;
+    validationState?: string;
   };
   className?: string;
 }
 
+function getEvidenceStatusLabel(claimStatus?: string, confidenceLevel?: string): string {
+  if (claimStatus === 'strongly_supported') return 'Supported assignment with validation boundaries';
+  if (claimStatus === 'supported') return 'Requires validation';
+  if (claimStatus === 'partial') return 'Validation-limited';
+  if (claimStatus === 'inconclusive') return 'Publication-limited';
+  if (claimStatus === 'contradicted') return 'Claim boundary';
+  // Fallback to confidence level mapping
+  if (confidenceLevel === 'high') return 'Supported assignment with validation boundaries';
+  if (confidenceLevel === 'medium') return 'Requires validation';
+  return 'Publication-limited';
+}
+
+function getEvidenceStatusColor(claimStatus?: string, confidenceLevel?: string): string {
+  if (claimStatus === 'strongly_supported' || confidenceLevel === 'high') return 'text-emerald-600';
+  if (claimStatus === 'supported' || confidenceLevel === 'medium') return 'text-cyan-600';
+  return 'text-amber-600';
+}
+
 export function ScientificReasoningPanel({ result, className }: ScientificReasoningPanelProps) {
-  // Map confidence level to conclusion
-  const getConclusion = (level: string) => {
-    if (level === 'high') return 'Complete';
-    if (level === 'medium') return 'Ready';
-    return 'Review';
-  };
-  
-  const status = getConclusion(result.confidenceLevel);
-  const statusColor = result.confidenceLevel === 'high' ? 'text-emerald-600' : 
-                      result.confidenceLevel === 'medium' ? 'text-cyan-600' : 'text-amber-600';
+  const status = getEvidenceStatusLabel(result.claimStatus, result.confidenceLevel);
+  const statusColor = getEvidenceStatusColor(result.claimStatus, result.confidenceLevel);
   
   return (
     <Card className={className}>
@@ -39,7 +51,7 @@ export function ScientificReasoningPanel({ result, className }: ScientificReason
           <span>{result.primaryResult}</span>
           <div className="flex flex-col items-end">
             <span className={`text-sm font-bold ${statusColor}`}>{status}</span>
-            <span className="text-xs text-text-muted font-normal">Conclusion</span>
+            <span className="text-xs text-text-muted font-normal">Evidence Status</span>
           </div>
         </CardTitle>
       </CardHeader>
@@ -64,13 +76,13 @@ export function ScientificReasoningPanel({ result, className }: ScientificReason
         </div>
 
         {result.warnings.length > 0 && (
-          <div className="p-3 bg-red-950/20 border border-red-900/50 rounded-lg">
-            <h4 className="text-xs font-semibold text-red-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+          <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+            <h4 className="text-xs font-semibold text-amber-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
               <AlertCircle size={14} /> Limitations
             </h4>
             <ul className="space-y-1">
               {result.warnings.map((warn, i) => (
-                <li key={i} className="text-sm text-red-200/70 ml-5 list-disc">
+                <li key={i} className="text-sm text-amber-900 ml-5 list-disc">
                   {warn}
                 </li>
               ))}

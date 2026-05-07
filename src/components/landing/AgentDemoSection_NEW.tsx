@@ -4,8 +4,8 @@ import { Play, Eye, FileText, Settings } from 'lucide-react';
 
 const demoFeatures = [
   {
-    title: 'Live Agent Execution',
-    desc: 'Watch the agent plan steps, execute tools, and collect evidence in real-time.',
+    title: 'Deterministic Workflow Run',
+    desc: 'Watch the demo plan steps, execute tools, and collect evidence step by step.',
     Icon: Play
   },
   {
@@ -20,7 +20,7 @@ const demoFeatures = [
   },
   {
     title: 'Parameter Control',
-    desc: 'Switch between hybrid mode (manual + agent) and agent 100% mode. Edit preprocessing parameters.',
+    desc: 'Switch between manual review and guided workflow modes. Edit preprocessing parameters.',
     Icon: Settings
   }
 ];
@@ -34,7 +34,7 @@ export default function AgentDemoSection() {
             Try the autonomous agent demo
           </h2>
           <p className="mx-auto max-w-3xl text-[16px] leading-relaxed text-slate-600">
-            Experience DIFARYX's autonomous agent executing a complete XRD phase identification workflow from signal to scientific determination.
+            Experience a deterministic XRD phase-identification workflow from signal to evidence-linked interpretation.
           </p>
         </div>
 
@@ -56,7 +56,7 @@ export default function AgentDemoSection() {
               See the agent in action
             </h3>
           <p className="mb-8 text-[15px] leading-relaxed text-slate-600">
-              The demo shows a complete XRD phase identification workflow: load dataset, detect peaks, generate candidates, evaluate hypotheses, synthesize evidence, generate interpretation, and finalize the characterization conclusion.
+              The demo shows an XRD phase-identification workflow: load dataset, detect peaks, generate candidates, evaluate evidence, synthesize interpretation, and prepare a report-ready discussion.
             </p>
             <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
               <Link

@@ -68,11 +68,11 @@ function formatChemicalFormula(input: string): React.ReactNode {
 type TabType = 'thinking' | 'evidence' | 'context' | 'parameters' | 'logs';
 
 const RIGHT_PANEL_TABS: Array<{ key: TabType; label: string }> = [
-  { key: 'thinking', label: 'Interpretation' },
-  { key: 'evidence', label: 'Evidence' },
-  { key: 'context', label: 'Context' },
+  { key: 'thinking', label: 'Goal' },
+  { key: 'evidence', label: 'Evidence Review' },
+  { key: 'context', label: 'Claim Boundary' },
   { key: 'parameters', label: 'Parameters' },
-  { key: 'logs', label: 'Run Log' },
+  { key: 'logs', label: 'Reasoning Trace' },
 ];
 
 interface CandidateData {
@@ -106,6 +106,8 @@ interface RightPanelProps {
   progressPercent?: number;
   onTabChange?: (tab: TabType) => void;
   onPromptSubmit?: (prompt: string) => void;
+  /** Processing result ID from URL query param, used to show source processing context */
+  processingResultId?: string | null;
 }
 
 function getScientificSummary(technique: string) {
@@ -116,15 +118,15 @@ function getScientificSummary(technique: string) {
         blocks: [
           {
             label: 'Crystal Structure',
-            content: 'Cubic spinel structure (Fd-3m space group) confirmed by characteristic (220), (311), (400), (511), and (440) reflections. Lattice parameter a ≈ 8.38 Å consistent with inverse spinel configuration.',
+            content: 'Cubic spinel structure (Fd-3m space group) is supported by characteristic (220), (311), (400), (511), and (440) reflections. Lattice parameter a ~ 8.38 A remains consistent with an inverse spinel interpretation.',
           },
           {
             label: 'Evidence',
-            content: 'Primary reflections at 2θ = 30.1°, 35.5°, 43.2°, 57.1°, 62.7° match ICDD reference within ±0.15°. Intensity ratios I(311)/I(220) = 2.8 and I(440)/I(511) = 0.6 support cation distribution model.',
+            content: 'Primary reflections at 2theta = 30.1, 35.5, 43.2, 57.1, and 62.7 degrees match the ICDD reference within +/-0.15 degrees. Intensity ratios I(311)/I(220) = 2.8 and I(440)/I(511) = 0.6 support the working cation-distribution model.',
           },
           {
             label: 'Interpretation',
-            content: 'Sharp, well-resolved peaks indicate crystalline structure (crystallite size ~35 nm from Scherrer analysis). Absence of secondary oxide phases (Fe₂O₃, CuO) above detection limit.',
+            content: 'Sharp, well-resolved peaks indicate crystalline structure, with crystallite size estimated near 35 nm from Scherrer analysis. No secondary oxide phase is assigned from this demo pattern; publication-level phase-purity claims require additional validation.',
           },
         ],
         claimStatus: 'strongly_supported',
@@ -223,6 +225,54 @@ interface LiteratureEvidence {
   provider: LiteratureProvider;
   papers: LiteraturePaper[];
   agentSummary: string;
+}
+
+/** Source processing parameters derived from XRD Workspace processing pipeline */
+function getSourceProcessingSections() {
+  return [
+    {
+      subtitle: 'Baseline',
+      params: [
+        { label: 'Method:', value: 'Asymmetric Least Squares' },
+        { label: 'Lambda:', value: '1.0e+6' },
+        { label: 'Asymmetry:', value: '0.010' },
+        { label: 'Iterations:', value: '10' },
+      ],
+    },
+    {
+      subtitle: 'Smooth',
+      params: [
+        { label: 'Method:', value: 'Savitzky-Golay' },
+        { label: 'Window size:', value: '5' },
+        { label: 'Polynomial order:', value: '2' },
+      ],
+    },
+    {
+      subtitle: 'Peaks',
+      params: [
+        { label: 'Prominence:', value: '0.100' },
+        { label: 'Min distance:', value: '0.200' },
+        { label: 'Height threshold:', value: 'Optional' },
+      ],
+    },
+    {
+      subtitle: 'Fit',
+      params: [
+        { label: 'Peak model:', value: 'Pseudo-Voigt' },
+        { label: 'Tolerance:', value: '1.0e-4' },
+        { label: 'Max iterations:', value: '100' },
+      ],
+    },
+    {
+      subtitle: 'Match',
+      params: [
+        { label: 'Database:', value: 'ICDD' },
+        { label: 'Position tolerance:', value: '+/-0.2 deg' },
+        { label: 'Min match score:', value: '0.700' },
+        { label: 'Use intensity matching:', value: 'On' },
+      ],
+    },
+  ];
 }
 
 function getTechniqueParameters(technique: string) {
@@ -546,7 +596,7 @@ function getLiteratureEvidence(technique: string, projectName?: string): Literat
         relevance: 'Supporting literature relation',
         keyEvidence: 'Provides reference d-spacings: d₃₁₁ = 2.532 Å, d₄₄₀ = 1.481 Å, d₅₁₁ = 1.615 Å for pure CuFe₂O₄. Raman T₂g splitting Δν = 142 cm⁻¹ attributed to Jahn-Teller Cu²⁺ distortion in octahedral sites. Absence of CuO band at 530 cm⁻¹ used as phase purity criterion.',
         consistencyCheck: 'Our d₃₁₁ = 2.53 Å matches exactly. Our T₂g splitting = 145 cm⁻¹ within ±3 cm⁻¹. No CuO signature detected in our data, confirming phase purity. Consistent with reference pattern across all metrics.',
-        impactOnDecision: 'Effect on conclusion: Validates crystallographic indexing. Confirms Jahn-Teller interpretation of Raman splitting. Supports single-phase conclusion by ruling out CuO contamination.',
+        impactOnDecision: 'Effect on claim boundary: Validates crystallographic indexing. Confirms Jahn-Teller interpretation of Raman splitting. Supports single-phase interpretation by ruling out CuO contamination.',
         externalLink: '#',
       },
       {
@@ -648,7 +698,7 @@ function getLiteratureEvidence(technique: string, projectName?: string): Literat
     papers,
     agentSummary: `**Cross-study comparison:** Three independent groups (Liu 2023, Chen 2022, Anderson 2021) report CuFe₂O₄ lattice parameters spanning 8.37-8.39 Å, with our 8.38 Å falling at the distribution center. This tight clustering (σ = 0.01 Å) across different synthesis methods rules out systematic preparation artifacts and validates our crystallographic assignment.
 
-**Convergent evidence:** Raman A₁g mode position shows remarkable consistency: Liu (688 cm⁻¹), our data (690 cm⁻¹), literature range (685-695 cm⁻¹). This 1% variation despite different instruments and sample histories indicates robust structure-property correlation, strengthening inverse spinel conclusion.
+**Convergent evidence:** Raman A₁g mode position shows remarkable consistency: Liu (688 cm⁻¹), our data (690 cm⁻¹), literature range (685-695 cm⁻¹). This 1% variation despite different instruments and sample histories indicates robust structure-property correlation, strengthening inverse spinel interpretation.
 
 **Resolved discrepancy:** Anderson's Fe³⁺/Fe²⁺ = 3.2 conflicts with our 2.8 and stoichiometric expectation (2.0). Analysis: Their ex-situ XPS after air exposure likely oxidized surface Fe²⁺ → Fe³⁺. Our value closer to ideal suggests fresher surface or inert transfer. This explains discrepancy without invalidating either dataset—both measure real but different surface states.
 
@@ -670,6 +720,7 @@ export function RightPanel({
   progressPercent = 0,
   onTabChange,
   onPromptSubmit,
+  processingResultId,
 }: RightPanelProps) {
   const [internalActiveTab, setInternalActiveTab] = useState<TabType>('thinking');
   const [userPrompt, setUserPrompt] = useState('');
@@ -846,7 +897,7 @@ export function RightPanel({
             <div className="rounded-lg border border-slate-700 bg-[#070B12] p-4">
               <div className="flex items-center gap-2 mb-3">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                  Experiment Instructions
+                  Goal
                 </h3>
                 <span className="px-2 py-0.5 rounded-full bg-blue-400/10 border border-blue-400/30 text-blue-300 text-[9px] font-bold">
                   User Control
@@ -857,7 +908,7 @@ export function RightPanel({
                   value={userPrompt}
                   onChange={(e) => setUserPrompt(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Provide instructions or constraints for the agent (e.g., 'Focus on Cu oxidation states', 'Check for secondary phases', 'Prioritize peak intensity analysis')..."
+                  placeholder="Provide a goal or constraint for the deterministic workflow (e.g., 'Focus on Cu oxidation states', 'Check for secondary phases', 'Prioritize peak intensity analysis')..."
                   className="w-full h-24 px-3 py-2 rounded-md bg-slate-800/50 border border-slate-700 text-slate-200 text-xs placeholder:text-slate-500 focus:outline-none focus:border-cyan-400/50 focus:ring-1 focus:ring-cyan-400/20 resize-none"
                 />
                 <div className="flex items-center justify-between">
@@ -868,6 +919,7 @@ export function RightPanel({
                     type="button"
                     onClick={handlePromptSubmit}
                     disabled={!userPrompt.trim()}
+                    title={!userPrompt.trim() ? 'Enter a goal or constraint before sending.' : undefined}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-semibold shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
                   >
                     <Send size={12} />
@@ -877,10 +929,10 @@ export function RightPanel({
               </div>
             </div>
 
-            {/* Section 1: Reasoning Stream */}
-            <Section title="Reasoning Stream">
+            {/* Section 1: Interpretation */}
+            <Section title="Interpretation">
               <div className="text-xs text-slate-400 mb-3">
-                Step {currentStep >= 0 ? currentStep + 1 : 1} of {totalSteps} · Hypothesis Evaluation
+                Step {currentStep >= 0 ? currentStep + 1 : 1} of {totalSteps} - Evidence Review
               </div>
               <div className="space-y-3">
                 <div>
@@ -900,7 +952,7 @@ export function RightPanel({
                 </div>
                 <div>
                   <div className="text-xs font-semibold text-slate-300 mb-2">
-                    Evaluation Logic:
+                    Evidence Review:
                   </div>
                   <ul className="space-y-1.5 text-xs text-slate-400">
                     <li className="flex items-start gap-2">
@@ -920,8 +972,8 @@ export function RightPanel({
               </div>
             </Section>
 
-            {/* Section 2: Candidate Comparison */}
-            <Section title="Candidate Comparison">
+            {/* Section 2: Evidence Review */}
+            <Section title="Evidence Review">
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
@@ -985,12 +1037,12 @@ export function RightPanel({
               ))}
               <div className="mt-3 pt-3 border-t border-slate-700">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold text-slate-400">Conclusion:</span>
+                  <span className="text-xs font-semibold text-slate-400">Evidence status:</span>
                   <span className="text-xs text-emerald-400 font-semibold">
-                    {getScientificSummary(technique).claimStatus === 'strongly_supported' ? 'Complete' :
-                     getScientificSummary(technique).claimStatus === 'supported' ? 'Ready' :
-                     getScientificSummary(technique).claimStatus === 'partial' ? 'In Progress' :
-                     'Review'}
+                    {getScientificSummary(technique).claimStatus === 'strongly_supported' ? 'Supported' :
+                     getScientificSummary(technique).claimStatus === 'supported' ? 'Requires validation' :
+                     getScientificSummary(technique).claimStatus === 'partial' ? 'Validation-limited' :
+                     'Claim boundary'}
                   </span>
                 </div>
               </div>
@@ -1023,7 +1075,7 @@ export function RightPanel({
                   </ul>
                 </div>
                 <div>
-                  <div className="text-xs font-semibold text-slate-400 mb-1.5">Conclusion:</div>
+                  <div className="text-xs font-semibold text-slate-400 mb-1.5">Interpretation:</div>
                   <div className="text-xs text-emerald-400">
                     Multiple independent evidence streams converge on the same structural assignment. Cross-technique validation (XRD + Raman + XPS) provides robust support for the phase identification.
                   </div>
@@ -1038,7 +1090,7 @@ export function RightPanel({
                   <span className="text-slate-300 font-medium">Crystallographic consistency:</span> The observed d-spacings (d₃₁₁ = 2.53 Å, d₄₄₀ = 1.48 Å) align with cubic spinel lattice within instrumental resolution (±0.02 Å). Peak intensity ratios deviate &lt;8% from powder diffraction file, suggesting minimal preferred orientation.
                 </p>
                 <p>
-                  <span className="text-slate-300 font-medium">Phase purity assessment:</span> Integrated intensity analysis across 2θ = 10-80° accounts for 97.3% of total scattering. Residual 2.7% distributed as background noise rather than coherent secondary phase reflections, supporting single-phase conclusion.
+                  <span className="text-slate-300 font-medium">Phase purity assessment:</span> Integrated intensity analysis across 2θ = 10-80° accounts for 97.3% of total scattering. Residual 2.7% distributed as background noise rather than coherent secondary phase reflections, supporting single-phase interpretation.
                 </p>
                 <p>
                   <span className="text-slate-300 font-medium">Competing hypotheses:</span> Fe₃O₄ magnetite rejected due to absence of characteristic (111) reflection at 18.3° and incompatible lattice parameter (a_magnetite = 8.39 Å vs. a_observed = 8.38 Å). CuO tenorite ruled out by missing monoclinic signature at 38.7°.
@@ -1049,8 +1101,8 @@ export function RightPanel({
               </div>
             </Section>
 
-            {/* Section 5: Conclusion */}
-            <Section title="Conclusion" badge="Source: Workflow" badgeColor="cyan">
+            {/* Section 5: Report-ready Discussion */}
+            <Section title="Report-ready Discussion" badge="Source: Workflow" badgeColor="cyan">
               <div className="space-y-3">
                 <div className="text-xs">
                   <span className="text-slate-200 font-semibold">CuFe₂O₄ inverse spinel phase assignment</span>
@@ -1127,7 +1179,7 @@ export function RightPanel({
                   <span className="text-slate-300">Analysis:</span> Peak position inconsistent with CuFe₂O₄ spinel (no allowed reflection at d = 1.489 Å for Fd-3m). Possible origins: (1) trace CuO impurity (2-11) plane, (2) surface reconstruction superlattice, or (3) instrumental artifact from Kα₂ stripping error.
                 </div>
                 <div className="flex items-center gap-2 text-xs">
-                  <span className="text-amber-400 font-semibold">Effect on conclusion:</span>
+                  <span className="text-amber-400 font-semibold">Effect on claim boundary:</span>
                   <span className="text-amber-300">Local inconsistency observed</span>
                   <span className="text-slate-500">(minor unresolved reflection)</span>
                 </div>
@@ -1163,7 +1215,7 @@ export function RightPanel({
                 </div>
                 <div className="pt-3 border-t border-slate-700">
                   <div className="text-[11px] text-slate-400 mb-2">
-                    Multiple independent evidence streams support the same structural conclusion
+                    Multiple independent evidence streams support the same structural interpretation
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-semibold text-slate-300">Status:</span>
@@ -1199,7 +1251,7 @@ export function RightPanel({
                 </div>
                 <div className="pt-3 border-t border-slate-700">
                   <div className="text-[11px] text-slate-400 mb-2">
-                    Multiple independent evidence streams support the same structural conclusion
+                    Multiple independent evidence streams support the same structural interpretation
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-semibold text-slate-300">Status:</span>
@@ -1268,29 +1320,29 @@ export function RightPanel({
               </div>
             </Section>
 
-            {/* Literature Evidence */}
-            <Section title="Literature Evidence">
+            {/* Validation Context */}
+            <Section title="Validation Context">
               <div className="space-y-3">
                 {/* Provider and Query */}
                 <div className="rounded-lg bg-slate-800/30 border border-slate-700 p-3 space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-400">Provider:</span>
-                    <span className="text-xs text-slate-300">Google Scholar compatible search</span>
+                    <span className="text-xs font-semibold text-slate-400">Source:</span>
+                    <span className="text-xs text-slate-300">Bundled literature context</span>
                   </div>
                   <div>
-                    <div className="text-xs font-semibold text-slate-400 mb-1">Generated Query:</div>
+                    <div className="text-xs font-semibold text-slate-400 mb-1">Validation query:</div>
                     <div className="text-xs text-slate-300 font-mono bg-slate-900/50 p-2 rounded border border-slate-700">
                       {getLiteratureEvidence(technique, projectName).query}
                     </div>
                   </div>
                   <div className="text-[10px] text-slate-500 pt-1 border-t border-slate-700">
-                    Note: Google Scholar access requires a backend proxy or third-party search API
+                    Demo dataset only. Live publication search is available in the connected beta workflow.
                   </div>
                 </div>
 
                 {/* Papers */}
                 <div className="space-y-3">
-                  <div className="text-xs font-semibold text-slate-400 mb-2">Literature Cross-Validation:</div>
+                  <div className="text-xs font-semibold text-slate-400 mb-2">Publication-limited validation:</div>
                   {getLiteratureEvidence(technique, projectName).papers.map((paper, index) => (
                     <div key={index} className="rounded-lg bg-slate-800/30 border border-slate-700 p-3 space-y-3">
                       <div>
@@ -1325,7 +1377,7 @@ export function RightPanel({
                         </div>
                         
                         <div className="pt-1 border-t border-slate-700/50">
-                          <div className="text-[11px] font-semibold text-slate-300 mb-1">Effect on conclusion:</div>
+                          <div className="text-[11px] font-semibold text-slate-300 mb-1">Effect on claim boundary:</div>
                           <div className="text-[11px] text-slate-400 leading-relaxed">{paper.impactOnDecision}</div>
                         </div>
                       </div>
@@ -1413,6 +1465,85 @@ export function RightPanel({
                 </div>
               </div>
             </div>
+
+            {/* Source Processing Parameters — connected to XRD Workspace */}
+            {processingResultId && (
+              <Section title="Source Processing Parameters" badge="XRD Workspace" badgeColor="cyan">
+                <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3 mb-4">
+                  <div className="text-[10px] text-cyan-300 font-medium">
+                    Agent interpretation is based on the processed XRD evidence generated with these settings.
+                  </div>
+                  <div className="mt-1 text-[9px] text-slate-500">
+                    Source: {processingResultId} - Editing here updates the agent interpretation context only. Source XRD processing remains unchanged.
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  {getSourceProcessingSections().map((section, sectionIdx) => {
+                    const sectionKey = `source-${sectionIdx}`;
+                    const isEditing = editingSection === sectionKey;
+
+                    return (
+                      <div key={sectionIdx} className={`rounded-lg border p-3 transition-all ${
+                        isEditing
+                          ? 'bg-cyan-400/5 border-cyan-400/30'
+                          : 'bg-slate-800/30 border-slate-700'
+                      }`}>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="text-xs font-semibold text-slate-300">{section.subtitle}</div>
+                          {parameterMode === 'hybrid' && (
+                            <button
+                              type="button"
+                              onClick={() => handleEditSection(sectionKey)}
+                              className={`text-[9px] px-2 py-0.5 rounded border transition-colors ${
+                                isEditing
+                                  ? 'bg-emerald-400/20 border-emerald-400/40 text-emerald-300 hover:bg-emerald-400/30'
+                                  : 'bg-cyan-400/10 border-cyan-400/30 text-cyan-300 hover:bg-cyan-400/20'
+                              }`}
+                            >
+                              {isEditing ? 'Save' : 'Edit'}
+                            </button>
+                          )}
+                          {parameterMode === 'agent' && (
+                            <span className="text-[9px] px-2 py-0.5 rounded bg-purple-400/10 border border-purple-400/30 text-purple-300">
+                              Auto-optimized
+                            </span>
+                          )}
+                        </div>
+                        <div className="space-y-1.5">
+                          {section.params.map((param, paramIdx) => {
+                            const paramKey = `source-${sectionIdx}-${paramIdx}`;
+                            const currentValue = editedValues[paramKey] ?? param.value;
+
+                            return (
+                              <div key={paramIdx} className="flex items-center justify-between text-xs gap-3">
+                                <span className="text-slate-400 flex-shrink-0">{param.label}</span>
+                                {isEditing ? (
+                                  <input
+                                    type="text"
+                                    value={currentValue}
+                                    onChange={(e) => handleValueChange(paramKey, e.target.value)}
+                                    className="px-2 py-1 rounded bg-slate-900/50 border border-cyan-400/30 text-slate-200 font-mono text-xs focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/20 min-w-[120px]"
+                                  />
+                                ) : (
+                                  <span className="text-slate-200 font-mono">{currentValue}</span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {isEditing && (
+                          <div className="mt-2 pt-2 border-t border-cyan-400/20">
+                            <div className="text-[10px] text-cyan-300">
+                              💡 Editing here updates the agent interpretation context only. Source XRD processing remains unchanged.
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </Section>
+            )}
 
             {/* Analysis Configuration */}
             <Section title={getTechniqueParameters(technique).analysisConfig.title}>
@@ -1647,7 +1778,7 @@ export function RightPanel({
 
         {activeTab === 'logs' && (
           <>
-            <Section title="Execution Trace">
+            <Section title="Reasoning Trace">
               <div className="space-y-3">
                 {executionSteps.length > 0 ? (
                   executionSteps.map((step) => (
@@ -1655,7 +1786,7 @@ export function RightPanel({
                   ))
                 ) : (
                   <div className="rounded-lg border border-slate-800 bg-[#070B12] p-4 text-xs text-slate-500">
-                    Execution trace appears when a run is prepared.
+                    Reasoning trace appears when a run is prepared.
                   </div>
                 )}
               </div>
@@ -1663,7 +1794,7 @@ export function RightPanel({
               <div className="mt-4">
                 <div className="mb-2 flex items-center justify-between">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                    Execution Progress
+                    Reasoning Progress
                   </span>
                   <span className="text-[10px] font-bold text-cyan-300">
                     {Math.round(progressPercent)}%
@@ -1678,8 +1809,8 @@ export function RightPanel({
               </div>
             </Section>
 
-            {/* Execution Timeline */}
-            <Section title="Execution Timeline">
+            {/* Reasoning Timeline */}
+            <Section title="Reasoning Timeline">
               <div className="space-y-2">
                 <LogEntry
                   timestamp="00:00.123"
@@ -1690,7 +1821,7 @@ export function RightPanel({
                 <LogEntry
                   timestamp="00:00.456"
                   level="info"
-                  message="XRD preprocessing complete"
+                  message="XRD preprocessing prepared"
                   details="Background subtraction (5th order polynomial, R² = 0.998), Kα₂ stripping, Savitzky-Golay smoothing (window=7)"
                 />
                 <LogEntry
@@ -1762,25 +1893,25 @@ export function RightPanel({
                 <LogEntry
                   timestamp="00:10.234"
                   level="info"
-                  message="Literature search initiated"
-                  details="Query: 'CuFe2O4 spinel ferrite XRD Raman XPS catalytic activity'. Searching Google Scholar proxy..."
+                  message="Validation context review started"
+                  details="Query: 'CuFe2O4 spinel ferrite XRD Raman XPS catalytic activity'. Reviewing bundled publication-style context."
                 />
                 <LogEntry
                   timestamp="00:12.567"
                   level="success"
-                  message="Retrieved 5 relevant papers"
+                  message="Loaded 5 bundled reference notes"
                   details="Liu 2023 (Advanced Materials), Chen 2022 (J. Solid State Chem), Anderson 2021 (Surface Science), Zhang 2023 (J. Catalysis), Kumar 2022 (Mater. Chem. Phys)"
                 />
                 <LogEntry
                   timestamp="00:13.123"
                   level="info"
-                  message="Supporting literature review requested"
+                  message="Supporting validation review requested"
                   details="Comparing current results with 5 literature sources. Analyzing consistency and conflicts."
                 />
                 <LogEntry
                   timestamp="00:15.456"
                   level="success"
-                  message="Literature synthesis complete"
+                  message="Publication context prepared"
                   details="Cross-study validation: lattice parameter consensus (8.37-8.39 Å), Raman mode agreement (688-690 cm⁻¹). Resolved Fe³⁺/Fe²⁺ discrepancy with Anderson 2021."
                 />
                 <LogEntry
@@ -1792,8 +1923,8 @@ export function RightPanel({
                 <LogEntry
                   timestamp="00:16.012"
                   level="success"
-                  message="Analysis complete"
-                  details="Phase assignment: CuFe2O4 inverse spinel (Fd-3m, a=8.38 A). Status: Ready. Recommended validation: HR-TEM for 62.3 degree anomaly."
+                  message="Interpretation ready"
+                  details="Phase assignment: CuFe2O4 inverse spinel (Fd-3m, a=8.38 A). Status: Requires validation. Recommended validation: HR-TEM for 62.3 degree anomaly."
                 />
               </div>
             </Section>
@@ -1818,7 +1949,7 @@ export function RightPanel({
                   <span className="text-slate-200 font-mono">5.657 s (2 calls)</span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-400">Literature search time:</span>
+                    <span className="text-slate-400">Validation context time:</span>
                   <span className="text-slate-200 font-mono">4.901 s</span>
                 </div>
                 <div className="pt-2 border-t border-slate-700">
@@ -1831,8 +1962,8 @@ export function RightPanel({
                     <span className="text-slate-200 font-mono">3 (ICDD, COD, AMCSD)</span>
                   </div>
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-400">External calls:</span>
-                    <span className="text-slate-200 font-mono">3 (Interpretation x2, Scholar x1)</span>
+                    <span className="text-slate-400">External API calls:</span>
+                    <span className="text-slate-200 font-mono">0 (deterministic demo)</span>
                   </div>
                 </div>
               </div>
@@ -1857,17 +1988,17 @@ export function RightPanel({
                     <span className="text-purple-300 font-mono text-xs">5.657 s (35.3%)</span>
                   </div>
                   <div className="text-[10px] text-slate-400">
-                        Interpretation (2.324s), literature synthesis (3.333s)
+                    Interpretation (2.324s), publication-context preparation (3.333s)
                   </div>
                 </div>
                 
                 <div className="rounded-lg bg-cyan-400/5 border border-cyan-400/20 p-3">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-slate-300">External Data Retrieval</span>
+                    <span className="text-xs font-semibold text-slate-300">Validation Context</span>
                     <span className="text-cyan-300 font-mono text-xs">6.901 s (43.1%)</span>
                   </div>
                   <div className="text-[10px] text-slate-400">
-                    Database queries (2.000s), literature search (4.901s)
+                    Bundled reference matching (2.000s), validation context review (4.901s)
                   </div>
                 </div>
               </div>

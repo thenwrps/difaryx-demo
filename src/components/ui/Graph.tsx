@@ -407,6 +407,7 @@ export function Graph({
               label={{ value: settings.yLabel, angle: -90, position: 'left', fill: '#94a3b8', fontSize: 12 }}
               domain={yDomain}
               allowDataOverflow
+              tickFormatter={(v) => (Math.abs(v) < 0.5 ? '0' : String(Math.round(v)))}
             />
             <Tooltip
               formatter={(value, name) => [
@@ -566,6 +567,7 @@ export function Graph({
             label={{ value: settings.yLabel, angle: -90, position: 'left', fill: '#94a3b8', fontSize: 12 }}
             domain={yDomain}
             allowDataOverflow
+            tickFormatter={(v) => (Math.abs(v) < 0.5 ? '0' : String(Math.round(v)))}
           />
           <Tooltip
             formatter={(value, name) => [

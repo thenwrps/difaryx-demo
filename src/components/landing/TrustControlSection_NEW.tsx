@@ -4,19 +4,19 @@ import { Eye, Settings, FileCheck, GitBranch } from 'lucide-react';
 const trustPrinciples = [
   {
     title: 'Reasoning Transparency',
-    desc: 'See candidate comparison, conflict analysis, uncertainty assessment, and evidence synthesis. Every conclusion shows its supporting data.',
+    desc: 'See candidate comparison, conflict analysis, uncertainty assessment, and evidence synthesis. Every interpretation shows its supporting data.',
     Icon: Eye,
     color: 'blue'
   },
   {
     title: 'Parameter Control',
-    desc: 'Switch between hybrid mode (manual + agent) and agent 100% mode. Edit preprocessing parameters, analysis thresholds, and database sources.',
+    desc: 'Switch between manual review and guided workflow modes. Edit preprocessing parameters, analysis thresholds, and reference sources.',
     Icon: Settings,
     color: 'purple'
   },
   {
     title: 'Evidence Provenance',
-    desc: 'Track which peaks, databases, and techniques contributed to each conclusion. Export reports with full evidence lineage.',
+    desc: 'Track which peaks, reference sources, and techniques contributed to each interpretation. Export reports with full evidence lineage.',
     Icon: FileCheck,
     color: 'emerald'
   },

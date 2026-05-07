@@ -9,7 +9,7 @@
         </div>
         <div className="flex items-center gap-3">
           <span className={`rounded-full border px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${isRunning ? 'border-cyan-400/40 bg-cyan-400/10 text-cyan-300' : runComplete ? 'border-emerald-400/40 bg-emerald-400/10 text-emerald-300' : 'border-slate-700 bg-[#070B12] text-slate-500'}`}>
-            {isRunning ? 'Running' : runComplete ? 'Complete' : 'Ready'}
+            {isRunning ? 'Running' : runComplete ? 'Supported' : 'Ready'}
           </span>
           <button type="button" onClick={runAgent} disabled={isRunning} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-4 text-xs font-bold text-white shadow-lg shadow-blue-600/20 transition-all hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60">
             {isRunning ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} fill="currentColor" />}
@@ -207,8 +207,8 @@
           {/* Conclusion Display */}
           <div className={`rounded-lg border p-4 text-center transition-all duration-500 ${runComplete ? 'border-emerald-400/30 bg-emerald-400/5' : 'border-slate-800 bg-[#0A0F1A]'}`}>
             <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Conclusion</p>
-            <p className={`mt-1 text-4xl font-black ${runComplete ? 'text-emerald-300' : 'text-slate-700'}`}>{runComplete ? 'Complete' : 'Pending'}</p>
-            <p className="mt-1 text-[10px] text-slate-500">{runComplete ? 'Ready - phase confirmed' : 'Pending characterization'}</p>
+            <p className={`mt-1 text-4xl font-black ${runComplete ? 'text-emerald-300' : 'text-slate-700'}`}>{runComplete ? 'Supported' : 'Pending'}</p>
+            <p className="mt-1 text-[10px] text-slate-500">{runComplete ? 'Requires validation' : 'Pending characterization'}</p>
           </div>
 
           {/* Phase Result */}
@@ -236,7 +236,7 @@
               <div className="rounded-lg border border-slate-800 bg-[#0A0F1A] p-3">
                 <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">Supporting Data</p>
                 <div className="space-y-1">
-            <p className={`mt-1 text-4xl font-black ${runComplete ? 'text-emerald-300' : 'text-slate-700'}`}>{runComplete ? 'Complete' : 'Pending'}</p>
+            <p className={`mt-1 text-4xl font-black ${runComplete ? 'text-emerald-300' : 'text-slate-700'}`}>{runComplete ? 'Supported' : 'Pending'}</p>
                     <div key={c} className="flex items-center gap-2 rounded-md border border-indigo-400/20 bg-indigo-500/10 px-2 py-1.5 text-[11px] text-indigo-100">
                       <CircleDot size={11} className="shrink-0 text-indigo-200" /><span>{c}</span>
                     </div>

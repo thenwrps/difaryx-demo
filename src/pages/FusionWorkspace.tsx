@@ -81,7 +81,7 @@ export default function FusionWorkspace() {
   };
 
   const formatReviewStatus = (value: number) => (
-    value >= 0.9 ? 'Complete' : value >= 0.75 ? 'Ready' : 'In Progress'
+    value >= 0.9 ? 'Supported' : value >= 0.75 ? 'Requires validation' : 'Validation-limited'
   );
   
   // Left Panel Content
@@ -159,9 +159,9 @@ export default function FusionWorkspace() {
         </p>
       </div>
       
-      {/* Conclusion */}
+      {/* Interpretation */}
       <div className="bg-white rounded-lg border border-gray-200 p-4">
-        <h3 className="text-sm font-semibold text-gray-700 mb-3">Conclusion</h3>
+        <h3 className="text-sm font-semibold text-gray-700 mb-3">Interpretation</h3>
         <div className="space-y-3">
           <div>
             <div className="text-xs text-gray-500 mb-1">Overall Status</div>
@@ -243,7 +243,7 @@ export default function FusionWorkspace() {
               : 'text-gray-600 hover:text-gray-900'
           }`}
         >
-          Conclusion
+          Interpretation
         </button>
         <button
           onClick={() => setActiveTab('matrix')}
@@ -291,14 +291,14 @@ export default function FusionWorkspace() {
       <div className="flex-1 overflow-auto p-6 bg-gray-50">
         {activeTab === 'decision' && (
           <div className="space-y-6">
-            {/* Final Conclusion Card */}
+            {/* Report-ready Discussion Card */}
             <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Final Conclusion</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Report-ready Discussion</h3>
               <p className="text-gray-700 leading-relaxed mb-4">
                 {fusionResult.decision.primaryConclusion}
               </p>
               <div className="flex items-center gap-3">
-                <span className="text-sm text-gray-600">Conclusion:</span>
+                <span className="text-sm text-gray-600">Evidence status:</span>
                 <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getConclusionBadgeColor(fusionResult.decision.confidenceScore >= 0.9 ? 'strongly-supported' : fusionResult.decision.confidenceScore >= 0.75 ? 'supported' : 'partial')}`}>
                   {formatReviewStatus(fusionResult.decision.confidenceScore)}
                 </span>
@@ -360,7 +360,7 @@ export default function FusionWorkspace() {
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Conclusion</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Claim</th>
                     <th className="px-4 py-3 text-center font-semibold text-gray-700">XPS</th>
                     <th className="px-4 py-3 text-center font-semibold text-gray-700">FTIR</th>
                     <th className="px-4 py-3 text-center font-semibold text-gray-700">Raman</th>
@@ -482,7 +482,7 @@ export default function FusionWorkspace() {
                     </div>
                     
                     <div>
-                      <span className="font-semibold text-gray-700">Effect on Conclusion:</span>
+                      <span className="font-semibold text-gray-700">Effect on Claim Boundary:</span>
                       <p className="mt-1 text-gray-600">{contradiction.effectOnConfidence}</p>
                     </div>
                   </div>

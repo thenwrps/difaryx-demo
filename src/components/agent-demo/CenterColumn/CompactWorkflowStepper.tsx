@@ -19,7 +19,7 @@ const STEP_LABELS = [
   'Evaluation',
   'Fusion',
   'Interpretation',
-  'Conclusion',
+  'Discussion',
 ] as const;
 
 const STATUS_STYLES = {

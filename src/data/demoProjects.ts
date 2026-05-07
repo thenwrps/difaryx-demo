@@ -9,11 +9,11 @@ export interface DemoPeak {
 export type ClaimStatus = 'strongly_supported' | 'supported' | 'partial' | 'inconclusive' | 'contradicted';
 
 function formatClaimStatusLabel(status: ClaimStatus): string {
-  if (status === 'strongly_supported') return 'Complete';
-  if (status === 'supported') return 'Ready';
-  if (status === 'partial') return 'In Progress';
-  if (status === 'inconclusive') return 'Pending';
-  return 'Review';
+  if (status === 'strongly_supported') return 'Supported assignment with validation boundaries';
+  if (status === 'supported') return 'Requires validation';
+  if (status === 'partial') return 'Validation-limited';
+  if (status === 'inconclusive') return 'Publication-limited';
+  return 'Claim boundary';
 }
 export type ValidationState = 'complete' | 'partial' | 'requires_validation';
 export type EvidenceRole = 'primary' | 'supporting' | 'context';
@@ -162,17 +162,17 @@ const LOCAL_EVIDENCE_KEY = 'difaryx-demo-evidence';
 export const demoProjects: DemoProject[] = [
   {
     id: 'cu-fe2o4-spinel',
-    name: 'CuFe2O4 Spinel',
+    name: 'CuFe₂O₄ Spinel',
     material: 'Copper ferrite spinel',
     techniques: ['XRD', 'Raman'],
     status: 'Report Ready',
     claimStatus: 'strongly_supported',
     validationState: 'complete',
-    phase: 'CuFe2O4 copper ferrite phase',
+    phase: 'CuFe₂O₄ copper ferrite phase',
     lastUpdated: '2 hours ago',
     createdDate: '2026-04-29',
     summary:
-      'XRD analysis identified 9 diffraction peaks. Primary phase assignment: CuFe2O4 is Complete with supporting data.',
+      'XRD analysis identified 9 diffraction peaks. The observed pattern supports CuFe₂O₄ spinel phase assignment, with validation still required before publication-level phase-purity claims.',
     xrdPeaks: [
       { position: 17.1, intensity: 72, label: '(111)' },
       { position: 20.8, intensity: 31, label: '(220)' },
@@ -185,16 +185,16 @@ export const demoProjects: DemoProject[] = [
       { position: 61.6, intensity: 44, label: '(533)' },
     ],
     evidence: [
-      'XRD peak positions align with the copper ferrite spinel reference pattern.',
-      'Raman A1g mode supports the spinel ferrite lattice.',
-      'Peak width indicates nanocrystalline domains without a dominant impurity phase.',
+      'XRD reflections near 30.1 deg, 35.5 deg, and 43.2 deg 2theta align with spinel ferrite reference peaks.',
+      'Raman A1g/T2g vibrational features support local spinel symmetry.',
+      'Peak width and unresolved weak reflections indicate validation is still required before phase-purity claims.',
     ],
     recommendations: [
       'Review notebook synthesis conditions before export.',
       'Run multi-tech correlation if surface oxidation state needs confirmation.',
     ],
     notebook: {
-      title: 'Exp-042: CuFe2O4 Spinel Phase Confirmation',
+      title: 'Exp-042: CuFe₂O₄ Spinel Phase Confirmation',
       pipeline: [
         'Imported XRD scan and normalized intensity baseline.',
         'Detected local maxima and filtered instrument noise.',
@@ -204,7 +204,7 @@ export const demoProjects: DemoProject[] = [
       peakDetection:
         '9 diffraction peaks detected across 17.1-61.6 degrees 2theta after baseline correction.',
       phaseIdentification:
-        'Primary phase assignment is CuFe2O4 copper ferrite phase, Complete with supporting data.',
+        'XRD analysis identified 9 diffraction peaks. The observed pattern supports CuFe₂O₄ spinel phase assignment, with validation still required before publication-level phase-purity claims.',
     },
     history: [
       {
@@ -221,7 +221,7 @@ export const demoProjects: DemoProject[] = [
         run: 'Agent decision run',
         technique: 'Agent Mode',
         claimStatus: 'strongly_supported',
-        status: 'Complete',
+        status: 'Report-ready discussion',
         date: '2026-04-29 07:36',
         action: 'agent',
       },
@@ -239,17 +239,17 @@ export const demoProjects: DemoProject[] = [
   },
   {
     id: 'cufe2o4-sba15',
-    name: 'CuFe2O4/SBA-15',
+    name: 'CuFe₂O₄/SBA-15',
     material: 'Copper ferrite on mesoporous silica',
     techniques: ['XRD', 'XPS', 'FTIR', 'Raman'],
     status: 'In Progress',
     claimStatus: 'supported',
     validationState: 'partial',
-    phase: 'CuFe2O4 dispersed on mesoporous SBA-15',
+    phase: 'CuFe₂O₄ dispersed on mesoporous SBA-15',
     lastUpdated: '5 hours ago',
     createdDate: '2026-04-28',
     summary:
-      'Multi-tech analysis indicates CuFe2O4 dispersed on mesoporous SBA-15 with consistent surface and bonding evidence.',
+      'Processed evidence supports CuFe₂O₄ spinel ferrite reflections in the CuFe₂O₄/SBA-15 sample, consistent with dispersed copper ferrite on mesoporous SBA-15. Phase distribution, loading uniformity, surface oxidation state, and support interaction remain validation-limited.',
     xrdPeaks: [
       { position: 20.9, intensity: 24, label: 'SBA shoulder' },
       { position: 30.1, intensity: 44, label: '(220)' },
@@ -258,16 +258,16 @@ export const demoProjects: DemoProject[] = [
       { position: 57.1, intensity: 38, label: '(511)' },
     ],
     evidence: [
-      'XPS: Cu 2p3/2 peak confirms Cu2+ state.',
-      'FTIR: Fe-O stretching vibration observed.',
-      'Raman: A1g mode supports spinel structure.',
+      'XRD reflections assigned to CuFe₂O₄ remain visible in the supported CuFe₂O₄/SBA-15 sample.',
+      'Raman vibrational modes provide supporting evidence for ferrite-like local structure.',
+      'FTIR silica/support features contextualize the SBA-15 matrix but do not independently prove ferrite phase purity.',
     ],
     recommendations: [
       'Quantify Cu/Fe ratio from XPS survey scan.',
-      'Compare FTIR silica bands before final report export.',
+      'Compare FTIR silica bands before report export.',
     ],
     notebook: {
-      title: 'Exp-044: CuFe2O4/SBA-15 Multi-Tech Correlation',
+      title: 'Exp-044: CuFe₂O₄/SBA-15 Multi-Tech Correlation',
       pipeline: [
         'Loaded XRD, XPS, and FTIR datasets under one project context.',
         'Aligned surface-state evidence with bulk phase indicators.',
@@ -277,7 +277,7 @@ export const demoProjects: DemoProject[] = [
       peakDetection:
         '5 ferrite-related reflections detected with broad SBA-15 support contribution.',
       phaseIdentification:
-        'Evidence supports dispersed CuFe2O4 on SBA-15, supported by multiple techniques.',
+        'CuFe₂O₄-related reflections observed in a CuFe₂O₄/SBA-15 supported sample. XRD supports structural assignment, while dispersion, loading uniformity, phase purity, and surface oxidation state remain validation-limited.',
     },
     history: [
       {
@@ -294,7 +294,7 @@ export const demoProjects: DemoProject[] = [
   },
   {
     id: 'nife2o4',
-    name: 'NiFe2O4',
+    name: 'NiFe₂O₄',
     material: 'Nickel ferrite spinel',
     techniques: ['XRD'],
     status: 'Report Ready',
@@ -318,7 +318,7 @@ export const demoProjects: DemoProject[] = [
     ],
     recommendations: ['Export report or run Raman confirmation.'],
     notebook: {
-      title: 'Exp-041: NiFe2O4 Control Sample',
+      title: 'Exp-041: NiFe₂O₄ Control Sample',
       pipeline: [
         'Imported XRD control scan.',
         'Detected spinel reflections.',
@@ -342,7 +342,7 @@ export const demoProjects: DemoProject[] = [
   },
   {
     id: 'cofe2o4',
-    name: 'CoFe2O4',
+    name: 'CoFe₂O₄',
     material: 'Cobalt ferrite spinel',
     techniques: ['XRD', 'XPS'],
     status: 'Report Ready',
@@ -366,14 +366,14 @@ export const demoProjects: DemoProject[] = [
     ],
     recommendations: ['Review XPS oxidation-state fit before archiving.'],
     notebook: {
-      title: 'Exp-039: CoFe2O4 Spinel Verification',
+      title: 'Exp-039: CoFe₂O₄ Spinel Verification',
       pipeline: [
         'Processed XRD scan and XPS survey.',
         'Matched ferrite phase pattern.',
         'Linked surface chemistry evidence to phase result.',
       ],
       peakDetection: '6 ferrite reflections detected in the XRD pattern.',
-      phaseIdentification: 'Evidence supports cobalt ferrite spinel phase. Status: Complete.',
+      phaseIdentification: 'Evidence supports cobalt ferrite spinel phase. Status: requires validation.',
     },
     history: [
       {
@@ -390,7 +390,7 @@ export const demoProjects: DemoProject[] = [
   },
   {
     id: 'fe3o4-nanoparticles',
-    name: 'Fe3O4 Nanoparticles',
+    name: 'Fe₃O₄ Nanoparticles',
     material: 'Iron oxide nanoparticles',
     techniques: ['FTIR', 'Raman'],
     status: 'In Progress',
@@ -413,9 +413,9 @@ export const demoProjects: DemoProject[] = [
       'Raman band pattern suggests magnetite-like nanoparticle signatures.',
       'Surface hydroxyl contribution remains visible in FTIR.',
     ],
-    recommendations: ['Run XRD confirmation to distinguish Fe3O4 from gamma-Fe2O3.'],
+    recommendations: ['Run XRD confirmation to distinguish Fe₃O₄ from gamma-Fe₂O₃.'],
     notebook: {
-      title: 'Exp-040: Fe3O4 Nanoparticle Surface Signature',
+      title: 'Exp-040: Fe₃O₄ Nanoparticle Surface Signature',
       pipeline: [
         'Imported FTIR and Raman spectra.',
         'Marked metal-oxygen and hydroxyl bands.',
@@ -514,13 +514,20 @@ export function getAgentPath(project: DemoProject) {
 }
 
 export function getProjectInsight(project: DemoProject) {
+  const confidenceLevel = project.claimStatus === 'strongly_supported' ? 'high' :
+    project.claimStatus === 'supported' ? 'medium' : 'low';
   return {
     primaryResult: project.phase,
+    confidenceScore: project.claimStatus === 'strongly_supported' ? 0.92 :
+      project.claimStatus === 'supported' ? 0.74 : 0.45,
+    confidenceLevel,
     claimStatus: project.claimStatus,
     validationState: project.validationState,
     interpretation: project.summary,
     keyEvidence: project.evidence,
-    warnings: project.status === 'In Progress' ? ['This demo project still has pending review items.'] : [],
+    warnings: project.status === 'In Progress'
+      ? ['XRD provides bulk-averaged structural evidence. Surface-sensitive and phase-purity claims remain validation-limited.']
+      : ['XRD provides bulk-averaged structural evidence. Surface-sensitive and phase-purity claims remain validation-limited.'],
     recommendedNextStep: project.recommendations,
   };
 }
@@ -668,7 +675,7 @@ export function buildAgentRun(project: DemoProject, selectedDatasets: Technique[
   }
 
   if (project.id === 'cufe2o4-sba15' && (!selectedDatasets.includes('XPS') || !selectedDatasets.includes('FTIR'))) {
-    warnings.push('CuFe2O4/SBA-15 benefits from XPS and FTIR correlation before final reporting.');
+    warnings.push('CuFe₂O₄/SBA-15 benefits from XPS and FTIR correlation before stronger reporting.');
   }
 
   const datasetPhrase = selectedDatasets.length > 0 ? selectedDatasets.join(' + ') : 'no selected datasets';
@@ -678,7 +685,7 @@ export function buildAgentRun(project: DemoProject, selectedDatasets: Technique[
     projectName: project.name,
     material: project.material,
     selectedDatasets,
-    decision: `${project.phase} confirmed from ${datasetPhrase}`,
+    decision: `${project.phase} — supported assignment from ${datasetPhrase}`,
     claimStatus,
     validationState,
     evidence,
@@ -695,7 +702,7 @@ export function buildAgentRun(project: DemoProject, selectedDatasets: Technique[
       `Evidence assessment: ${formatClaimStatusLabel(claimStatus)}.`,
     ],
     generatedAt: new Date().toISOString(),
-    summary: `${project.summary} Agent run used ${datasetPhrase} and produced ${formatClaimStatusLabel(claimStatus)} status.`,
+    summary: `${project.summary} Processing run used ${datasetPhrase} with evidence status: ${formatClaimStatusLabel(claimStatus)}.`,
   };
 }
 

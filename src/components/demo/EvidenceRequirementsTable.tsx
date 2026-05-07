@@ -26,6 +26,14 @@ const STATUS_CONFIG: Record<EvidenceRequirementStatus, { dot: string; badge: str
   },
 };
 
+function formatStatusLabel(status: EvidenceRequirementStatus): string {
+  if (status === 'Complete') return 'Supported';
+  if (status === 'Ready') return 'Requires validation';
+  if (status === 'In Progress') return 'Validation-limited';
+  if (status === 'Pending') return 'Pending validation';
+  return 'Evidence review';
+}
+
 interface EvidenceRequirementsTableProps {
   compact?: boolean;
 }
@@ -88,7 +96,7 @@ export function EvidenceRequirementsTable({ compact = false }: EvidenceRequireme
                         className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap ${cfg.badge}`}
                       >
                         <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
-                        {entry.status}
+                        {formatStatusLabel(entry.status)}
                       </span>
                     </td>
                     <td className="py-1.5 text-slate-500 align-top">
@@ -119,7 +127,7 @@ export function EvidenceRequirementsTable({ compact = false }: EvidenceRequireme
                   className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap ${cfg.badge}`}
                 >
                   <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
-                  {entry.status}
+                  {formatStatusLabel(entry.status)}
                 </span>
               </div>
               <div className="text-[11px] text-slate-400">

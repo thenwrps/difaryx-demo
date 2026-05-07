@@ -42,6 +42,13 @@ export default function SettingsPage() {
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          <Card className="p-5 xl:col-span-2">
+            <h2 className="text-sm font-semibold flex items-center gap-2"><Database size={16} className="text-primary" /> Demo Dataset · Deterministic Scientific Workflow</h2>
+            <p className="mt-2 max-w-3xl text-sm leading-relaxed text-text-muted">
+              This demo uses a deterministic scientific workflow for reliability. The same structured pipeline is designed to connect with model and tool-based execution layers.
+            </p>
+          </Card>
+
           <Card className="p-5">
             <h2 className="text-sm font-semibold flex items-center gap-2"><User size={16} className="text-primary" /> Profile</h2>
             <div className="mt-5 grid gap-4">
@@ -73,7 +80,7 @@ export default function SettingsPage() {
           <Card className="p-5">
             <h2 className="text-sm font-semibold flex items-center gap-2"><Bot size={16} className="text-primary" /> Analysis Preferences</h2>
             <div className="mt-5 grid gap-4">
-              <ToggleRow label="Evidence-linked conclusions" description="Require every conclusion to cite supporting data." />
+              <ToggleRow label="Evidence-linked interpretations" description="Require every interpretation to cite supporting data." />
               <Field label="Review criterion" value="Structural consistency" />
               <ToggleRow label="Include limitations in reports" description="Surface uncertainty and follow-up validation notes." />
             </div>

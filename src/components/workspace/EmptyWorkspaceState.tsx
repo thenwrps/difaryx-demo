@@ -22,9 +22,9 @@ export function EmptyWorkspaceState({
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-surface">
             <Database size={32} className="text-text-muted" />
           </div>
-          <h2 className="text-xl font-bold text-text-main">No Dataset Loaded</h2>
+          <h2 className="text-xl font-bold text-text-main">Demo Dataset Pending</h2>
           <p className="mt-2 text-sm text-text-muted">
-            Load a sample dataset or upload your own {technique} data to begin analysis
+            Load the demo dataset to begin {technique} processing. Connected uploads are available in the beta workflow.
           </p>
         </div>
 
@@ -35,12 +35,13 @@ export function EmptyWorkspaceState({
             onClick={onLoadSample}
           >
             <Database size={16} />
-            Load Sample Dataset
+            Load Demo Dataset
           </Button>
           <Button
             variant="outline"
             className="w-full gap-2"
             onClick={onUploadDataset}
+            title="Available in the connected beta workflow."
           >
             <Upload size={16} />
             Upload Dataset
@@ -48,7 +49,7 @@ export function EmptyWorkspaceState({
         </div>
 
         <p className="mt-6 text-xs text-text-muted">
-          Supported formats: CSV, TXT, XY
+          Supported import formats in the connected beta workflow: CSV, TXT, XY
         </p>
       </Card>
     </div>

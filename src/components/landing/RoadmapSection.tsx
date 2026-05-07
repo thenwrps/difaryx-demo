@@ -13,7 +13,7 @@ const phases = [
     status: 'Active',
     active: false,
     title: 'Cloud Integration',
-    items: ['Modular deployment (Cloud Run, containers)', 'Provider routing (cloud agent, open model)', 'API-first architecture', 'Extensible tool registry'],
+    items: ['Modular deployment (Cloud Run, containers)', 'Provider routing (model layer)', 'API-first architecture', 'Extensible tool registry'],
   },
   {
     label: 'PHASE 3',

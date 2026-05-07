@@ -141,12 +141,12 @@ type DatasetOption = {
 };
 
 const DEFAULT_MISSION =
-  'Investigate the selected scientific dataset and produce an evidence-linked material characterization decision.';
+  'Investigate the selected scientific dataset and produce an evidence-linked material characterization interpretation.';
 
 const MODEL_MODE_LABELS: Record<ModelMode, string> = {
-  deterministic: 'Deterministic',
-  'vertex-gemini': 'Cloud Agent',
-  gemma: 'Open Agent',
+  deterministic: 'Deterministic Workflow',
+  'vertex-gemini': 'Model Layer Pending',
+  gemma: 'Open Model Pending',
 };
 
 const CONTEXT_ORDER: AgentContext[] = ['XRD', 'XPS', 'FTIR', 'Raman'];
@@ -167,7 +167,7 @@ const CONTEXT_CONFIG: Record<
     label: 'XRD Phase Identification',
     graphType: 'xrd',
     featureName: 'Diffraction peaks',
-    decisionKind: 'Phase decision',
+    decisionKind: 'Phase interpretation',
     iconTone: 'text-cyan-300',
     defaultFeatureCount: 9,
     stages: [
@@ -212,14 +212,14 @@ const CONTEXT_CONFIG: Record<
         toolName: 'evaluate_phase_candidates',
         displayName: 'Evaluate Phase Candidates',
         inputSummary: 'Observed peaks and candidate references',
-        outputSummary: 'Candidate evaluation complete',
+        outputSummary: 'Candidate evaluation prepared',
         durationMs: 620,
       },
       {
         id: 'fusion',
         label: 'Evidence Fusion',
         shortLabel: 'Fusion',
-        detail: 'Evaluating missing and unexplained peak evidence before the decision.',
+        detail: 'Evaluating missing and unexplained peak evidence before claim boundary review.',
         toolName: 'analyze_peak_conflicts',
         displayName: 'Analyze Peak Conflicts',
         inputSummary: 'Ranked candidates and unexplained features',
@@ -232,7 +232,7 @@ const CONTEXT_CONFIG: Record<
         label: 'Interpretation',
         shortLabel: 'Interpret',
         detail: 'Preparing interpretation for multi-source evidence.',
-        toolName: 'gemini_reasoner',
+        toolName: 'interpretation_refinement',
         displayName: 'Agent Interpreter',
         inputSummary: 'Aggregated evidence from deterministic analysis',
         outputSummary: 'Interpretation generated',
@@ -240,13 +240,13 @@ const CONTEXT_CONFIG: Record<
       },
       {
         id: 'decision',
-        label: 'Finalize Interpretation',
-        shortLabel: 'Decision',
-        detail: 'Synthesizing phase evidence into a conclusion-ready interpretation.',
+        label: 'Claim Boundary Review',
+        shortLabel: 'Boundary',
+        detail: 'Synthesizing phase evidence into a bounded interpretation.',
         toolName: 'generate_xrd_interpretation',
         displayName: 'Generate XRD Interpretation',
         inputSummary: 'Evaluation results, evidence, conflicts, and caveats',
-        outputSummary: 'Conclusion generated',
+        outputSummary: 'Report-ready discussion prepared',
         durationMs: 620,
       },
     ],
@@ -255,7 +255,7 @@ const CONTEXT_CONFIG: Record<
     label: 'XPS Surface Chemistry',
     graphType: 'xps',
     featureName: 'Core-level components',
-    decisionKind: 'Surface chemistry decision',
+    decisionKind: 'Surface chemistry interpretation',
     iconTone: 'text-violet-300',
     defaultFeatureCount: 5,
     stages: [
@@ -320,7 +320,7 @@ const CONTEXT_CONFIG: Record<
         label: 'Interpretation',
         shortLabel: 'Interpret',
         detail: 'Preparing interpretation for multi-source evidence.',
-        toolName: 'gemini_reasoner',
+        toolName: 'interpretation_refinement',
         displayName: 'Agent Interpreter',
         inputSummary: 'Aggregated evidence from deterministic analysis',
         outputSummary: 'Interpretation generated',
@@ -328,13 +328,13 @@ const CONTEXT_CONFIG: Record<
       },
       {
         id: 'decision',
-        label: 'Finalize Interpretation',
-        shortLabel: 'Decision',
-        detail: 'Generating a surface-chemistry decision with caveats.',
+        label: 'Claim Boundary Review',
+        shortLabel: 'Boundary',
+        detail: 'Generating a surface-chemistry interpretation with validation boundaries.',
         toolName: 'decision_logic',
-        displayName: 'Generate Surface Decision',
+        displayName: 'Generate Surface Interpretation',
         inputSummary: 'Evidence summary and limitations',
-        outputSummary: 'Conclusion generated',
+        outputSummary: 'Report-ready discussion prepared',
         durationMs: 620,
       },
     ],
@@ -343,7 +343,7 @@ const CONTEXT_CONFIG: Record<
     label: 'FTIR Bonding Analysis',
     graphType: 'ftir',
     featureName: 'Vibrational bands',
-    decisionKind: 'Bonding decision',
+    decisionKind: 'Bonding interpretation',
     iconTone: 'text-rose-300',
     defaultFeatureCount: 4,
     stages: [
@@ -408,7 +408,7 @@ const CONTEXT_CONFIG: Record<
         label: 'Interpretation',
         shortLabel: 'Interpret',
         detail: 'Preparing interpretation for multi-source evidence.',
-        toolName: 'gemini_reasoner',
+        toolName: 'interpretation_refinement',
         displayName: 'Agent Interpreter',
         inputSummary: 'Aggregated evidence from deterministic analysis',
         outputSummary: 'Interpretation generated',
@@ -416,13 +416,13 @@ const CONTEXT_CONFIG: Record<
       },
       {
         id: 'decision',
-        label: 'Finalize Interpretation',
-        shortLabel: 'Decision',
-        detail: 'Generating a bonding interpretation with limitations.',
+        label: 'Claim Boundary Review',
+        shortLabel: 'Boundary',
+        detail: 'Generating a bonding interpretation with validation boundaries.',
         toolName: 'decision_logic',
-        displayName: 'Generate Bonding Decision',
+        displayName: 'Generate Bonding Interpretation',
         inputSummary: 'Evidence summary and caveats',
-        outputSummary: 'Conclusion generated',
+        outputSummary: 'Report-ready discussion prepared',
         durationMs: 620,
       },
     ],
@@ -431,7 +431,7 @@ const CONTEXT_CONFIG: Record<
     label: 'Raman Structural Fingerprint',
     graphType: 'raman',
     featureName: 'Raman modes',
-    decisionKind: 'Structural fingerprint decision',
+    decisionKind: 'Structural fingerprint interpretation',
     iconTone: 'text-emerald-300',
     defaultFeatureCount: 6,
     stages: [
@@ -496,7 +496,7 @@ const CONTEXT_CONFIG: Record<
         label: 'Interpretation',
         shortLabel: 'Interpret',
         detail: 'Preparing interpretation for multi-source evidence.',
-        toolName: 'gemini_reasoner',
+        toolName: 'interpretation_refinement',
         displayName: 'Agent Interpreter',
         inputSummary: 'Aggregated evidence from deterministic analysis',
         outputSummary: 'Interpretation generated',
@@ -504,13 +504,13 @@ const CONTEXT_CONFIG: Record<
       },
       {
         id: 'decision',
-        label: 'Finalize Interpretation',
-        shortLabel: 'Decision',
-        detail: 'Generating a structural interpretation with caveats.',
+        label: 'Claim Boundary Review',
+        shortLabel: 'Boundary',
+        detail: 'Generating a structural interpretation with validation boundaries.',
         toolName: 'decision_logic',
-        displayName: 'Generate Structural Decision',
+        displayName: 'Generate Structural Interpretation',
         inputSummary: 'Evidence summary and limitations',
-        outputSummary: 'Conclusion generated',
+        outputSummary: 'Report-ready discussion prepared',
         durationMs: 620,
       },
     ],
@@ -634,7 +634,7 @@ function mapToolTraceToExecutionSteps(
     number: index + 1,
     title: stages[index]?.label || entry.displayName,
     description: stages[index]?.detail || entry.inputSummary,
-    tool: entry.toolName,
+    tool: entry.displayName,
     time: `${(entry.durationMs / 1000).toFixed(1)}s`,
     status: entry.status,
   }));
@@ -726,15 +726,15 @@ function formatReviewStatus(status: string) {
   switch (status) {
     case 'strongly_supported':
     case 'complete':
-      return 'Complete';
+      return 'Supported';
     case 'supported':
-      return 'Ready';
+      return 'Requires validation';
     case 'partial':
-      return 'In Progress';
+      return 'Validation-limited';
     case 'pending':
       return 'Pending';
     default:
-      return 'Review';
+      return 'Claim boundary';
   }
 }
 
@@ -760,7 +760,7 @@ function asDemoPeaks(peaks: Array<{ position: number; intensity: number; label?:
 
 /**
  * Create decision result using fusionEngine as the single reasoning authority
- * No scoring, weighting, or confidence calculations - fusionEngine controls all decisions
+ * No local numeric review math - fusionEngine controls interpretation output
  */
 function createDecisionResult(
   context: AgentContext,
@@ -806,12 +806,12 @@ function createDecisionResult(
   const metrics: Array<{ label: string; value: string; tone?: 'cyan' | 'emerald' | 'violet' | 'amber' }> = [
     { label: config.featureName, value: String(featureCount), tone: 'cyan' },
     { label: 'Evidence nodes', value: String(evidenceNodes.length), tone: 'emerald' },
-    { label: 'Conclusion', value: formatReviewStatus(dominantClaim?.status ?? 'unsupported'), tone: 'violet' },
+    { label: 'Evidence Status', value: formatReviewStatus(dominantClaim?.status ?? 'unsupported'), tone: 'violet' },
   ];
   
   // Build detail rows from reasoning trace
   const detailRows = fusionResult.reasoningTrace.map((trace, index) => ({
-    Conclusion: trace.claimId,
+    Claim: trace.claimId,
     Review: formatReviewStatus(trace.status),
     Evidence: `${trace.evidenceIds.length} nodes`,
     Conflicts: trace.contradictingEvidenceIds.length > 0 ? 'Yes' : 'No',
@@ -948,10 +948,15 @@ export default function AgentDemo() {
       : Math.min(100, ((agentState.reasoningState.currentStepIndex + 1) / stages.length) * 100);
   const templateMode = normalizeNotebookTemplateMode(searchParams.get('template'));
   const workflowProcessingResult = useMemo(
-    () =>
-      getProcessingResult(searchParams.get('processing')) ??
-      getLatestProcessingResult(selectedProject.id) ??
-      createProcessingResultFromXrdDemo(selectedProject.id),
+    () => {
+      const requestedProcessingResult = getProcessingResult(searchParams.get('processing'));
+      const routeProcessingResult =
+        requestedProcessingResult?.projectId === selectedProject.id ? requestedProcessingResult : null;
+
+      return routeProcessingResult ??
+        getLatestProcessingResult(selectedProject.id) ??
+        createProcessingResultFromXrdDemo(selectedProject.id);
+    },
     [searchParams, selectedProject.id],
   );
 
@@ -1027,7 +1032,7 @@ export default function AgentDemo() {
     }));
     appendLog({
       stamp: '[decision]',
-      message: `${CONTEXT_CONFIG[context].decisionKind} complete: ${decision.conclusion}`,
+      message: `${CONTEXT_CONFIG[context].decisionKind} prepared: ${decision.conclusion}`,
       type: 'success',
     });
   };
@@ -1249,7 +1254,7 @@ export default function AgentDemo() {
     if (!currentResult) return;
     appendLog({
       stamp: '[report]',
-      message: 'Report package prepared with graph evidence, tool trace, decision, and caveats.',
+      message: 'Report package prepared with graph evidence, reasoning trace, claim boundary, and caveats.',
       type: 'success',
     });
     showFeedback('Export report preview prepared.');
@@ -1286,7 +1291,7 @@ export default function AgentDemo() {
     saveNotebookEntry(notebookEntry);
     appendLog({
       stamp: '[notebook]',
-      message: `Refined discussion saved to Notebook Lab as ${notebookEntry.templateLabel}.`,
+      message: `Saved deterministic demo notebook entry from the current interpretation context as ${notebookEntry.templateLabel}.`,
       type: 'success',
     });
     navigate(`/notebook?project=${selectedProject.id}&entry=${notebookEntry.id}&template=${templateMode}`);
@@ -1310,7 +1315,7 @@ export default function AgentDemo() {
     if (!currentResult) return;
     appendLog({
       stamp: '[repro]',
-      message: `Reproducible report generated from deterministic tool trace: ${stages.map((stage) => stage.toolName).join(' -> ')}.`,
+      message: `Reproducible report generated from deterministic reasoning trace: ${stages.map((stage) => stage.displayName).join(' -> ')}.`,
       type: 'tool',
     });
     showFeedback('Reproducible report generated.');
@@ -1339,12 +1344,13 @@ export default function AgentDemo() {
         onNewAnalysis={handlePrimaryRun}
         onExportReport={handleExportReport}
         isRunning={runningGuardRef.current}
+        showActions={false}
       />
 
       {/* Second Row: Control Bar */}
       <div className="shrink-0 border-b border-white/[0.08] bg-[#0A0F1A] px-4 py-2">
-        <div className="flex min-h-[36px] flex-wrap items-center gap-2 min-[1180px]:flex-nowrap">
-          <label className="relative flex h-[34px] w-full min-w-0 items-center overflow-hidden rounded-lg border border-slate-800 bg-[#070B12] px-2.5 transition-colors focus-within:border-cyan-400/50 min-[760px]:w-[calc(50%_-_4px)] min-[1180px]:w-[220px] min-[1440px]:w-[250px]">
+        <div className="grid gap-2 min-[780px]:grid-cols-2 min-[1180px]:grid-cols-[180px_minmax(260px,1fr)_170px_205px_170px]">
+          <label className="relative flex h-[32px] w-full min-w-0 items-center overflow-hidden rounded-lg border border-slate-800 bg-[#070B12] px-2.5 transition-colors focus-within:border-cyan-400/50">
             <select
               value={agentState.context}
               disabled={agentState.reasoningState.status === 'running'}
@@ -1364,7 +1370,7 @@ export default function AgentDemo() {
             </span>
           </label>
 
-          <label className="relative flex h-[34px] w-full min-w-0 flex-1 items-center overflow-hidden rounded-lg border border-slate-800 bg-[#070B12] px-2.5 transition-colors focus-within:border-cyan-400/50 min-[760px]:min-w-[250px] min-[1440px]:min-w-[300px]">
+          <label className="relative flex h-[32px] w-full min-w-0 items-center overflow-hidden rounded-lg border border-slate-800 bg-[#070B12] px-2.5 transition-colors focus-within:border-cyan-400/50">
             <select
               value={selectedDataset.id}
               disabled={agentState.reasoningState.status === 'running'}
@@ -1386,7 +1392,7 @@ export default function AgentDemo() {
             </span>
           </label>
 
-          <label className="relative flex h-[34px] w-full min-w-0 items-center overflow-hidden rounded-lg border border-slate-800 bg-[#070B12] px-2.5 transition-colors focus-within:border-cyan-400/50 min-[760px]:w-[170px] min-[1440px]:w-[200px]">
+          <label className="relative flex h-[32px] w-full min-w-0 items-center overflow-hidden rounded-lg border border-slate-800 bg-[#070B12] px-2.5 transition-colors focus-within:border-cyan-400/50">
             <select
               value={agentState.modelMode}
               disabled={agentState.reasoningState.status === 'running'}
@@ -1400,9 +1406,9 @@ export default function AgentDemo() {
               className="absolute inset-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
               aria-label="Reasoning mode"
             >
-              <option value="deterministic">Deterministic</option>
-              <option value="vertex-gemini">Cloud Agent</option>
-              <option value="gemma">Open Agent</option>
+              <option value="deterministic">Deterministic Workflow</option>
+              <option value="vertex-gemini">Model Layer Pending</option>
+              <option value="gemma">Open Model Pending</option>
             </select>
             <span className="pointer-events-none flex min-w-0 items-baseline gap-1.5 whitespace-nowrap">
               <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-slate-500">Mode:</span>
@@ -1412,42 +1418,58 @@ export default function AgentDemo() {
             </span>
           </label>
 
-          <div className="flex h-[34px] w-full min-w-0 items-center gap-2 rounded-lg border border-slate-800 bg-[#070B12] px-2 min-[760px]:w-[200px] min-[1440px]:w-[230px]">
+          <div className="flex h-[32px] w-full min-w-0 items-center gap-2 rounded-lg border border-slate-800 bg-[#070B12] px-2">
             <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-slate-500">Run:</span>
-            <div className="grid h-7 min-w-0 flex-1 grid-cols-2 rounded-lg bg-[#050812] p-0.5">
+            <div className="grid h-6 min-w-0 flex-1 grid-cols-2 rounded-lg bg-[#050812] p-0.5">
               {(['auto', 'step'] as ExecutionMode[]).map((mode) => (
                 <button
                   key={mode}
                   type="button"
                   disabled={agentState.reasoningState.status === 'running'}
+                  title={agentState.reasoningState.status === 'running' ? 'Controls are locked while the deterministic run is active.' : undefined}
                   onClick={() => handleExecutionModeChange(mode)}
                   className={`rounded-md text-[10px] font-bold transition-colors disabled:opacity-60 ${agentState.reasoningState.executionMode === mode ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-slate-200'}`}
                 >
-                  {mode === 'auto' ? 'Auto Run' : 'Step-by-Step'}
+                  {mode === 'auto' ? 'Auto' : 'Step'}
                 </button>
               ))}
             </div>
           </div>
 
+          <div className="flex h-[32px] w-full min-w-0 items-center gap-2 rounded-lg border border-slate-800 bg-[#070B12] px-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 min-[780px]:col-span-2 min-[1180px]:col-span-1">
+            <span className="shrink-0">Status:</span>
+            <span className="truncate text-slate-300">
+              {agentState.reasoningState.status === 'running'
+                ? 'Reasoning trace active'
+                : currentResult
+                  ? 'Report-ready discussion'
+                  : 'Ready'}
+            </span>
+          </div>
+        </div>
+
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
           <button
             type="button"
             onClick={handlePrimaryRun}
             disabled={runningGuardRef.current}
-            className="inline-flex h-[34px] w-full shrink-0 items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-3 text-[11px] font-bold text-white shadow-md shadow-blue-600/20 transition-all hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60 min-[760px]:w-[135px] min-[1440px]:w-[150px]"
+            title={runningGuardRef.current ? 'Controls are locked while the deterministic run is active.' : undefined}
+            className="inline-flex h-[31px] w-full items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-2.5 text-[10px] font-bold text-white shadow-md shadow-blue-600/20 transition-all hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60 min-[560px]:w-auto"
           >
             {agentState.reasoningState.status === 'running' ? (
               <Loader2 size={12} className="animate-spin" />
             ) : (
               <Play size={12} fill="currentColor" />
             )}
-            New Execution
+            Run
           </button>
 
           <button
             type="button"
             onClick={resetExecution}
             disabled={runningGuardRef.current}
-            className="inline-flex h-[34px] w-full shrink-0 items-center justify-center gap-1.5 rounded-lg border border-slate-700 px-3 text-[11px] font-semibold text-slate-300 transition-colors hover:border-cyan-400/40 hover:text-cyan-200 disabled:cursor-not-allowed disabled:opacity-50 min-[760px]:w-[80px] min-[1440px]:w-[88px]"
+            title={runningGuardRef.current ? 'Controls are locked while the deterministic run is active.' : undefined}
+            className="inline-flex h-[31px] w-full items-center justify-center gap-1.5 rounded-lg border border-slate-700 px-2.5 text-[10px] font-semibold text-slate-300 transition-colors hover:border-cyan-400/40 hover:text-cyan-200 disabled:cursor-not-allowed disabled:opacity-50 min-[560px]:w-auto"
           >
             Reset
           </button>
@@ -1456,42 +1478,61 @@ export default function AgentDemo() {
             type="button"
             onClick={handleRefineInterpretation}
             disabled={runningGuardRef.current}
-            className="inline-flex h-[34px] w-full shrink-0 items-center justify-center gap-1.5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 text-[11px] font-semibold text-cyan-100 transition-colors hover:border-cyan-300/50 hover:bg-cyan-500/15 disabled:cursor-not-allowed disabled:opacity-50 min-[760px]:w-[150px] min-[1440px]:w-[170px]"
+            title={runningGuardRef.current ? 'Controls are locked while the deterministic run is active.' : undefined}
+            className="inline-flex h-[31px] w-full items-center justify-center gap-1.5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-2.5 text-[10px] font-semibold text-cyan-100 transition-colors hover:border-cyan-300/50 hover:bg-cyan-500/15 disabled:cursor-not-allowed disabled:opacity-50 min-[560px]:w-auto"
           >
             <Brain size={12} />
-            Refine Interpretation
+            Refine
           </button>
 
           <button
             type="button"
             onClick={handleSaveToNotebook}
             disabled={runningGuardRef.current}
-            className="inline-flex h-[34px] w-full shrink-0 items-center justify-center gap-1.5 rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-3 text-[11px] font-semibold text-emerald-100 transition-colors hover:border-emerald-300/50 hover:bg-emerald-400/15 disabled:cursor-not-allowed disabled:opacity-50 min-[760px]:w-[190px] min-[1440px]:w-[210px]"
+            title={runningGuardRef.current ? 'Controls are locked while the deterministic run is active.' : undefined}
+            className="inline-flex h-[31px] w-full items-center justify-center gap-1.5 rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-2.5 text-[10px] font-semibold text-emerald-100 transition-colors hover:border-emerald-300/50 hover:bg-emerald-400/15 disabled:cursor-not-allowed disabled:opacity-50 min-[560px]:w-auto"
           >
             <FileText size={12} />
-            Save Discussion to Notebook
+            Save to Notebook
           </button>
 
           <button
             type="button"
             onClick={handleOpenSourceProcessing}
             disabled={runningGuardRef.current}
-            className="inline-flex h-[34px] w-full shrink-0 items-center justify-center gap-1.5 rounded-lg border border-slate-700 px-3 text-[11px] font-semibold text-slate-300 transition-colors hover:border-cyan-400/40 hover:text-cyan-200 disabled:cursor-not-allowed disabled:opacity-50 min-[760px]:w-[165px] min-[1440px]:w-[185px]"
+            title={runningGuardRef.current ? 'Controls are locked while the deterministic run is active.' : 'Open source processing'}
+            className="inline-flex h-[31px] w-full items-center justify-center gap-1.5 rounded-lg border border-slate-700 px-2.5 text-[10px] font-semibold text-slate-300 transition-colors hover:border-cyan-400/40 hover:text-cyan-200 disabled:cursor-not-allowed disabled:opacity-50 min-[560px]:w-auto"
           >
             <Database size={12} />
-            Open Source Processing
+            Source
           </button>
 
           <button
             type="button"
             onClick={handleViewClaimBoundary}
             disabled={runningGuardRef.current}
-            className="inline-flex h-[34px] w-full shrink-0 items-center justify-center gap-1.5 rounded-lg border border-slate-700 px-3 text-[11px] font-semibold text-slate-300 transition-colors hover:border-cyan-400/40 hover:text-cyan-200 disabled:cursor-not-allowed disabled:opacity-50 min-[760px]:w-[150px] min-[1440px]:w-[170px]"
+            title={runningGuardRef.current ? 'Controls are locked while the deterministic run is active.' : undefined}
+            className="inline-flex h-[31px] w-full items-center justify-center gap-1.5 rounded-lg border border-slate-700 px-2.5 text-[10px] font-semibold text-slate-300 transition-colors hover:border-cyan-400/40 hover:text-cyan-200 disabled:cursor-not-allowed disabled:opacity-50 min-[560px]:w-auto"
           >
             <ClipboardList size={12} />
-            View Claim Boundary
+            Claim Boundary
+          </button>
+
+          <button
+            type="button"
+            onClick={handleExportReport}
+            disabled={runningGuardRef.current}
+            title={runningGuardRef.current ? 'Controls are locked while the deterministic run is active.' : undefined}
+            className="inline-flex h-[31px] w-full items-center justify-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800/50 px-2.5 text-[10px] font-semibold text-slate-300 transition-colors hover:border-slate-600 hover:bg-slate-800 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 min-[560px]:w-auto"
+          >
+            <Download size={12} />
+            Export
           </button>
         </div>
+      </div>
+
+      <div className="shrink-0 border-b border-white/[0.08] bg-[#070B12] px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+        Demo dataset · Deterministic scientific workflow
       </div>
 
       {/* Three-Column Layout */}
@@ -1525,6 +1566,7 @@ export default function AgentDemo() {
           totalSteps={stages.length}
           executionSteps={executionSteps}
           progressPercent={progressPercent}
+          processingResultId={workflowProcessingResult.id}
           candidates={
             xrdAnalysis?.candidates.slice(0, 3).map((candidate, index) => ({
               phase: candidate.phase.name,

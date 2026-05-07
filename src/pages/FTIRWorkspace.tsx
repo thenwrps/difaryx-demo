@@ -81,7 +81,7 @@ export default function FTIRWorkspace() {
 
   const handleUploadDataset = () => {
     // Upload functionality placeholder
-    alert('File upload functionality coming soon. Please use "Load Sample Dataset" to try the workspace.');
+    alert('Available in the connected beta workflow. Load the demo dataset to try the workspace.');
   };
   
   // Run FTIR processing with current parameters
@@ -118,7 +118,7 @@ export default function FTIRWorkspace() {
   const matchedBands = uniqueMatchedBandIds.size;
   
   const confidenceBadge = processingResult.interpretation.confidenceLevel;
-  const reviewStatus = confidenceBadge === 'high' ? 'Complete' : confidenceBadge === 'medium' ? 'Ready' : 'Review';
+  const reviewStatus = confidenceBadge === 'high' ? 'Supported' : confidenceBadge === 'medium' ? 'Requires validation' : 'Validation-limited';
   
   // Handle Auto Mode toggle
   const handleAutoModeChange = (enabled: boolean) => {

@@ -295,3 +295,45 @@ export const XRD_DEMO_DATASETS: XrdDemoDataset[] = [
 export function getXrdDemoDataset(datasetId?: string | null) {
   return XRD_DEMO_DATASETS.find((dataset) => dataset.id === datasetId) ?? XRD_DEMO_DATASETS[0];
 }
+
+/**
+ * Project-dataset compatibility mapping.
+ * Only projects listed here have valid XRD demo data.
+ * Projects without an entry must not render CuFe2O4 evidence as their own.
+ */
+export const XRD_PROJECT_COMPATIBILITY: Record<string, {
+  /** Dataset IDs that belong to this project */
+  datasetIds: string[];
+  /** Short label for the working assignment */
+  assignment: string;
+  /** Material label for display */
+  materialLabel: string;
+}> = {
+  'cu-fe2o4-spinel': {
+    datasetIds: ['xrd-cufe2o4-clean', 'xrd-cufe2o4-fe2o3-impurity', 'xrd-amorphous-dominant'],
+    assignment: 'CuFe2O4',
+    materialLabel: 'copper ferrite spinel',
+  },
+  'cufe2o4-sba15': {
+    datasetIds: ['xrd-cufe2o4-clean'],
+    assignment: 'CuFe2O4/SBA-15',
+    materialLabel: 'copper ferrite on mesoporous silica',
+  },
+};
+
+/**
+ * Check if a project has valid XRD demo data.
+ * Returns the compatibility entry if valid, or null if the project has no matching XRD dataset.
+ */
+export function getXrdProjectCompatibility(projectId: string) {
+  return XRD_PROJECT_COMPATIBILITY[projectId] ?? null;
+}
+
+/**
+ * Check if a dataset belongs to a project.
+ */
+export function isDatasetCompatibleWithProject(datasetId: string, projectId: string): boolean {
+  const compat = XRD_PROJECT_COMPATIBILITY[projectId];
+  if (!compat) return false;
+  return compat.datasetIds.includes(datasetId);
+}

@@ -9,8 +9,8 @@ const solutionPillars = [
     color: 'blue'
   },
   {
-    title: 'Autonomous Agent Layer',
-    desc: 'Agent plans analysis steps, executes tools, collects evidence, reasons over uncertainty, and makes traceable decisions.',
+    title: 'Scientific Reasoning Layer',
+    desc: 'The workflow plans analysis steps, executes tools, collects evidence, reasons over uncertainty, and prepares traceable interpretations.',
     Icon: Brain,
     color: 'purple'
   },
@@ -57,10 +57,10 @@ export default function SolutionSection() {
       <div className="mx-auto max-w-[1200px] px-6">
         <div className="mb-12 text-center">
           <h2 className="mb-4 text-[32px] font-bold leading-[1.2] text-slate-900 lg:text-[40px]">
-            DIFARYX unifies characterization workflows with autonomous agent execution
+            DIFARYX unifies characterization workflows with scientific reasoning
           </h2>
           <p className="mx-auto max-w-3xl text-[16px] leading-relaxed text-slate-600">
-            A single platform that combines structured scientific workflows with an autonomous agent layer for planning, execution, evidence collection, reasoning, and decision-making.
+            A single platform that combines structured scientific workflows with planning, execution, evidence collection, reasoning, and report-ready discussion.
           </p>
         </div>
 

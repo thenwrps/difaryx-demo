@@ -2,9 +2,9 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import {
   Activity,
-  Brain,
   Database,
   FileText,
+  History,
   Layers,
   Settings,
 } from 'lucide-react';
@@ -55,9 +55,9 @@ export function LeftSidebar({
           to={notebookRoute}
         />
         <NavItem
-          icon={Brain}
-          label="Knowledge"
-          to="/knowledge"
+          icon={History}
+          label="History"
+          to="/history"
         />
         <NavItem
           icon={Settings}

@@ -4,40 +4,59 @@ import { Bot, ClipboardList, FileText, FolderOpen, GitCompare, History, Notebook
 import { DashboardLayout } from '../components/layout/DashboardLayout';
 import { Card } from '../components/ui/Card';
 import { getAllHistoryEntries } from '../data/demoProjects';
+import {
+  XRD_DEMO_DATASETS,
+  getXrdProjectCompatibility,
+  isDatasetCompatibleWithProject,
+} from '../data/xrdDemoDatasets';
 import { formatChemicalFormula } from '../utils';
 
 function formatClaimStatus(status: string): string {
   switch (status) {
-    case 'strongly_supported': return 'Complete';
-    case 'supported': return 'Ready';
-    case 'partial': return 'In Progress';
-    case 'inconclusive': return 'Review';
-    case 'contradicted': return 'Review';
+    case 'strongly_supported': return 'Supported assignment';
+    case 'supported': return 'Requires validation';
+    case 'partial': return 'Validation-limited';
+    case 'inconclusive': return 'Publication-limited';
+    case 'contradicted': return 'Claim boundary';
     default: return status;
   }
+}
+
+function hasMatchedXrdDemoData(projectId: string): boolean {
+  const compatibility = getXrdProjectCompatibility(projectId);
+  if (!compatibility) return false;
+
+  return compatibility.datasetIds.some((datasetId) => (
+    isDatasetCompatibleWithProject(datasetId, projectId) &&
+    XRD_DEMO_DATASETS.some((dataset) => dataset.id === datasetId)
+  ));
+}
+
+function recordNeedsDataset(projectId: string, techniques: string[]) {
+  return techniques.some((technique) => technique.includes('XRD')) && !hasMatchedXrdDemoData(projectId);
 }
 
 const agentRuns = [
   {
     id: 'AG-RUN-CF-042',
     projectId: 'cu-fe2o4-spinel',
-    project: 'CuFe2O4 Spinel Formation',
+    project: 'CuFe₂O₄ Spinel Formation',
     goal: 'Determine ferrite spinel formation and catalytic activation evidence',
     mode: 'Deep Analysis',
     claimStatus: 'supported',
     decision: 'Spinel formation supported; catalytic activation requires XPS validation',
-    status: 'Report-ready',
+    status: 'Report-ready discussion',
     date: '2026-04-29',
     techniques: ['XRD', 'Raman', 'FTIR', 'XPS'],
   },
   {
     id: 'AG-RUN-SBA-044',
     projectId: 'cufe2o4-sba15',
-    project: 'CuFe2O4/SBA-15 Multi-Tech Correlation',
+    project: 'CuFe₂O₄/SBA-15 Multi-Tech Correlation',
     goal: 'Fuse XRD, Raman, FTIR, and XPS evidence for supported ferrite catalyst',
     mode: 'Autonomous Workflow',
     claimStatus: 'strongly_supported',
-    decision: 'Multi-tech evidence supports dispersed CuFe2O4/SBA-15 structure',
+    decision: 'Multi-tech evidence supports dispersed CuFe₂O₄/SBA-15 structure',
     status: 'Evidence-linked',
     date: '2026-04-29',
     techniques: ['XRD', 'Raman', 'FTIR', 'XPS'],
@@ -45,8 +64,8 @@ const agentRuns = [
   {
     id: 'AG-RUN-NF-041',
     projectId: 'nife2o4',
-    project: 'NiFe2O4 Control Sample',
-    goal: 'Compare control ferrite phase against CuFe2O4 reference workflow',
+    project: 'NiFe₂O₄ Control Sample',
+    goal: 'Compare control ferrite phase against CuFe₂O₄ reference workflow',
     mode: 'Quick Insight',
     claimStatus: 'partial',
     decision: 'Phase evidence acceptable; requires replicate confirmation',
@@ -79,6 +98,10 @@ function ActionIcon({ action }: { action: string }) {
 export default function HistoryPage() {
   const entries = getAllHistoryEntries();
   const [feedback, setFeedback] = React.useState('');
+  const reportReadyCount = agentRuns.filter(
+    (run) => !recordNeedsDataset(run.projectId, run.techniques) && run.status === 'Report-ready discussion',
+  ).length;
+  const evidenceLinkedCount = agentRuns.filter((run) => !recordNeedsDataset(run.projectId, run.techniques)).length;
 
   const compareRun = (runId: string) => {
     setFeedback(`${runId} queued for comparison`);
@@ -92,7 +115,7 @@ export default function HistoryPage() {
           <p className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">DIFARYX records</p>
           <h1 className="mt-2 text-2xl font-bold tracking-tight">Experiment History</h1>
           <p className="text-text-muted mt-1 text-sm">
-            Trace previous characterization runs, supporting data, conclusions, and source provenance.
+            Trace previous characterization runs, supporting data, interpretation, and source provenance.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             {['Source', 'Supporting Data', 'Reproducibility log'].map((badge) => (
@@ -135,7 +158,19 @@ export default function HistoryPage() {
               <p className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">Source</p>
               <h2 className="mt-1 text-lg font-semibold">Characterization runs</h2>
             </div>
-            {agentRuns.map((run) => (
+            {agentRuns.map((run) => {
+              const needsDataset = recordNeedsDataset(run.projectId, run.techniques);
+              const displayStatus = needsDataset ? 'Requires dataset' : run.status;
+              const displayClaimStatus = needsDataset ? 'No matched dataset' : formatClaimStatus(run.claimStatus);
+              const displayDecision = needsDataset
+                ? 'No processed XRD result linked to this project.'
+                : run.decision;
+              const actionTarget = needsDataset
+                ? `/workspace/xrd?project=${run.projectId}`
+                : `/demo/agent?project=${run.projectId}&run=${run.id}`;
+              const actionText = needsDataset ? 'Open Workspace' : 'View Run';
+
+              return (
               <Card key={run.id} className="p-5">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div className="min-w-0">
@@ -148,13 +183,13 @@ export default function HistoryPage() {
                         {run.mode}
                       </span>
                       <span className="rounded-full border border-border bg-background px-2.5 py-1 text-xs font-semibold text-text-muted">
-                        {run.status}
+                        {displayStatus}
                       </span>
                     </div>
                     <h3 className="mt-3 text-base font-semibold text-text-main">{formatChemicalFormula(run.project)}</h3>
                     <p className="mt-2 text-sm text-text-muted">{run.goal}</p>
                     <p className="mt-3 text-sm text-text-main">
-                      <span className="font-semibold">Decision:</span> {run.decision}
+                      <span className="font-semibold">Interpretation:</span> {displayDecision}
                     </p>
                     <div className="mt-4 flex flex-wrap gap-2">
                       {run.techniques.map((technique) => (
@@ -172,11 +207,12 @@ export default function HistoryPage() {
                       <div className="rounded-lg border border-border bg-background p-3">
                         <p className="text-text-muted">Status</p>
                         <p className={`mt-1 font-semibold ${
+                          needsDataset ? 'text-amber-600' :
                           run.claimStatus === 'strongly_supported' ? 'text-emerald-600' :
                           run.claimStatus === 'supported' ? 'text-cyan' :
                           run.claimStatus === 'partial' ? 'text-amber-500' :
                           'text-text-muted'
-                        }`}>{formatClaimStatus(run.claimStatus)}</p>
+                        }`}>{displayClaimStatus}</p>
                       </div>
                       <div className="rounded-lg border border-border bg-background p-3">
                         <p className="text-text-muted">Date</p>
@@ -185,19 +221,31 @@ export default function HistoryPage() {
                     </div>
                     <div className="grid gap-2">
                       <Link
-                        to={`/demo/agent?project=${run.projectId}&run=${run.id}`}
+                        to={actionTarget}
                         className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md bg-primary px-3 text-xs font-semibold text-white hover:bg-primary/90 transition-colors"
                       >
-                        <Bot size={14} />
-                        View Run
+                        {needsDataset ? <FolderOpen size={14} /> : <Bot size={14} />}
+                        {actionText}
                       </Link>
-                      <Link
-                        to={`/notebook?project=${run.projectId}`}
-                        className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-border px-3 text-xs font-semibold text-text-main hover:bg-surface-hover transition-colors"
-                      >
-                        <NotebookText size={14} />
-                        Open Notebook
-                      </Link>
+                      {needsDataset ? (
+                        <button
+                          type="button"
+                          disabled
+                          title="Requires a matched processing result before creating a notebook entry."
+                          className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-border px-3 text-xs font-semibold text-text-muted opacity-60"
+                        >
+                          <NotebookText size={14} />
+                          Notebook unavailable
+                        </button>
+                      ) : (
+                        <Link
+                          to={`/notebook?project=${run.projectId}`}
+                          className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-border px-3 text-xs font-semibold text-text-main hover:bg-surface-hover transition-colors"
+                        >
+                          <NotebookText size={14} />
+                          Open Notebook
+                        </Link>
+                      )}
                       <button
                         type="button"
                         onClick={() => compareRun(run.id)}
@@ -210,7 +258,8 @@ export default function HistoryPage() {
                   </div>
                 </div>
               </Card>
-            ))}
+              );
+            })}
           </div>
 
           <Card className="h-fit p-5">
@@ -219,10 +268,10 @@ export default function HistoryPage() {
             <div className="mt-4 space-y-3 text-sm">
               {[
                 ['Total characterization runs', '3'],
-                ['Report-ready runs', '1'],
-                ['Evidence-linked runs', '2'],
+                ['Report-ready discussions', String(reportReadyCount)],
+                ['Evidence-linked runs', String(evidenceLinkedCount)],
                 ['Techniques covered', 'XRD, Raman, FTIR, XPS'],
-                ['Most recent decision', 'Spinel formation supported by evidence'],
+                ['Most recent interpretation', 'Spinel formation supported by evidence'],
               ].map(([label, value]) => (
                 <div key={label} className="rounded-lg border border-border bg-background p-3">
                   <p className="text-xs text-text-muted">{label}</p>
@@ -231,7 +280,7 @@ export default function HistoryPage() {
               ))}
             </div>
             <p className="mt-4 rounded-lg border border-primary/20 bg-primary/10 p-3 text-xs leading-relaxed text-text-muted">
-              Every agent conclusion is linked back to datasets, methods, evidence, caveats, and next actions.
+              Every interpretation is linked back to datasets, methods, evidence, caveats, and next actions.
             </p>
           </Card>
         </div>
@@ -246,12 +295,20 @@ export default function HistoryPage() {
             <div>Analysis run</div>
             <div>Project</div>
             <div>Technique</div>
-            <div>Status</div>
-            <div>Status</div>
+            <div>Evidence status</div>
+            <div>Record state</div>
             <div>Date</div>
             <div>Action</div>
           </div>
-          {entries.map((entry) => (
+          {entries.map((entry) => {
+            const techniques = entry.technique.split('+').map((technique) => technique.trim());
+            const needsDataset = recordNeedsDataset(entry.projectId, techniques);
+            const displayClaimStatus = needsDataset ? 'No matched dataset' : formatClaimStatus(entry.claimStatus);
+            const displayStatus = needsDataset ? 'Requires dataset' : entry.status;
+            const displayActionPath = needsDataset ? `/workspace/xrd?project=${entry.projectId}` : actionPath(entry);
+            const displayActionLabel = needsDataset ? 'Open Workspace' : actionLabel(entry.action);
+
+            return (
             <div
               key={entry.id}
               className="grid grid-cols-[1.3fr_1fr_0.8fr_0.7fr_0.7fr_0.8fr_0.8fr] gap-4 px-5 py-4 border-t border-border text-sm items-center"
@@ -263,26 +320,33 @@ export default function HistoryPage() {
               <div className="text-text-muted">{entry.projectName}</div>
               <div className="text-text-muted">{entry.technique}</div>
               <div className={`font-semibold ${
+                needsDataset ? 'text-amber-600' :
                 entry.claimStatus === 'strongly_supported' ? 'text-emerald-600' :
                 entry.claimStatus === 'supported' ? 'text-cyan' :
                 entry.claimStatus === 'partial' ? 'text-amber-500' :
                 'text-text-muted'
-              }`}>{formatClaimStatus(entry.claimStatus)}</div>
+              }`}>{displayClaimStatus}</div>
               <div>
                 <span className="rounded-full border border-border bg-background px-2 py-1 text-xs text-text-muted">
-                  {entry.status}
+                  {displayStatus}
                 </span>
               </div>
               <div className="text-text-muted">{entry.date}</div>
               <Link
-                to={actionPath(entry)}
+                to={displayActionPath}
                 className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-border px-2 text-xs font-semibold text-text-main hover:bg-surface-hover transition-colors"
               >
-                <ActionIcon action={entry.action} />
-                {actionLabel(entry.action)}
+                {needsDataset ? <FolderOpen size={15} /> : <ActionIcon action={entry.action} />}
+                {displayActionLabel}
               </Link>
             </div>
-          ))}
+            );
+          })}
+          {entries.length === 0 && (
+            <div className="px-5 py-8 text-center text-sm text-text-muted">
+              No exported reports yet. Generate a report section from a validated notebook entry.
+            </div>
+          )}
         </Card>
       </div>
     </DashboardLayout>

@@ -846,14 +846,14 @@ ${result.decision}
       <div className="flex-1 overflow-y-auto bg-background p-3">
         {/* Header */}
         <div className="mb-3 rounded-lg border border-border bg-surface px-4 py-3">
-          <div className="flex items-center justify-between gap-3">
-            <div>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-[220px]">
               <h1 className="text-lg font-bold text-text-main">Cross-Tech Evidence Review</h1>
-              <p className="mt-1 text-[10px] text-text-muted whitespace-nowrap">
+              <p className="mt-1 text-[10px] text-text-muted">
                 Compare linked evidence across XRD, Raman, XPS, and FTIR
               </p>
             </div>
-            <div className="flex items-center gap-1.5 flex-nowrap">
+            <div className="flex max-w-full flex-wrap items-center justify-start gap-1.5 sm:justify-end">
               <select
                 value={project.id}
                 onChange={(event) => {
@@ -861,7 +861,7 @@ ${result.decision}
                   searchParams.set('project', newProjectId);
                   window.location.href = `/workspace/multi?${searchParams.toString()}`;
                 }}
-                className="rounded border border-border bg-background px-3 py-1.5 text-sm font-semibold text-text-main outline-none hover:border-primary/40 focus:border-primary flex-shrink-0"
+                className="h-8 max-w-full rounded border border-border bg-background px-3 text-sm font-semibold text-text-main outline-none hover:border-primary/40 focus:border-primary sm:max-w-[240px]"
               >
                 {demoProjects.map((proj) => (
                   <option key={proj.id} value={proj.id}>
@@ -869,7 +869,7 @@ ${result.decision}
                   </option>
                 ))}
               </select>
-              <div className="relative flex-shrink-0">
+              <div className="relative">
                 <details className="group">
                   <summary className="cursor-pointer list-none rounded border border-border bg-background px-3 py-1.5 text-sm font-semibold text-text-main hover:border-primary/40 inline-flex min-w-fit">
                     <span className="whitespace-nowrap">{Array.from(activeTechniques).join(', ')}</span>
@@ -894,36 +894,36 @@ ${result.decision}
               </div>
               <button 
                 onClick={handleRunReview}
-                className="flex-shrink-0 inline-flex items-center justify-center gap-1.5 h-8 px-3 text-xs rounded-md font-medium bg-primary text-white hover:bg-primary/90 transition-colors"
+                className="inline-flex h-8 items-center justify-center gap-1.5 whitespace-nowrap rounded-md bg-primary px-3 text-xs font-medium text-white transition-colors hover:bg-primary/90"
               >
-                <Play size={14} /> Run Evidence Review
+                <Play size={14} /> Run Review
               </button>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                className="gap-1.5 flex-shrink-0"
+                className="gap-1.5 whitespace-nowrap"
                 onClick={handleSaveProcessingResult}
               >
-                <CheckCircle2 size={14} /> Save Processing Result
+                <CheckCircle2 size={14} /> Save Result
               </Button>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                className="gap-1.5 flex-shrink-0"
+                className="gap-1.5 whitespace-nowrap"
                 onClick={handleRefineInterpretation}
               >
-                <FileText size={14} /> Refine Interpretation
+                <FileText size={14} /> Refine
               </Button>
-              <Link to={`/workspace/fusion?project=${project.id}`} className="flex-shrink-0">
-                <Button variant="outline" size="sm" className="gap-1.5">
-                  <BookOpen size={14} /> Report Export
+              <Link to={`/workspace/fusion?project=${project.id}`}>
+                <Button variant="outline" size="sm" className="gap-1.5 whitespace-nowrap">
+                  <BookOpen size={14} /> Report
                 </Button>
               </Link>
-              <Link to={`/notebook?project=${project.id}&source=fusion&template=research`} className="flex-shrink-0">
-                <Button variant="outline" size="sm" className="gap-1.5">
-                  <Save size={14} /> Add to Notebook
+              <Link to={`/notebook?project=${project.id}&source=fusion&template=research`}>
+                <Button variant="outline" size="sm" className="gap-1.5 whitespace-nowrap">
+                  <Save size={14} /> Notebook
                 </Button>
               </Link>
             </div>
@@ -1018,12 +1018,12 @@ ${result.decision}
 
           {/* Right Panel: Vertical sections */}
           <div className="space-y-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 180px)' }}>
-            {/* Scientific Conclusion */}
+            {/* Scientific Interpretation */}
             <Card className="p-3">
-              <h2 className="mb-2 text-xs font-bold text-text-main">Characterization Conclusion</h2>
+              <h2 className="mb-2 text-xs font-bold text-text-main">Characterization Interpretation</h2>
               <div className="space-y-2">
                 <div>
-                  <div className="text-[9px] font-semibold uppercase tracking-wider text-primary">Conclusion</div>
+                  <div className="text-[9px] font-semibold uppercase tracking-wider text-primary">Interpretation</div>
                   <p className="mt-1 text-[10px] leading-relaxed text-text-main">
                     {reviewOutput?.conclusion || 'Convergent multi-technique evidence supports spinel ferrite structure with characteristic vibrational and diffraction signatures.'}
                   </p>
@@ -1081,7 +1081,7 @@ ${result.decision}
                   </ul>
                 </div>
                 <div>
-                  <div className="text-[9px] font-semibold uppercase tracking-wider text-primary">Conclusion</div>
+                  <div className="text-[9px] font-semibold uppercase tracking-wider text-primary">Claim Boundary</div>
                   <p className="mt-1 text-[10px] font-semibold text-text-main">
                     {reviewOutput?.decision || 'Proceed with spinel ferrite structural assignment for downstream analysis and reporting.'}
                   </p>

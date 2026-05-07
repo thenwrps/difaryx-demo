@@ -8,10 +8,10 @@ export default function CTASection() {
       <div className="mx-auto max-w-[1200px] px-6">
         <div className="text-center">
           <h2 className="mb-6 text-[36px] font-bold leading-[1.1] text-white lg:text-[44px]">
-            Experience autonomous scientific workflow execution
+            Experience deterministic scientific workflow execution
           </h2>
           <p className="mx-auto mb-10 max-w-3xl text-[17px] leading-relaxed text-slate-300">
-            Try DIFARYX's agent demo to see how autonomous execution, interpretation, and supporting data work together for traceable characterization conclusions.
+            Try the DIFARYX demo to see how deterministic execution, interpretation, and supporting data work together for traceable characterization discussions.
           </p>
           
           <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
@@ -39,8 +39,8 @@ export default function CTASection() {
             </div>
             <div className="rounded-xl border border-white/10 bg-white/5 p-6 backdrop-blur-sm">
               <div className="mb-2 text-[28px] font-bold text-white">7</div>
-              <div className="text-[13px] font-semibold text-slate-300">Autonomous Execution Steps</div>
-              <div className="mt-1 text-[12px] text-slate-400">From signal to decision</div>
+              <div className="text-[13px] font-semibold text-slate-300">Workflow Steps</div>
+              <div className="mt-1 text-[12px] text-slate-400">From signal to interpretation</div>
             </div>
             <div className="rounded-xl border border-white/10 bg-white/5 p-6 backdrop-blur-sm">
               <div className="mb-2 text-[28px] font-bold text-white">100%</div>
