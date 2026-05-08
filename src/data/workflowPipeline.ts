@@ -5,6 +5,10 @@ import {
   type Technique,
 } from './demoProjects';
 import { canonicalDemoScenario } from './demo';
+import {
+  getConditionBoundaryNotes,
+  getLatestExperimentConditionLock,
+} from './experimentConditionLock';
 
 export type NotebookTemplateMode = 'research' | 'rd' | 'analytical';
 export type ReportTemplate = 'manuscript' | 'technical_report' | 'analytical_report';
@@ -119,7 +123,7 @@ export const NOTEBOOK_TEMPLATES: Record<NotebookTemplateMode, NotebookTemplate> 
     label: 'Analytical-job Mode',
     stepperLabels: ['Sample', 'Prep', 'Method', 'Calibration', 'Run', 'QA/QC', 'Result', 'Report'],
     tabs: ['Sample', 'Method / SOP', 'Calibration', 'QA/QC', 'Analytical Result', 'Report', 'Run Log'],
-    requiredSections: ['Sample Context', 'Method / SOP', 'Calibration and QA/QC', 'Analytical Result', 'Pass / Fail / Retest Decision'],
+    requiredSections: ['Sample Context', 'Method / SOP', 'Calibration and QA/QC', 'Analytical Result', 'Review / Retest Decision'],
     statusLabels: ['QA/QC Status', 'Result Validity', 'Specification Status', 'Report Status'],
     reportTemplate: 'analytical_report',
   },
@@ -128,7 +132,7 @@ export const NOTEBOOK_TEMPLATES: Record<NotebookTemplateMode, NotebookTemplate> 
 const TEMPLATE_MICRO_FLOWS: Record<NotebookTemplateMode, string[]> = {
   research: ['Processing Result', 'Interpretation Refinement', 'Notebook Entry', 'Report Section'],
   rd: ['Test Result', 'Risk Review', 'Go/No-Go Rationale'],
-  analytical: ['Analytical Run', 'QA/QC Review', 'Validated Result'],
+  analytical: ['Analytical Run', 'QA/QC Review', 'Reviewed Result'],
 };
 
 const TEMPLATE_STATUS_VALUES: Record<NotebookTemplateMode, string[]> = {
@@ -156,7 +160,7 @@ export const CLAIM_BOUNDARY = {
   ],
   notSupportedYet: [
     'Publication-level phase-pure confirmation',
-    'Validated bulk oxidation-state distribution',
+    'Bulk oxidation-state distribution not supported yet',
   ],
   contextual: [
     'Raman/FTIR support features',
@@ -225,7 +229,7 @@ function getProcessingResultCopy(projectId: string) {
         'Major XRD reflections align with the expected cubic spinel pattern.',
         'Raman context supports local spinel symmetry through the A1g mode.',
         'XPS remains required for surface oxidation-state validation.',
-        'FTIR provides bonding and surface context but is not definitive for phase assignment.',
+        'FTIR provides bonding and surface context but is not sufficient for phase assignment.',
       ],
       limitations: [
         'Weak unresolved reflections limit phase-purity strength.',
@@ -312,8 +316,22 @@ export function refineDiscussionFromProcessing(
 ): AgentDiscussionRefinement {
   const template = NOTEBOOK_TEMPLATES[templateMode];
   const discussionDraft = getDiscussionDraft(processingResult.projectId, templateMode);
-  const claimBoundary = getProjectClaimBoundary(processingResult.projectId);
-  const validationNotes = getProjectValidationNotes(processingResult.projectId);
+  const projectClaimBoundary = getProjectClaimBoundary(processingResult.projectId);
+  const conditionLock = getLatestExperimentConditionLock(processingResult.projectId);
+  const conditionBoundaryNotes = conditionLock
+    ? getConditionBoundaryNotes(conditionLock, [processingResult.technique])
+    : [];
+  const claimBoundary = {
+    ...projectClaimBoundary,
+    pending: [
+      ...(projectClaimBoundary.pending ?? []),
+      ...conditionBoundaryNotes,
+    ],
+  };
+  const validationNotes = [
+    ...getProjectValidationNotes(processingResult.projectId),
+    ...conditionBoundaryNotes,
+  ];
 
   return {
     id: `refinement-${processingResult.id}-${templateMode}`,
@@ -382,7 +400,7 @@ export function createReportSectionFromNotebookEntry(entry: NotebookEntry): Repo
 
 function getTemplateEntryTitle(templateMode: NotebookTemplateMode) {
   if (templateMode === 'rd') return 'Go/No-Go Rationale';
-  if (templateMode === 'analytical') return 'Validated Result';
+  if (templateMode === 'analytical') return 'Reviewed Result';
   return 'Refined Discussion';
 }
 
@@ -458,12 +476,12 @@ function getTemplateSections(
         heading: 'Analytical Result',
         lines: [
           'Analytical Result: result validity supports a CuFe₂O₄ spinel ferrite assignment within the current method scope.',
-          'Result Validity: pass for screening report; retest or complementary validation required for stronger specification claims.',
+          'Result Validity: screening-level support; retest or complementary validation required for stronger specification claims.',
         ],
       },
       {
-        heading: 'Pass / Fail / Retest Decision',
-        lines: ['Pass / Fail / Retest: pass with retest requirements for phase purity, surface state, and bulk composition.'],
+        heading: 'Review / Retest Decision',
+        lines: ['Review / Retest: screening-level support with retest requirements for phase purity, surface state, and bulk composition.'],
       },
     ];
   }

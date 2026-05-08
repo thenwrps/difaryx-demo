@@ -10,7 +10,8 @@ import {
 import { DashboardLayout } from '../components/layout/DashboardLayout';
 import { Graph } from '../components/ui/Graph';
 import { ParameterDrawer } from '../components/workspace/ParameterDrawer';
-import { xpsDemoData, XPS_DEMO_DATASETS, getXpsDemoDataset } from '../data/xpsDemoData';
+import { xpsDemoData, XPS_DEMO_DATASETS, getXpsDemoDataset, getXpsProjectDatasetId } from '../data/xpsDemoData';
+import { getProject } from '../data/demoProjects';
 import { XPS_DEFAULT_PARAMETERS, getStepParameterDefinitions } from '../data/parameterDefinitions';
 import { useParameterPersistence } from '../hooks/useParameterPersistence';
 import { runXpsProcessing, convertXpsParametersToProcessingParams } from '../agents/xpsAgent/runner';
@@ -23,6 +24,8 @@ import type { EvidenceNode, FusionResult, PeakInput } from '../engines/fusionEng
 
 export default function XPSWorkspace() {
   const [searchParams] = useSearchParams();
+  const project = getProject(searchParams.get('project'));
+  const projectDatasetId = getXpsProjectDatasetId(project.id);
   
   // Entry mode detection
   const entryMode = getWorkspaceEntryMode(searchParams, 'xps');
@@ -33,7 +36,7 @@ export default function XPSWorkspace() {
   const [datasetName, setDatasetName] = useState<string>('');
   
   const [activeTab, setActiveTab] = useState<'spectrum' | 'peakList' | 'chemicalStates'>('spectrum');
-  const [selectedDatasetId, setSelectedDatasetId] = useState(xpsDemoData.id);
+  const [selectedDatasetId, setSelectedDatasetId] = useState(projectDatasetId ?? xpsDemoData.id);
   
   // Parameter state management
   const [autoMode, setAutoMode] = useState(true);
@@ -50,9 +53,11 @@ export default function XPSWorkspace() {
   useEffect(() => {
     if (!entryMode) {
       // Project mode - use existing behavior
+      const projectDataset = getXpsDemoDataset(projectDatasetId);
+      setSelectedDatasetId(projectDataset.id);
       setHasDatasetLoaded(true);
       setDatasetSource('project');
-      setDatasetName(selectedDataset.fileName);
+      setDatasetName(projectDataset.fileName);
       return;
     }
 
@@ -73,7 +78,7 @@ export default function XPSWorkspace() {
       setHasDatasetLoaded(false);
       setDatasetSource(null);
     }
-  }, [entryMode, selectedDataset.fileName]);
+  }, [entryMode, projectDatasetId]);
   
   // Handlers for empty state
   const handleLoadSample = () => {
@@ -305,7 +310,7 @@ export default function XPSWorkspace() {
             technique="XPS"
             source={datasetSource}
             datasetName={datasetName}
-            projectName={undefined}
+            projectName={datasetSource === 'project' ? project.name : undefined}
           />
         )}
         

@@ -290,6 +290,30 @@ export const XRD_DEMO_DATASETS: XrdDemoDataset[] = [
       noiseAmplitude: 0.52,
     }),
   },
+  {
+    id: 'xrd-nife2o4-control',
+    label: 'NiFe2O4 control',
+    fileName: 'nife2o4_control_demo.xy',
+    sampleName: 'NiFe2O4 control sample',
+    description: 'Nickel ferrite control pattern with the expected spinel reflection series.',
+    expectedSignal: 'NiFe2O4 should appear as the working spinel-ferrite assignment with validation boundaries.',
+    dataPoints: synthesizeXrdPattern({
+      components: [{ phaseId: 'nife2o4', scale: 0.82, width: 0.16 }],
+      noiseAmplitude: 0.56,
+    }),
+  },
+  {
+    id: 'xrd-cofe2o4-control',
+    label: 'CoFe2O4 control',
+    fileName: 'cofe2o4_control_demo.xy',
+    sampleName: 'CoFe2O4 control sample',
+    description: 'Cobalt ferrite control pattern with the expected spinel reflection series.',
+    expectedSignal: 'CoFe2O4 should appear as the working spinel-ferrite assignment with validation boundaries.',
+    dataPoints: synthesizeXrdPattern({
+      components: [{ phaseId: 'cofe2o4', scale: 0.84, width: 0.16 }],
+      noiseAmplitude: 0.56,
+    }),
+  },
 ];
 
 export function getXrdDemoDataset(datasetId?: string | null) {
@@ -318,6 +342,16 @@ export const XRD_PROJECT_COMPATIBILITY: Record<string, {
     datasetIds: ['xrd-cufe2o4-clean'],
     assignment: 'CuFe2O4/SBA-15',
     materialLabel: 'copper ferrite on mesoporous silica',
+  },
+  nife2o4: {
+    datasetIds: ['xrd-nife2o4-control'],
+    assignment: 'NiFe2O4',
+    materialLabel: 'nickel ferrite spinel',
+  },
+  cofe2o4: {
+    datasetIds: ['xrd-cofe2o4-control'],
+    assignment: 'CoFe2O4',
+    materialLabel: 'cobalt ferrite spinel',
   },
 };
 

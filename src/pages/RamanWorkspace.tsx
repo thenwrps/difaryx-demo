@@ -10,7 +10,8 @@ import {
 import { DashboardLayout } from '../components/layout/DashboardLayout';
 import { Graph } from '../components/ui/Graph';
 import { ParameterDrawer } from '../components/workspace/ParameterDrawer';
-import { ramanDemoData, RAMAN_DEMO_DATASETS, getRamanDemoDataset } from '../data/ramanDemoData';
+import { ramanDemoData, RAMAN_DEMO_DATASETS, getRamanDemoDataset, getRamanProjectDatasetId } from '../data/ramanDemoData';
+import { getProject } from '../data/demoProjects';
 import { runRamanProcessing } from '../agents/ramanAgent/runner';
 import { getWorkspaceEntryMode, getSampleDatasetName } from '../utils/workspaceEntry';
 import { DatasetInfoBar } from '../components/workspace/DatasetInfoBar';
@@ -18,6 +19,8 @@ import { EmptyWorkspaceState } from '../components/workspace/EmptyWorkspaceState
 
 export default function RamanWorkspace() {
   const [searchParams] = useSearchParams();
+  const project = getProject(searchParams.get('project'));
+  const projectDatasetId = getRamanProjectDatasetId(project.id);
   
   // Entry mode detection
   const entryMode = getWorkspaceEntryMode(searchParams, 'raman');
@@ -28,7 +31,7 @@ export default function RamanWorkspace() {
   const [datasetName, setDatasetName] = useState<string>('');
   
   const [activeTab, setActiveTab] = useState<'spectrum' | 'peakList' | 'modeAssignments'>('spectrum');
-  const [selectedDatasetId, setSelectedDatasetId] = useState(ramanDemoData.id);
+  const [selectedDatasetId, setSelectedDatasetId] = useState(projectDatasetId ?? ramanDemoData.id);
   
   // Parameter state management
   const [autoMode, setAutoMode] = useState(true);
@@ -44,9 +47,11 @@ export default function RamanWorkspace() {
   useEffect(() => {
     if (!entryMode) {
       // Project mode - use existing behavior
+      const projectDataset = getRamanDemoDataset(projectDatasetId);
+      setSelectedDatasetId(projectDataset.id);
       setHasDatasetLoaded(true);
       setDatasetSource('project');
-      setDatasetName(selectedDataset.fileName);
+      setDatasetName(projectDataset.fileName);
       return;
     }
 
@@ -67,7 +72,7 @@ export default function RamanWorkspace() {
       setHasDatasetLoaded(false);
       setDatasetSource(null);
     }
-  }, [entryMode, selectedDataset.fileName]);
+  }, [entryMode, projectDatasetId]);
   
   // Handlers for empty state
   const handleLoadSample = () => {
@@ -236,7 +241,7 @@ export default function RamanWorkspace() {
             technique="RAMAN"
             source={datasetSource}
             datasetName={datasetName}
-            projectName={undefined}
+            projectName={datasetSource === 'project' ? project.name : undefined}
           />
         )}
         

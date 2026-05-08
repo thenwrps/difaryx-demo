@@ -45,6 +45,13 @@ import {
   isDatasetCompatibleWithProject,
 } from '../data/xrdDemoDatasets';
 import { getLockedContext } from '../data/lockedContext';
+import {
+  formatConditionLockTimestamp,
+  getConditionBoundaryNotes,
+  getExperimentConditionLock,
+  getConditionLockSectionLines,
+  getConditionLockStatusLabel,
+} from '../data/experimentConditionLock';
 
 const NOTEBOOK_TEMPLATE_MODES: NotebookTemplateMode[] = ['research', 'rd', 'analytical'];
 
@@ -91,11 +98,11 @@ const NOTEBOOK_TEMPLATE_DETAILS: Record<
   analytical: {
     description:
       'For sample analysis, method execution, calibration, QA/QC, result validity, and analytical reporting.',
-    output: 'Analytical report + QA/QC status + pass/fail or validity decision.',
+    output: 'Analytical report + QA/QC status + review or retest decision.',
     status: 'Report-ready',
-    primaryLabel: 'Validated Result',
+    primaryLabel: 'Reviewed Result',
     reportPreview: 'Analytical report section generated from method, QA/QC, and result validity.',
-    badges: ['Source workflow', 'QA/QC review', 'Result validity', 'Analytical result', 'Pass / Fail / Retest'],
+    badges: ['Source workflow', 'QA/QC review', 'Result validity', 'Analytical result', 'Review / Retest'],
   },
 };
 
@@ -150,7 +157,7 @@ function getProjectNotebookContent(projectId: string) {
       keyEvidence: [
         'XRD reflections assigned to CuFe₂O₄ remain visible in the supported CuFe₂O₄/SBA-15 sample.',
         'Raman vibrational modes provide supporting evidence for ferrite-like local structure.',
-        'FTIR silica/support features contextualize the SBA-15 matrix but do not independently prove ferrite phase purity.',
+        'FTIR silica/support features contextualize the SBA-15 matrix but do not independently establish ferrite phase purity.',
       ],
       supportingData: [
         {
@@ -172,7 +179,7 @@ function getProjectNotebookContent(projectId: string) {
           evidence: 'Silica/support bands contextualize the SBA-15 matrix',
           strength: 'In Progress' as const,
           dataset: 'cu-fe2o4-sba15_ftir.csv',
-          caveat: 'FTIR support features do not independently prove ferrite phase purity.',
+          caveat: 'FTIR support features do not independently establish ferrite phase purity.',
         },
         {
           technique: 'XPS',
@@ -272,6 +279,7 @@ export default function NotebookLab() {
   const project = getProject(searchParams.get('project'));
   const runId = searchParams.get('run');
   const entryId = searchParams.get('entry');
+  const experimentId = searchParams.get('experiment');
   const agentRun = runId ? getRun(runId) : null;
   const [templateMode, setTemplateMode] = useState<NotebookTemplateMode>(
     () => normalizeNotebookTemplateMode(searchParams.get('template')),
@@ -295,6 +303,18 @@ export default function NotebookLab() {
     () => getProcessingRuns().filter((run) => run.projectId === project.id),
     [project.id, feedback],
   );
+  const selectedExperiment = useMemo(() => {
+    const projectExperiments = localExperiments.filter((experiment) => experiment.projectId === project.id);
+    return (
+      projectExperiments.find((experiment) => experiment.id === experimentId) ??
+      [...projectExperiments].reverse().find((experiment) => experiment.conditionLock) ??
+      null
+    );
+  }, [experimentId, localExperiments, project.id]);
+  const experimentConditionLock = selectedExperiment?.conditionLock ?? getExperimentConditionLock(project.id, experimentId);
+  const experimentConditionLines = getConditionLockSectionLines(experimentConditionLock);
+  const experimentConditionBoundaryNotes = getConditionBoundaryNotes(experimentConditionLock, project.techniques);
+  const experimentConditionStatus = getConditionLockStatusLabel(experimentConditionLock);
   const attachedRunRecord = useMemo(() => getProcessingRun(attachedRun), [attachedRun]);
   const hasMatchedNotebookData = hasMatchedXrdDemoData(project.id);
   const projectNotebookContent = getProjectNotebookContent(project.id);
@@ -424,6 +444,10 @@ export default function NotebookLab() {
         'Requires validation: matched processing result is required before claim-boundary review.',
       ]
     ).map((line) => `- ${line}`).join('\n');
+    const experimentConditionMarkdown = [
+      ...experimentConditionLines,
+      ...experimentConditionBoundaryNotes.map((note) => `Claim boundary: ${note}`),
+    ].map((line) => `- ${line}`).join('\n');
     const lockedContextMarkdown = lockedContext
       ? `## Locked Scientific Context
 
@@ -468,6 +492,9 @@ ${evidenceMarkdown}
 ## Claim Boundary
 ${claimBoundaryMarkdown}
 
+## Experiment Conditions
+${experimentConditionMarkdown}
+
 ## Validation Notes
 ${validationMarkdown}
 
@@ -510,6 +537,7 @@ ${sourceRunLines}
           { heading: 'Summary', lines: [projectNotebookContent.summary] },
           { heading: 'Report-ready Discussion', lines: [projectNotebookContent.reportPreview] },
           { heading: 'Key Evidence', lines: keyEvidenceItems },
+          { heading: 'Experiment Conditions', lines: experimentConditionLines },
           { heading: 'Status', lines: [displayNotebookStatus] },
           { heading: 'Provenance', lines: projectNotebookContent.runLog.map(([label, value]) => `${label}: ${value}`) },
         ],
@@ -602,33 +630,36 @@ ${sourceRunLines}
             {localExperiments.map((experiment) => (
               <Link
                 key={experiment.id}
-                to={`/notebook?project=${experiment.projectId}`}
+                to={`/notebook?project=${experiment.projectId}&experiment=${experiment.id}`}
                 className={`block w-full text-left px-3 py-2 rounded-md text-xs font-medium leading-snug transition-colors border ${
-                  experiment.projectId === project.id
+                  experiment.projectId === project.id && experiment.id === experimentId
                     ? 'bg-primary/5 text-primary border-primary/20'
                     : 'text-text-muted hover:bg-surface-hover hover:text-text-main border-transparent'
                 }`}
               >
                 <span>{experiment.title}</span>
                 <span className="mt-1 block text-xs text-text-muted">{experiment.technique} - {experiment.fileName}</span>
+                <span className="mt-1 block text-[10px] font-semibold text-amber-600">
+                  {getConditionLockStatusLabel(experiment.conditionLock)}
+                </span>
               </Link>
             ))}
           </div>
         </div>
 
         <div className="flex-1 min-w-0 flex flex-col overflow-y-auto relative">
-          <div className="sticky top-0 z-10 bg-surface/80 backdrop-blur border-b border-border p-3 flex flex-wrap justify-between items-center gap-3">
+          <div className="sticky top-0 z-10 bg-surface/80 backdrop-blur border-b border-border px-3 py-2 flex flex-wrap justify-between items-center gap-2">
             <div>
               <div className="flex items-center gap-2 text-[11px] text-text-muted mb-1">
                 <span>Created: {project.createdDate}</span>
                 <span>|</span>
-                <span>Source: Processing Result → Interpretation Refinement → Notebook Entry</span>
+                <span>Source: Processing Result -&gt; Refinement -&gt; Notebook</span>
               </div>
-              <h1 className="text-lg font-bold">{notebook.title}</h1>
+              <h1 className="text-base font-bold">{notebook.title}</h1>
               {(() => {
                 const lockedContext = getLockedContext(project.id);
                 return lockedContext ? (
-                  <div className="mt-2 rounded border border-amber-500/30 bg-amber-500/5 px-3 py-2">
+                  <div className="mt-1 rounded border border-amber-500/30 bg-amber-500/5 px-2.5 py-1.5">
                     <p className="text-[10px] font-semibold text-amber-700">
                       Locked context preserved: sample identity, source dataset, processing path, and claim boundary were not modified.
                     </p>
@@ -638,8 +669,9 @@ ${sourceRunLines}
               <div className="mt-2 flex max-w-4xl flex-wrap gap-1.5">
                 {[
                   ['Mode', notebookTemplate.label],
-                  ['Pipeline', 'Processing Result → Interpretation Refinement → Notebook Entry → Report Section'],
+                  ['Pipeline', 'Processing -> Refinement -> Notebook -> Report'],
                   ['Status', displayNotebookStatus],
+                  ['Condition lock', experimentConditionStatus],
                 ].map(([label, value]) => (
                   <span
                     key={label}
@@ -780,18 +812,79 @@ ${sourceRunLines}
             </div>
           )}
 
-          <div className="p-6 max-w-5xl w-full mx-auto space-y-8">
-            <section className="grid grid-cols-1 gap-4 xl:grid-cols-2 2xl:hidden">
-              {hasMatchedNotebookData ? (
-                <AIInsightPanel result={getProjectInsight(project)} />
-              ) : (
-                <Card className="p-4">
-                  <div className="text-sm font-semibold text-text-main">Validation pending</div>
-                  <p className="mt-2 text-sm leading-relaxed text-text-muted">
-                    No matched processing result is linked to this project. Evidence and report discussion are not generated.
+          <div className="p-4 max-w-6xl w-full mx-auto space-y-4">
+            <section className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,0.95fr)_minmax(280px,0.85fr)_minmax(280px,0.95fr)]">
+              <div className="min-w-0">
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-text-muted">Characterization Overview</div>
+                {hasMatchedNotebookData ? (
+                  <div className="max-h-[300px] overflow-y-auto rounded-xl">
+                    <AIInsightPanel result={getProjectInsight(project)} />
+                  </div>
+                ) : (
+                  <Card className="p-4">
+                    <div className="text-sm font-semibold text-text-main">Validation pending</div>
+                    <p className="mt-2 text-sm leading-relaxed text-text-muted">
+                      No matched processing result is linked to this project. Evidence and report discussion are not generated.
+                    </p>
+                  </Card>
+                )}
+              </div>
+              <div className="min-w-0 rounded-xl border border-border bg-surface p-3">
+                <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-wider text-text-muted">Experiment Conditions</div>
+                    <div className="mt-1 text-sm font-bold text-text-main">{experimentConditionStatus}</div>
+                    <p className="mt-1 text-xs leading-relaxed text-text-muted">
+                      Locked conditions define reproducibility constraints before interpretation handoff.
+                    </p>
+                  </div>
+                  <div className="rounded-md border border-border bg-background px-2.5 py-1.5 text-[11px] text-text-muted">
+                    Locked at: {formatConditionLockTimestamp(experimentConditionLock)}
+                  </div>
+                </div>
+                <div className="mt-3 max-h-40 space-y-1.5 overflow-y-auto pr-1">
+                  {experimentConditionLines.map((line) => (
+                    <div key={line} className="rounded-md border border-border bg-background px-2.5 py-1.5 text-[11px] leading-relaxed text-text-muted">
+                      {line}
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-2 rounded-md border border-amber-500/20 bg-amber-500/5 p-2">
+                  <div className="text-[10px] font-semibold uppercase tracking-wider text-amber-700">Condition-aware claim boundary</div>
+                  <ul className="mt-1 space-y-0.5 text-[11px] leading-relaxed text-text-muted">
+                    {experimentConditionBoundaryNotes.slice(0, 3).map((note) => (
+                      <li key={note}>- {note}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+              <div className="min-w-0 rounded-xl border border-primary/20 bg-surface p-3">
+                <div className="text-xs font-semibold uppercase tracking-wider text-primary">Refined Discussion / Report Preview</div>
+                <div className="mt-2 rounded-md border border-border bg-background p-3">
+                  <div className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">
+                    {notebookTemplateDetails.primaryLabel}
+                  </div>
+                  <p className="mt-2 text-xs leading-relaxed text-text-main">
+                    {hasMatchedNotebookData
+                      ? projectNotebookContent.discussion
+                      : 'No matched processing result is linked to this notebook entry.'}
                   </p>
-                </Card>
-              )}
+                </div>
+                <div className="mt-2 rounded-md border border-border bg-background p-3">
+                  <div className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">Report section</div>
+                  <p className="mt-2 text-xs leading-relaxed text-text-main">
+                    {hasMatchedNotebookData
+                      ? projectNotebookContent.reportPreview
+                      : 'No report-oriented section is available until a matched processing result is linked to this project.'}
+                  </p>
+                </div>
+                <div className="mt-2 rounded-md border border-primary/20 bg-primary/5 p-2">
+                  <div className="text-[10px] font-semibold uppercase tracking-wider text-primary">Discussion readiness</div>
+                  <p className="mt-1 text-xs font-semibold text-text-main">
+                    {displayNotebookStatus}: {hasMatchedNotebookData ? notebookTemplateDetails.output : 'Load compatible data before report-ready discussion.'}
+                  </p>
+                </div>
+              </div>
             </section>
 
             {!hasMatchedNotebookData && (
@@ -811,8 +904,22 @@ ${sourceRunLines}
               </section>
             )}
 
-            <section className="space-y-4">
-              <div className="rounded-xl border border-border bg-surface p-5">
+            <details className="rounded-xl border border-border bg-surface">
+              <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-text-main">
+                <span>Full template, refined discussion, and report section</span>
+                <span className="rounded-md border border-primary/20 bg-primary/5 px-2.5 py-1 text-[11px] text-primary">
+                  Secondary record details
+                </span>
+              </summary>
+              <div className="space-y-4 border-t border-border p-4">
+              <details className="rounded-xl border border-border bg-surface">
+                <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-text-main">
+                  <span>Template selector and workflow details</span>
+                  <span className="rounded-md border border-primary/20 bg-primary/5 px-2.5 py-1 text-[11px] text-primary">
+                    {notebookTemplate.label} · {notebookTemplateDetails.primaryLabel}
+                  </span>
+                </summary>
+                <div className="border-t border-border p-4">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div>
                     <h3 className="text-base font-bold text-text-main">Notebook Template Selector</h3>
@@ -917,9 +1024,10 @@ ${sourceRunLines}
                     </div>
                   </div>
                 </div>
-              </div>
+                </div>
+              </details>
 
-              <div className="rounded-xl border border-primary/20 bg-surface p-5">
+              <div className="rounded-xl border border-primary/20 bg-surface p-4">
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                   <div>
                     <div className="text-[11px] font-bold uppercase tracking-wider text-primary">
@@ -939,7 +1047,7 @@ ${sourceRunLines}
                   </div>
                 </div>
 
-                <div className="mt-4 rounded-lg border border-border bg-background p-4">
+                <div className="mt-3 rounded-lg border border-border bg-background p-3">
                   <div className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">
                     {hasMatchedNotebookData ? primaryNotebookSection?.heading ?? notebookTemplateDetails.primaryLabel : 'No matched processing result'}
                   </div>
@@ -952,26 +1060,31 @@ ${sourceRunLines}
                   </div>
                 </div>
 
-                <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
-                  {(hasMatchedNotebookData ? supportingNotebookSections : [
-                    {
-                      heading: 'Validation Pending',
-                      lines: ['No matched processing result is available for this project.', 'Evidence and report sections remain unavailable until compatible data is processed.'],
-                    },
-                  ]).map((section) => (
-                    <div key={section.heading} className="rounded-lg border border-border bg-background p-3">
-                      <div className="text-xs font-bold text-text-main">{section.heading}</div>
-                      <div className="mt-2 space-y-2">
-                        {section.lines.map((line) => (
-                          <p key={line} className="text-xs leading-relaxed text-text-muted">{line}</p>
-                        ))}
+                <details className="mt-3 rounded-lg border border-border bg-background">
+                  <summary className="cursor-pointer list-none px-3 py-2 text-xs font-semibold text-text-main">
+                    Additional notebook sections
+                  </summary>
+                  <div className="grid grid-cols-1 gap-3 border-t border-border p-3 lg:grid-cols-2">
+                    {(hasMatchedNotebookData ? supportingNotebookSections : [
+                      {
+                        heading: 'Validation Pending',
+                        lines: ['No matched processing result is available for this project.', 'Evidence and report sections remain unavailable until compatible data is processed.'],
+                      },
+                    ]).map((section) => (
+                      <div key={section.heading} className="rounded-lg border border-border bg-surface p-3">
+                        <div className="text-xs font-bold text-text-main">{section.heading}</div>
+                        <div className="mt-2 space-y-2">
+                          {section.lines.map((line) => (
+                            <p key={line} className="text-xs leading-relaxed text-text-muted">{line}</p>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                </details>
               </div>
 
-              <div className="rounded-xl border border-border bg-surface p-5">
+              <div className="rounded-xl border border-border bg-surface p-4">
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                   <div>
                     <div className="text-[11px] font-bold uppercase tracking-wider text-text-muted">Report Section Preview</div>
@@ -990,7 +1103,7 @@ ${sourceRunLines}
                     <Download size={14} /> Export Report Section
                   </Button>
                 </div>
-                <div className="mt-4 rounded-lg border border-border bg-background p-4">
+                <div className="mt-3 rounded-lg border border-border bg-background p-3">
                   <p className="text-sm leading-relaxed text-text-main">
                     {hasMatchedNotebookData
                       ? projectNotebookContent.reportPreview
@@ -1001,8 +1114,17 @@ ${sourceRunLines}
                   Report route is not enabled in this demo. Export-ready sections are generated from notebook entries.
                 </p>
               </div>
-            </section>
+              </div>
+            </details>
 
+            <details className="rounded-xl border border-border bg-surface">
+              <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-text-main">
+                <span>Supplementary notebook record</span>
+                <span className="rounded-md border border-border bg-background px-2.5 py-1 text-[11px] text-text-muted">
+                  Supporting data, run log, exports, trace, and validation notes
+                </span>
+              </summary>
+              <div className="space-y-4 border-t border-border p-4">
             <section className="space-y-4">
               <div className="rounded-xl border border-primary/20 bg-surface p-5">
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
@@ -1335,10 +1457,12 @@ ${sourceRunLines}
                 <FileText size={14} className="inline mr-1" /> Export Markdown
               </button>
             </section>
+              </div>
+            </details>
           </div>
         </div>
 
-        <div className="hidden w-[340px] border-l border-border bg-background 2xl:flex flex-col shrink-0 overflow-y-auto">
+        <div className="hidden">
           <div className="p-6">
             <div className="mb-4 text-xs font-semibold text-text-muted uppercase tracking-wider">Characterization Overview</div>
             {hasMatchedNotebookData ? (
@@ -1360,7 +1484,7 @@ ${sourceRunLines}
         onClose={() => setExperimentModalOpen(false)}
         onCreated={() => {
           setLocalExperiments(getLocalExperiments());
-          showFeedback('Experiment and dataset added');
+          showFeedback('Experiment, dataset, and condition record added');
         }}
       />
     </DashboardLayout>

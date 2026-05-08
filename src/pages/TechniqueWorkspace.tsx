@@ -10,6 +10,7 @@ import {
   FlaskConical,
   FolderKanban,
   Layers3,
+  LockKeyhole,
   Play,
   RotateCcw,
   Save,
@@ -56,6 +57,13 @@ import {
 } from '../data/demoProjects';
 import { DemoExportFormat, exportDemoArtifact } from '../utils/demoExport';
 import { getRun, type AgentRun } from '../data/runModel';
+import {
+  ExperimentConditionLock,
+  createDraftExperimentConditionLock,
+  getConditionBoundaryNotes,
+  getConditionLockStatusLabel,
+  lockExperimentConditions,
+} from '../data/experimentConditionLock';
 
 type XpsRegion = 'Survey' | 'Cu 2p' | 'Fe 2p' | 'O 1s';
 
@@ -239,6 +247,7 @@ export default function TechniqueWorkspace() {
     date: new Date().toISOString().slice(0, 10),
     notes: 'Frontend demo dataset prepared inside DIFARYX.',
   });
+  const [conditionLock, setConditionLock] = useState<ExperimentConditionLock>(() => createDraftExperimentConditionLock());
 
   useEffect(() => {
     setImported(false);
@@ -262,6 +271,7 @@ export default function TechniqueWorkspace() {
       technique: activeTechnique,
       fileName: `${project.id}_${activeTechnique.toLowerCase()}_new.xy`,
     }));
+    setConditionLock(createDraftExperimentConditionLock());
   }, [project.id, project.name, project.material, activeTechnique, selectedDataset?.id, latestSavedRun?.id]);
 
   if (isMultiCompat) {
@@ -279,6 +289,7 @@ export default function TechniqueWorkspace() {
     : getTechniqueLabels(activeTechnique);
   const localExperiments = getLocalExperiments(project.id);
   const savedEvidence = getSavedEvidence(project.id, activeTechnique);
+  const conditionBoundaryNotes = getConditionBoundaryNotes(conditionLock, project.techniques);
   const featuresAvailable = detectedFeatures.length > 0;
   const processingCount = [baseline, xpsBackground, smoothing, normalize, ftirOffset !== 0, ftirSlope !== 0].filter(Boolean).length;
   
@@ -552,8 +563,52 @@ export default function TechniqueWorkspace() {
     }));
   };
 
+  const updateInlineConditionGroup = <
+    Group extends 'synthesisConditions' | 'measurementConditions' | 'processingConditions',
+    Field extends keyof NonNullable<ExperimentConditionLock[Group]>,
+  >(
+    group: Group,
+    field: Field,
+    value: string,
+  ) => {
+    setConditionLock((current) => ({
+      ...current,
+      [group]: {
+        ...(current[group] ?? {}),
+        [field]: value,
+      },
+      userConfirmed: false,
+      lockedAt: undefined,
+      completenessStatus: 'draft',
+    }));
+  };
+
+  const updateInlineValidationCondition = (
+    field: 'replicateRequired' | 'referenceValidationRequired' | 'refinementRequired' | 'publicationClaimAllowed',
+    value: boolean,
+  ) => {
+    setConditionLock((current) => ({
+      ...current,
+      validationConditions: {
+        ...(current.validationConditions ?? { crossTechniqueRequired: [] }),
+        [field]: value,
+      },
+      userConfirmed: false,
+      lockedAt: undefined,
+      completenessStatus: 'draft',
+    }));
+  };
+
+  const handleLockInlineConditions = () => {
+    setConditionLock((current) => lockExperimentConditions(current));
+  };
+
   const handleCreateExperiment = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!conditionLock.userConfirmed) {
+      setFormError('Lock experiment conditions before adding the dataset. Missing condition fields remain condition-limited.');
+      return;
+    }
     const technique = normalizeTechnique(form.technique);
     const labelsForDataset = getTechniqueLabels(technique);
     const dataset = saveDataset({
@@ -592,12 +647,14 @@ export default function TechniqueWorkspace() {
       date: form.date,
       notes: form.notes,
       datasetIds: [dataset.id],
+      conditionLock,
     });
 
     setRefreshKey((key) => key + 1);
     setExperimentOpen(false);
+    setConditionLock(createDraftExperimentConditionLock());
     appendLog(`new experiment added: ${form.experimentTitle}`);
-    showToast('Experiment and dataset added');
+    showToast('Experiment, dataset, and condition record added');
     navigate(getWorkspaceRoute(project, technique, dataset.id));
   };
 
@@ -658,6 +715,9 @@ export default function TechniqueWorkspace() {
                   <div key={experiment.id} className="rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-xs">
                     <span className="font-semibold text-text-main">{experiment.title}</span>
                     <span className="block mt-0.5 text-text-muted">{experiment.technique} - {experiment.fileName}</span>
+                    <span className="block mt-0.5 text-[10px] font-semibold text-amber-600">
+                      {getConditionLockStatusLabel(experiment.conditionLock)}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -706,6 +766,112 @@ export default function TechniqueWorkspace() {
                     className="mt-1 h-16 w-full rounded-md border border-border bg-surface px-2 py-1.5 text-xs text-text-main focus:outline-none focus:border-primary"
                   />
                 </label>
+                <div className="rounded-md border border-amber-500/20 bg-amber-500/5 p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="flex items-center gap-1.5 text-[11px] font-bold text-text-main">
+                        <LockKeyhole size={13} className="text-amber-600" /> Experiment Conditions
+                      </div>
+                      <p className="mt-1 text-[10px] leading-relaxed text-text-muted">
+                        Lock user-provided conditions before interpretation handoff. Missing fields remain condition-limited.
+                      </p>
+                    </div>
+                    <span className="rounded border border-border bg-background px-2 py-0.5 text-[9px] font-semibold text-text-muted">
+                      {getConditionLockStatusLabel(conditionLock)}
+                    </span>
+                  </div>
+                  <div className="mt-3 grid grid-cols-1 gap-2">
+                    {[
+                      {
+                        label: 'Synthesis method',
+                        value: conditionLock.synthesisConditions?.method,
+                        onChange: (value: string) => updateInlineConditionGroup('synthesisConditions', 'method', value),
+                      },
+                      {
+                        label: 'Instrument / source',
+                        value: conditionLock.measurementConditions?.instrument ?? conditionLock.measurementConditions?.radiationOrSource,
+                        onChange: (value: string) => setConditionLock((current) => ({
+                          ...current,
+                          measurementConditions: {
+                            ...(current.measurementConditions ?? {}),
+                            instrument: value,
+                            radiationOrSource: value,
+                          },
+                          userConfirmed: false,
+                          lockedAt: undefined,
+                          completenessStatus: 'draft',
+                        })),
+                      },
+                      {
+                        label: 'Scan range / calibration',
+                        value: conditionLock.measurementConditions?.scanRange ?? conditionLock.measurementConditions?.calibrationReference,
+                        onChange: (value: string) => setConditionLock((current) => ({
+                          ...current,
+                          measurementConditions: {
+                            ...(current.measurementConditions ?? {}),
+                            scanRange: value,
+                            calibrationReference: value,
+                          },
+                          userConfirmed: false,
+                          lockedAt: undefined,
+                          completenessStatus: 'draft',
+                        })),
+                      },
+                      {
+                        label: 'Processing method',
+                        value: conditionLock.processingConditions?.baselineCorrection ?? conditionLock.processingConditions?.normalization ?? conditionLock.processingConditions?.peakDetection,
+                        onChange: (value: string) => setConditionLock((current) => ({
+                          ...current,
+                          processingConditions: {
+                            ...(current.processingConditions ?? {}),
+                            baselineCorrection: value,
+                            normalization: value,
+                            peakDetection: value,
+                          },
+                          userConfirmed: false,
+                          lockedAt: undefined,
+                          completenessStatus: 'draft',
+                        })),
+                      },
+                    ].map((item) => (
+                      <label key={item.label} className="block text-[10px] font-semibold text-text-muted">
+                        {item.label}
+                        <input
+                          value={item.value ?? ''}
+                          onChange={(event) => item.onChange(event.target.value)}
+                          placeholder="user-provided"
+                          className="mt-1 w-full rounded-md border border-border bg-surface px-2 py-1.5 text-[11px] text-text-main placeholder:text-text-muted/60 focus:outline-none focus:border-primary"
+                        />
+                      </label>
+                    ))}
+                  </div>
+                  <div className="mt-3 grid grid-cols-1 gap-1.5">
+                    {[
+                      ['Replicate required', 'replicateRequired'],
+                      ['Reference validation required', 'referenceValidationRequired'],
+                      ['Refinement required', 'refinementRequired'],
+                      ['Publication-level claim allowed after validation', 'publicationClaimAllowed'],
+                    ].map(([label, field]) => (
+                      <label key={field} className="inline-flex items-center gap-2 text-[10px] font-semibold text-text-muted">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(conditionLock.validationConditions?.[field as keyof NonNullable<ExperimentConditionLock['validationConditions']>])}
+                          onChange={(event) => updateInlineValidationCondition(field as 'replicateRequired' | 'referenceValidationRequired' | 'refinementRequired' | 'publicationClaimAllowed', event.target.checked)}
+                          className="h-3 w-3 accent-primary"
+                        />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                  <ul className="mt-3 space-y-1 text-[10px] leading-relaxed text-text-muted">
+                    {conditionBoundaryNotes.slice(0, 3).map((note) => (
+                      <li key={note}>- {note}</li>
+                    ))}
+                  </ul>
+                  <Button type="button" variant="outline" size="sm" onClick={handleLockInlineConditions} className="mt-3 w-full gap-1.5">
+                    <LockKeyhole size={13} /> Lock experiment conditions
+                  </Button>
+                </div>
                 <label className="block text-[11px] font-medium text-text-muted">
                   Fake upload (.txt, .csv, .xy)
                   <input
@@ -717,7 +883,7 @@ export default function TechniqueWorkspace() {
                 </label>
                 {parsedUpload && <p className="text-[11px] text-primary">{parsedUpload.points.length} numeric rows ready from {parsedUpload.fileName}</p>}
                 {formError && <p className="text-[11px] text-amber-600">{formError}</p>}
-                <Button type="submit" size="sm" className="w-full gap-2">
+                <Button type="submit" size="sm" className="w-full gap-2" disabled={!conditionLock.userConfirmed}>
                   <FilePlus2 size={14} /> Add Dataset
                 </Button>
               </form>

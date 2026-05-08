@@ -39,6 +39,11 @@ import {
   type Technique as UploadedTechnique,
   type UploadedSignalRun,
 } from '../data/uploadedSignalRuns';
+import {
+  getConditionBoundaryNotes,
+  getConditionLockStatusLabel,
+  getLatestExperimentConditionLock,
+} from '../data/experimentConditionLock';
 
 // Cross-tech evidence types
 interface CrossTechEvidence {
@@ -707,6 +712,20 @@ export default function MultiTechWorkspace() {
   const [uploadStorageStatus, setUploadStorageStatus] = useState(() => getUploadedSignalStorageStatus());
   const [handoffPrepared, setHandoffPrepared] = useState(false);
   const [uploadFeedback, setUploadFeedback] = useState('');
+  const [uploadPanelExpanded, setUploadPanelExpanded] = useState(false);
+  const experimentConditionLock = useMemo(
+    () => getLatestExperimentConditionLock(project.id),
+    [project.id],
+  );
+  const conditionAvailableTechniques =
+    latestUploadedRun && latestUploadedRun.technique !== 'Unknown'
+      ? [latestUploadedRun.technique]
+      : [];
+  const conditionBoundaryNotes = getConditionBoundaryNotes(
+    experimentConditionLock,
+    conditionAvailableTechniques,
+  );
+  const conditionLockStatus = getConditionLockStatusLabel(experimentConditionLock);
 
   const claimBoundary = CLAIM_BOUNDARY_BY_TECHNIQUE[selectedUploadTechnique];
   const activeUploadQuality = latestUploadedRun?.evidenceQuality ?? uploadErrorQuality;
@@ -741,6 +760,7 @@ export default function MultiTechWorkspace() {
     { label: `Technique: ${selectedUploadTechnique}`, ready: selectedUploadTechnique !== 'Unknown', fallback: 'Technique unknown' },
     { label: 'Columns mapped', ready: mappingReady, fallback: parsedUpload ? 'Mapping required' : 'Pending parse' },
     { label: 'Context locked', ready: Boolean(latestUploadedRun), fallback: contextReady ? 'Ready to lock' : 'Context required' },
+    { label: 'Conditions explicitly tied', ready: false, fallback: 'Conditions not attached' },
     { label: 'Quality assessed', ready: Boolean(latestUploadedRun?.evidenceQuality), fallback: 'Gate pending' },
     { label: 'Handoff preview', ready: handoffPrepared, fallback: latestUploadedRun ? 'Preview available' : 'Pending analysis' },
   ];
@@ -772,6 +792,7 @@ export default function MultiTechWorkspace() {
     }
 
     setUploadedFileName(file.name);
+    setUploadPanelExpanded(true);
 
     try {
       const text = await file.text();
@@ -1086,13 +1107,13 @@ ${result.decision}
 
   return (
     <DashboardLayout>
-      <div className="flex-1 overflow-y-auto bg-background p-3">
+      <div className="flex-1 overflow-y-auto bg-background p-2">
         {/* Header */}
-        <div className="mb-3 rounded-lg border border-border bg-surface px-4 py-3">
-          <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="mb-2 rounded-lg border border-border bg-surface px-3 py-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="min-w-[220px]">
-              <h1 className="text-lg font-bold text-text-main">Cross-Tech Evidence Review</h1>
-              <p className="mt-1 text-[10px] text-text-muted">
+              <h1 className="text-base font-bold text-text-main">Cross-Tech Evidence Review</h1>
+              <p className="mt-0.5 text-[10px] text-text-muted">
                 Compare linked evidence across XRD, Raman, XPS, and FTIR
               </p>
             </div>
@@ -1171,7 +1192,7 @@ ${result.decision}
               </Link>
             </div>
           </div>
-          <div className="mt-3 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2">
+          <div className="mt-2 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1.5">
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-text-muted">
               <span className="font-bold text-emerald-700">Processing Result Ready</span>
               <span>Detected peaks: 9</span>
@@ -1182,52 +1203,64 @@ ${result.decision}
           </div>
         </div>
 
-        <Card id="beta-upload" className="mb-3 overflow-hidden">
-          <div className="border-b border-border bg-surface-hover/40 px-4 py-3">
-            <div className="flex flex-wrap items-start justify-between gap-3">
+        <Card id="beta-upload" className="mb-2 overflow-hidden">
+          <div className={`${uploadPanelExpanded ? 'border-b' : ''} border-border bg-surface-hover/40 px-3 py-2`}>
+            <div className="grid grid-cols-1 items-center gap-2 xl:grid-cols-[260px_minmax(0,1fr)_auto]">
               <div>
                 <div className="flex items-center gap-2">
-                  <h2 className="text-sm font-bold text-text-main">Upload Experimental Signal</h2>
+                  <h2 className="text-sm font-bold text-text-main">Add supporting dataset</h2>
                   <span className="rounded border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
                     Public beta
                   </span>
                 </div>
-                <p className="mt-1 max-w-3xl text-[11px] text-text-muted">
-                  Parse real XRD, XPS, FTIR, Raman, or unknown signal files into a bounded multi-technique evidence workflow.
-                </p>
-                <p className="mt-1 text-[10px] text-text-muted">
-                  Uploaded runs remain separate from bundled CuFe2O4 demo evidence and use only user-confirmed context.
-                </p>
+                <p className="mt-0.5 text-[10px] text-text-muted">Attach another technique, replicate, or validation signal.</p>
               </div>
-              <label className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-white transition-colors hover:bg-primary/90">
-                <Upload size={14} /> Upload experimental signal
-                <input
-                  type="file"
-                  accept=".csv,.txt,.xy,.dat,text/csv,text/plain"
-                  className="sr-only"
-                  onChange={handleUploadFileChange}
-                />
-              </label>
-            </div>
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {uploadWorkflowStatuses.map((item) => (
-                <span
-                  key={item.label}
-                  className={`rounded border px-2 py-1 text-[10px] font-semibold ${
-                    item.ready
-                      ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700'
-                      : 'border-border bg-background text-text-muted'
-                  }`}
+              <div className="flex flex-wrap gap-1.5">
+                {uploadWorkflowStatuses.map((item) => (
+                  <span
+                    key={item.label}
+                    className={`rounded border px-2 py-1 text-[10px] font-semibold ${
+                      item.ready
+                        ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700'
+                        : 'border-border bg-background text-text-muted'
+                    }`}
+                  >
+                    {item.ready ? item.label : item.fallback}
+                  </span>
+                ))}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-white transition-colors hover:bg-primary/90">
+                  <Upload size={14} /> Upload action
+                  <input
+                    type="file"
+                    accept=".csv,.txt,.xy,.dat,text/csv,text/plain"
+                    className="sr-only"
+                    onChange={handleUploadFileChange}
+                  />
+                </label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1.5"
+                  onClick={() => setUploadPanelExpanded((expanded) => !expanded)}
                 >
-                  {item.ready ? item.label : item.fallback}
-                </span>
-              ))}
+                  {uploadPanelExpanded ? 'Hide upload details' : 'Show upload details'}
+                </Button>
+              </div>
             </div>
             {(!uploadStorageStatus.available || uploadStorageStatus.corrupted) && (
               <p className="mt-2 text-[10px] text-amber-700">{uploadStorageStatus.message}</p>
             )}
+            <div className="mt-1.5 rounded border border-border bg-background/80 px-2 py-1.5 text-[10px] leading-relaxed text-text-muted">
+              <span className="font-semibold text-text-main">Experiment condition lock: {conditionLockStatus}.</span>{' '}
+              Supporting uploads do not inherit synthesis, measurement, processing, or validation conditions unless
+              explicitly tied to the current experiment record.
+            </div>
           </div>
 
+          {uploadPanelExpanded && (
           <div className="grid grid-cols-1 gap-3 p-3 xl:grid-cols-[320px_1fr]">
             <div className="space-y-3">
               <div className="rounded-lg border border-border bg-background p-3">
@@ -1336,6 +1369,14 @@ ${result.decision}
                 <p>User-confirmed context is treated as a locked scientific constraint.</p>
                 <p>DIFARYX may test analytical paths, but source context remains unchanged.</p>
                 <p>Suggested changes require explicit user action.</p>
+              </div>
+              <div className="rounded border border-border bg-background p-2 text-[10px] leading-relaxed text-text-muted">
+                <div className="font-semibold text-text-main">Experiment condition awareness</div>
+                <p className="mt-1">{conditionLockStatus}</p>
+                <p className="mt-1">
+                  Upload-derived signal evidence remains separate until the user explicitly ties it to the current
+                  experiment condition record.
+                </p>
               </div>
             </div>
 
@@ -1555,6 +1596,17 @@ ${result.decision}
                       ))}
                     </ul>
                   </div>
+                  <div className="mt-3">
+                    <div className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">Condition boundary</div>
+                    <ul className="mt-2 space-y-1 text-[10px] leading-relaxed text-text-muted">
+                      {conditionBoundaryNotes.slice(0, 3).map((item) => (
+                        <li key={item} className="flex gap-1.5">
+                          <span className="text-primary">-</span>
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <Button
                       type="button"
@@ -1595,6 +1647,7 @@ ${result.decision}
                           ['Sample identity', latestUploadedRun.sampleIdentity],
                           ['Evidence quality', latestUploadedRun.evidenceQuality.label],
                           ['Locked source context', 'Source context was preserved during analysis.'],
+                          ['Experiment conditions', `${conditionLockStatus}; explicit attachment required for uploaded runs.`],
                           ['Beta limitation', 'Uploaded-data interpretation is beta-limited and bounded by current evidence coverage.'],
                         ].map(([label, value]) => (
                           <div key={label} className="rounded border border-border bg-background p-2">
@@ -1613,7 +1666,9 @@ ${result.decision}
                       </div>
                       <div className="mt-3 rounded border border-amber-500/30 bg-amber-500/5 p-2">
                         <div className="text-[9px] font-semibold uppercase tracking-wider text-amber-700">Claim boundary</div>
-                        <div className="mt-1 text-xs leading-relaxed text-text-main">{latestUploadedRun.claimBoundary.join(' ')}</div>
+                        <div className="mt-1 text-xs leading-relaxed text-text-main">
+                          {[...latestUploadedRun.claimBoundary, ...conditionBoundaryNotes.slice(0, 2)].join(' ')}
+                        </div>
                       </div>
                     </div>
                     <div className="rounded border border-border bg-surface p-3">
@@ -1629,6 +1684,7 @@ ${result.decision}
                         <li>Locked context: {latestUploadedRun.lockedContext.referenceScope}</li>
                         <li>Features: {latestUploadedRun.extractedFeatures.length}</li>
                         <li>Evidence gate: {latestUploadedRun.evidenceQuality.label}</li>
+                        <li>Experiment conditions: {conditionLockStatus}</li>
                         <li>Limitations retained for report/export review.</li>
                       </ul>
                       <Link to={`/notebook?project=${project.id}&source=uploaded-beta&template=analytical`}>
@@ -1695,13 +1751,14 @@ ${result.decision}
               </div>
             </div>
           </div>
+          )}
         </Card>
 
         {/* Main 2-column layout: Left (2x2 graphs) | Right (vertical sections) */}
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_380px]">
+        <div className="grid grid-cols-1 gap-2 lg:grid-cols-[minmax(0,1fr)_360px]">
           {/* Left Panel: 2x2 synchronized evidence grid */}
-          <div className="space-y-3">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="space-y-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {(['XRD', 'Raman', 'XPS', 'FTIR'] as Technique[]).map((technique) => {
                 const techniqueDatasets = getDatasetsByTechnique(project.id, technique);
                 const dataset = techniqueDatasets[0];
@@ -1710,7 +1767,7 @@ ${result.decision}
 
                 return (
                   <Card key={technique} className={`overflow-hidden transition-opacity ${!isActive ? 'opacity-40' : ''}`}>
-                    <div className="border-b border-border bg-surface-hover/40 p-2">
+                    <div className="border-b border-border bg-surface-hover/40 px-2 py-1.5">
                       <div className="flex items-center justify-between">
                         <h2 className="text-xs font-bold text-text-main">{technique}</h2>
                         <Link to={getWorkspaceRoute(project, technique, dataset?.id)}>
@@ -1721,8 +1778,8 @@ ${result.decision}
                       </div>
                     </div>
                     {isActive && (
-                      <div className="p-2">
-                        <div className="h-32 rounded-md border border-border bg-background p-1">
+                      <div className="p-1.5">
+                        <div className="h-24 rounded-md border border-border bg-background p-1">
                           <Graph
                             type={technique.toLowerCase() as 'xrd' | 'xps' | 'ftir' | 'raman'}
                             height="100%"
@@ -1739,7 +1796,7 @@ ${result.decision}
                         </div>
                         
                         {/* Evidence items for this technique */}
-                        <div className="mt-2 space-y-1">
+                        <div className="mt-1 max-h-14 space-y-1 overflow-y-auto">
                           {techniqueEvidence.map((evidence) => {
                             const isHighlighted = isEvidenceHighlighted(evidence.id);
                             const isSelected = selectedEvidenceId === evidence.id;
@@ -1751,7 +1808,7 @@ ${result.decision}
                                 onClick={() => handleEvidenceClick(evidence.id)}
                                 onMouseEnter={() => handleEvidenceHover(evidence.id)}
                                 onMouseLeave={() => handleEvidenceHover(null)}
-                                className={`cursor-pointer rounded-md border p-1.5 text-[10px] transition-all ${
+                                className={`cursor-pointer rounded-md border px-1.5 py-1 text-[9px] leading-snug transition-all ${
                                   isSelected
                                     ? 'border-primary bg-primary/10 text-primary font-semibold shadow-md'
                                     : isLinkedToClaim

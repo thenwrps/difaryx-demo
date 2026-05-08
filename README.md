@@ -1,6 +1,6 @@
 # DIFARYX
 
-DIFARYX turns experimental characterization signals into evidence-linked scientific reasoning, bounded decisions, and report-ready outputs. The current repository is a deterministic frontend demo for materials characterization workflows, with an XRD workspace, a multi-technique workspace, Agent Mode, Notebook Lab, History, Settings, and a public-beta uploaded-signal workflow for XRD, XPS, FTIR, and Raman.
+DIFARYX turns experimental characterization signals into evidence-linked scientific reasoning, bounded decisions, and report-ready outputs. The current repository is a deterministic frontend demo for materials characterization workflows, with an XRD workspace, a multi-technique workspace, Agent Mode, Notebook Lab, History, Settings, New Experiment condition locking, and a public-beta uploaded-signal workflow for XRD, XPS, FTIR, and Raman.
 
 ## Why This Matters
 
@@ -24,6 +24,10 @@ Current internal handoff model:
 
 `ProcessingResult -> AgentDiscussionRefinement -> NotebookEntry -> ReportSection`
 
+New Experiment records add a reproducibility layer before interpretation handoff:
+
+`Locked Scientific Context + Experiment Condition Lock -> Evidence Quality Gate -> Claim Boundary -> Notebook / Report`
+
 The current demo uses local deterministic logic for processing, reasoning states, notebook previews, and report handoff. The literature and validation stage is represented as bounded workflow language and validation-pending claim boundaries; live literature retrieval and backend validation services are future integration points.
 
 ## Current Demo Routes
@@ -31,10 +35,10 @@ The current demo uses local deterministic logic for processing, reasoning states
 | Route | What reviewers should see |
 | --- | --- |
 | `/` | Public DIFARYX concept page and workflow story. |
-| `/dashboard` | Product overview with demo projects, readiness, graph previews, and agent entry points. |
+| `/dashboard` | Product overview with demo projects, readiness, graph previews, agent entry points, and New Experiment creation. |
 | `/workspace` | Workspace entry surface that routes reviewers into technique review. |
 | `/workspace/xrd` | XRD graph review, processing controls, feature detection, evidence saving, and exports. |
-| `/workspace/multi` | Multi-technique evidence hub and public-beta uploaded-signal workflow. |
+| `/workspace/multi` | Multi-technique evidence hub, public-beta uploaded-signal workflow, and condition-lock handoff framing. |
 | `/demo/agent` | Deterministic Agent Mode with goal, graph, execution log, evidence, reasoning, and decision. |
 | `/notebook` | Notebook Lab with evidence summary, caveats, provenance, and report/export preview. |
 | `/history` | Deterministic run history and workspace provenance. |
@@ -67,6 +71,27 @@ The upload beta accepts comma, tab, semicolon, and whitespace-delimited numeric 
 
 Uploaded runs are stored only in the browser under `difaryx.uploadedSignalRuns.v1` when localStorage is available. Stored runs are capped and compacted for demo safety. If browser storage is unavailable or contains malformed saved data, the upload workflow remains usable in memory.
 
+Supporting uploads do not silently inherit synthesis, measurement, processing, or validation conditions. If an uploaded run is tied to a current experiment, DIFARYX shows the available condition lock and keeps the condition boundary visible in the handoff preview.
+
+## Experiment Condition Lock
+
+The New Experiment flow now treats experiment conditions as a first-class locked record. Users can enter and lock:
+
+- Sample preparation conditions: synthesis method, precursor ratio, solvent, pH, temperature/time, calcination temperature/time, atmosphere, and post-treatment.
+- Measurement conditions: instrument, radiation/source, scan range, step size, scan rate, calibration reference, and acquisition mode.
+- Processing conditions: baseline correction, smoothing, normalization, peak detection, fitting model, and reference database.
+- Validation conditions: replicate requirement, reference validation requirement, cross-technique validation, refinement requirement, and whether publication-level claims are allowed after validation.
+
+When the user clicks `Lock experiment conditions`, DIFARYX stores a local timestamped condition record with the experiment. Missing non-critical fields are preserved as incomplete rather than erased or inferred. The condition record then appears in Dashboard local experiment cards, `/workspace/multi` upload framing, Agent Mode claim-boundary context, Notebook Lab, and Notebook export previews.
+
+Condition lock effects are intentionally conservative:
+
+- Incomplete measurement conditions mark interpretation as measurement-limited.
+- Incomplete processing conditions mark output as method-limited.
+- Missing or restrictive validation conditions block publication-level claims.
+- Refinement requirements block phase-purity claims until refinement evidence is attached.
+- Required cross-technique evidence, such as XPS, blocks the corresponding surface or oxidation-state validation claim until that evidence is attached.
+
 ## Technique-Specific Claim Boundaries
 
 | Technique | Evidence role | Boundary |
@@ -82,8 +107,10 @@ Uploaded runs are stored only in the browser under `difaryx.uploadedSignalRuns.v
 - Uploaded runs remain separate from bundled CuFe2O4 demo evidence.
 - Sample identity is not inferred without user-confirmed context.
 - User-confirmed source context is treated as a locked scientific constraint.
+- User-confirmed experiment conditions are treated as locked reproducibility constraints.
 - Evidence quality gates run before interpretation handoff.
 - Claim boundaries are generated before Notebook / Report preview.
+- Condition boundaries are shown before Notebook / Report preview when an experiment condition record is available or pending.
 - Unsupported or weak uploads produce a bounded blocked state instead of material-specific interpretation.
 - Output language favors bounded terms such as "supports", "is consistent with", "requires validation", "evidence-limited", "context-confirmed", "reference validation pending", and "cannot establish".
 
@@ -97,6 +124,7 @@ Notebook and report surfaces receive structured, bounded context rather than raw
 - Technique
 - Sample identity
 - Locked context
+- Experiment condition status
 - Extracted features
 - Evidence quality
 - Claim boundary

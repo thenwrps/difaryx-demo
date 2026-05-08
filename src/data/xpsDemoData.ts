@@ -257,10 +257,108 @@ export const c1sDemoData: XpsDataset = {
   ],
 };
 
+function generateCoFe2pSpectrum(): { bindingEnergy: number[]; intensity: number[] } {
+  const bindingEnergy: number[] = [];
+  const intensity: number[] = [];
+
+  for (let be = 810; be >= 700; be -= 0.2) {
+    const rounded = Number(be.toFixed(1));
+    bindingEnergy.push(rounded);
+
+    let signal = 980 + 120 * Math.exp(-(810 - be) / 95) + 22 * Math.sin(be * 0.17);
+    signal += 6200 * Math.exp(-Math.pow((be - 780.1) / 1.7, 2));
+    signal += 4200 * Math.exp(-Math.pow((be - 795.6) / 1.9, 2));
+    signal += 5600 * Math.exp(-Math.pow((be - 710.8) / 1.6, 2));
+    signal += 3600 * Math.exp(-Math.pow((be - 724.4) / 1.8, 2));
+    signal += 700 * Math.exp(-Math.pow((be - 786.0) / 2.8, 2));
+
+    intensity.push(Math.round(signal));
+  }
+
+  return { bindingEnergy, intensity };
+}
+
+const coFe2pSpectrum = generateCoFe2pSpectrum();
+const coFe2pBaseline = generateBaseline(coFe2pSpectrum.intensity);
+
+export const cofe2o4XpsDemoData: XpsDataset = {
+  id: 'cofe2o4-xps-demo-001',
+  label: 'CoFe2O4 Co/Fe 2p regions',
+  region: 'Co 2p + Fe 2p',
+  sampleName: 'CoFe2O4 control sample',
+  fileName: 'cofe2o4_surface_xps.xy',
+
+  signal: coFe2pSpectrum,
+  baseline: coFe2pBaseline,
+
+  peaks: [
+    {
+      id: 'co-peak-1',
+      bindingEnergy: 780.1,
+      intensity: 6200,
+      fwhm: 1.7,
+      area: 11800,
+      assignment: 'Co 2p3/2',
+    },
+    {
+      id: 'co-peak-2',
+      bindingEnergy: 795.6,
+      intensity: 4200,
+      fwhm: 1.9,
+      area: 8200,
+      assignment: 'Co 2p1/2',
+    },
+    {
+      id: 'fe-peak-1',
+      bindingEnergy: 710.8,
+      intensity: 5600,
+      fwhm: 1.6,
+      area: 9800,
+      assignment: 'Fe 2p3/2',
+    },
+    {
+      id: 'fe-peak-2',
+      bindingEnergy: 724.4,
+      intensity: 3600,
+      fwhm: 1.8,
+      area: 6500,
+      assignment: 'Fe 2p1/2',
+    },
+  ],
+
+  matches: [
+    {
+      peakId: 'co-peak-1',
+      observedBE: 780.1,
+      referenceBE: 780.0,
+      deltaBE: 0.1,
+      element: 'Co',
+      oxidationState: 'Co(II/III)',
+      assignment: 'Co 2p3/2 surface-state envelope',
+      confidence: 0.86,
+    },
+    {
+      peakId: 'fe-peak-1',
+      observedBE: 710.8,
+      referenceBE: 710.8,
+      deltaBE: 0.0,
+      element: 'Fe',
+      oxidationState: 'Fe(III)',
+      assignment: 'Fe 2p3/2 ferrite-like envelope',
+      confidence: 0.9,
+    },
+  ],
+};
+
 /**
  * Export all demo datasets
  */
-export const XPS_DEMO_DATASETS = [xpsDemoData, c1sDemoData];
+export const XPS_DEMO_DATASETS = [xpsDemoData, c1sDemoData, cofe2o4XpsDemoData];
+
+export function getXpsProjectDatasetId(projectId?: string | null): string | null {
+  if (projectId === 'cofe2o4') return cofe2o4XpsDemoData.id;
+  return null;
+}
 
 /**
  * Helper function to get demo dataset by ID

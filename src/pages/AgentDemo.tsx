@@ -55,6 +55,10 @@ import { MainHeader } from '../components/agent-demo/MainHeader';
 import { CenterColumn } from '../components/agent-demo/CenterColumn';
 import { RightPanel } from '../components/agent-demo/RightPanel';
 import { evaluate as evaluateFusionEngine, createEvidenceNodes, type EvidenceNode, type FusionResult, type PeakInput } from '../engines/fusionEngine';
+import {
+  getConditionLockStatusLabel,
+  getLatestExperimentConditionLock,
+} from '../data/experimentConditionLock';
 
 type AgentContext = Technique;
 type ModelMode = 'deterministic' | 'vertex-gemini' | 'gemma';
@@ -179,7 +183,7 @@ const CONTEXT_CONFIG: Record<
         toolName: 'load_xrd_dataset',
         displayName: 'Load XRD Dataset',
         inputSummary: '2theta-intensity spectrum',
-        outputSummary: 'Spectrum loaded and validated',
+        outputSummary: 'Spectrum loaded and checked',
         durationMs: 560,
       },
       {
@@ -908,6 +912,10 @@ export default function AgentDemo() {
   );
   const selectedDataset = selectedOption.dataset;
   const selectedProject = selectedOption.project;
+  const experimentConditionLock = getLatestExperimentConditionLock(selectedProject.id);
+  const experimentConditionLabel = experimentConditionLock?.userConfirmed
+    ? getConditionLockStatusLabel(experimentConditionLock)
+    : 'Not locked';
   const contextConfig = CONTEXT_CONFIG[agentState.context];
   const stages = contextConfig.stages;
   const xrdAnalysis = useMemo(
@@ -1349,7 +1357,7 @@ export default function AgentDemo() {
 
       {/* Second Row: Control Bar */}
       <div className="shrink-0 border-b border-white/[0.08] bg-[#0A0F1A] px-4 py-2">
-        <div className="grid gap-2 min-[780px]:grid-cols-2 min-[1180px]:grid-cols-[180px_minmax(260px,1fr)_170px_205px_170px]">
+        <div className="grid gap-2 min-[780px]:grid-cols-2 min-[1180px]:grid-cols-[170px_minmax(250px,1fr)_160px_220px_185px_170px]">
           <label className="relative flex h-[32px] w-full min-w-0 items-center overflow-hidden rounded-lg border border-slate-800 bg-[#070B12] px-2.5 transition-colors focus-within:border-cyan-400/50">
             <select
               value={agentState.context}
@@ -1418,6 +1426,11 @@ export default function AgentDemo() {
             </span>
           </label>
 
+          <div className="flex h-[32px] w-full min-w-0 items-center gap-2 rounded-lg border border-amber-400/25 bg-amber-400/5 px-2.5 text-[10px] font-semibold uppercase tracking-wider text-amber-200">
+            <span className="shrink-0 text-amber-300">Conditions:</span>
+            <span className="truncate text-amber-100">{experimentConditionLabel}</span>
+          </div>
+
           <div className="flex h-[32px] w-full min-w-0 items-center gap-2 rounded-lg border border-slate-800 bg-[#070B12] px-2">
             <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-slate-500">Run:</span>
             <div className="grid h-6 min-w-0 flex-1 grid-cols-2 rounded-lg bg-[#050812] p-0.5">
@@ -1442,8 +1455,8 @@ export default function AgentDemo() {
               {agentState.reasoningState.status === 'running'
                 ? 'Reasoning trace active'
                 : currentResult
-                  ? 'Report-ready discussion'
-                  : 'Ready'}
+                  ? 'Discussion ready with validation requirements'
+                  : 'Ready with validation requirements'}
             </span>
           </div>
         </div>
@@ -1572,9 +1585,9 @@ export default function AgentDemo() {
             xrdAnalysis?.candidates.slice(0, 3).map((candidate, index) => ({
               phase: candidate.phase.name,
               peakAlignment: index === 0 ? '0.12° ≤ 0.20°' : index === 1 ? '0.28° > 0.20°' : '0.31° > 0.20°',
-              structuralFit: index === 0 ? 'consistent' : 'partial',
+              structuralFit: index === 0 ? 'supported' : 'partial',
               completeness: (candidate.matches.length / candidate.phase.peaks.length).toFixed(2),
-              evaluation: index === 0 ? 'Ready' : 'In Progress',
+              evaluation: index === 0 ? 'Requires validation' : 'In Progress',
               result: index === 0 ? 'Match' : 'Rejected',
               reason: index === 1 ? 'missing peak 35.7°' : index === 2 ? 'intensity mismatch' : undefined,
             }))

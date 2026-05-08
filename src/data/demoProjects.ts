@@ -1,3 +1,5 @@
+import type { ExperimentConditionLock } from './experimentConditionLock';
+
 export type Technique = 'XRD' | 'XPS' | 'FTIR' | 'Raman';
 
 export interface DemoPeak {
@@ -129,6 +131,7 @@ export interface DemoExperiment {
   date: string;
   notes: string;
   datasetIds: string[];
+  conditionLock?: ExperimentConditionLock;
 }
 
 export interface ProcessingRun {
@@ -260,7 +263,7 @@ export const demoProjects: DemoProject[] = [
     evidence: [
       'XRD reflections assigned to CuFe₂O₄ remain visible in the supported CuFe₂O₄/SBA-15 sample.',
       'Raman vibrational modes provide supporting evidence for ferrite-like local structure.',
-      'FTIR silica/support features contextualize the SBA-15 matrix but do not independently prove ferrite phase purity.',
+      'FTIR silica/support features contextualize the SBA-15 matrix but do not independently establish ferrite phase purity.',
     ],
     recommendations: [
       'Quantify Cu/Fe ratio from XPS survey scan.',

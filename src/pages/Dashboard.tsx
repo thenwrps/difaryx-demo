@@ -9,18 +9,25 @@ import { ExperimentModal } from '../components/workspace/ExperimentModal';
 import {
   DEFAULT_PROJECT_ID,
   DemoExperiment,
+  Technique,
   demoProjects,
   getAgentPath,
   getDefaultTechnique,
+  getTechniqueLabels,
   getLocalExperiments,
   getNotebookPath,
   getProject,
+  makeTechniquePattern,
 } from '../data/demoProjects';
 import {
   XRD_DEMO_DATASETS,
   getXrdProjectCompatibility,
   isDatasetCompatibleWithProject,
 } from '../data/xrdDemoDatasets';
+import {
+  getConditionBoundaryNotes,
+  getConditionLockStatusLabel,
+} from '../data/experimentConditionLock';
 import { formatChemicalFormula } from '../utils';
 
 const PRODUCT_WORKFLOW_STEPS = [
@@ -48,13 +55,23 @@ function hasMatchedXrdDemoData(projectId: string): boolean {
   ));
 }
 
+const DASHBOARD_SPECTRA_PREVIEWS: Partial<Record<string, Technique[]>> = {
+  nife2o4: ['XRD'],
+  cofe2o4: ['XRD', 'XPS'],
+  'fe3o4-nanoparticles': ['FTIR', 'Raman'],
+};
+
+function getDashboardSpectraPreviews(projectId: string): Technique[] {
+  return DASHBOARD_SPECTRA_PREVIEWS[projectId] ?? [];
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const [feedback, setFeedback] = useState('');
   const [localExperiments, setLocalExperiments] = useState<DemoExperiment[]>([]);
   const [experimentModalOpen, setExperimentModalOpen] = useState(false);
   const [experimentProjectId, setExperimentProjectId] = useState(DEFAULT_PROJECT_ID);
-  const [selectedTechniques, setSelectedTechniques] = useState<Record<string, string>>({});
+  const [selectedTechniques, setSelectedTechniques] = useState<Record<string, Technique>>({});
 
   useEffect(() => {
     setLocalExperiments(getLocalExperiments());
@@ -110,21 +127,34 @@ export default function Dashboard() {
           {demoProjects.map((project) => {
             const currentTechnique = selectedTechniques[project.id] || project.techniques[0];
             const hasXrdDemoData = hasMatchedXrdDemoData(project.id);
+            const spectraPreviews = getDashboardSpectraPreviews(project.id);
+            const hasSpectraPreview = !hasXrdDemoData && spectraPreviews.length > 0;
+            const hasDashboardEvidence = hasXrdDemoData || hasSpectraPreview;
+            const graphData = hasSpectraPreview
+              ? makeTechniquePattern(project, currentTechnique)
+              : undefined;
+            const graphLabels = getTechniqueLabels(currentTechnique);
             const dashboardStatus = hasXrdDemoData
               ? formatDashboardClaimStatus(project.claimStatus)
-              : 'No matched dataset';
+              : hasSpectraPreview
+                ? formatDashboardClaimStatus(project.claimStatus)
+                : 'No matched dataset';
             const dashboardSummary = hasXrdDemoData
               ? project.summary
-              : 'No processed XRD result linked to this project.';
+              : hasSpectraPreview
+                ? project.summary
+                : 'No processed XRD result linked to this project.';
             const dashboardBadges = hasXrdDemoData
               ? ['Research Mode', 'Publication-limited', 'Validation required']
-              : ['Research Mode', 'Requires dataset', 'Validation pending'];
+              : hasSpectraPreview
+                ? ['Research Mode', 'Publication-limited', 'Validation required']
+                : ['Research Mode', 'Requires dataset', 'Validation pending'];
             
             return (
             <Card 
               key={project.id} 
               className="cursor-pointer hover:border-primary/50 transition-colors group flex flex-col h-full"
-              onClick={() => navigate(hasXrdDemoData ? `/workspace?project=${project.id}` : `/workspace/xrd?project=${project.id}`)}
+              onClick={() => navigate(hasDashboardEvidence ? `/workspace?project=${project.id}` : `/workspace/xrd?project=${project.id}`)}
             >
               <div className="p-4 border-b border-border bg-surface-hover/30 flex justify-between items-start">
                 <div>
@@ -135,7 +165,7 @@ export default function Dashboard() {
                 </div>
                 <div className="text-right">
                   <div className={`text-sm font-bold ${
-                    !hasXrdDemoData ? 'text-amber-600' :
+                    !hasDashboardEvidence ? 'text-amber-600' :
                     project.claimStatus === 'strongly_supported' ? 'text-emerald-600' :
                     project.claimStatus === 'supported' ? 'text-cyan' :
                     project.claimStatus === 'partial' ? 'text-amber-500' :
@@ -150,6 +180,18 @@ export default function Dashboard() {
                 <div className="h-[180px] mb-3">
                   {hasXrdDemoData ? (
                     <Graph type={currentTechnique.toLowerCase() as any} height="100%" showBackground={false} showCalculated={false} showResidual={false} showLegend={false} />
+                  ) : hasSpectraPreview ? (
+                    <Graph
+                      type={currentTechnique.toLowerCase() as any}
+                      height="100%"
+                      showBackground={false}
+                      showCalculated={false}
+                      showResidual={false}
+                      showLegend={false}
+                      externalData={graphData}
+                      xAxisLabel={graphLabels.xLabel}
+                      yAxisLabel={graphLabels.yLabel}
+                    />
                   ) : (
                     <div className="flex h-full flex-col items-center justify-center rounded-md border border-dashed border-amber-500/30 bg-amber-500/5 px-4 text-center">
                       <AlertTriangle size={18} className="mb-2 text-amber-600" />
@@ -183,7 +225,7 @@ export default function Dashboard() {
                         </button>
                       ))}
                     </div>
-                    {!hasXrdDemoData ? (
+                    {!hasDashboardEvidence ? (
                       <span className="text-xs text-amber-600 flex items-center gap-1">
                         <AlertTriangle size={12} /> Requires dataset
                       </span>
@@ -205,7 +247,7 @@ export default function Dashboard() {
                       ))}
                     </div>
                     <div className="text-[10px] font-medium text-text-dim tracking-wide">
-                      {hasXrdDemoData ? (
+                      {hasDashboardEvidence ? (
                         <>
                           Processing <span className="text-primary/60">-&gt;</span> Refinement <span className="text-primary/60">-&gt;</span> Notebook
                         </>
@@ -218,7 +260,7 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <div className="mt-auto pt-4 grid grid-cols-4 gap-1.5 border-t border-border min-h-[52px]">
-                  {hasXrdDemoData ? (
+                  {hasDashboardEvidence ? (
                     <>
                       <Link
                         to={`/workspace/${currentTechnique.toLowerCase()}?project=${project.id}`}
@@ -301,6 +343,8 @@ export default function Dashboard() {
             const workspaceTechnique = project.techniques.includes(experiment.technique)
               ? experiment.technique
               : getDefaultTechnique(project);
+            const conditionStatus = getConditionLockStatusLabel(experiment.conditionLock);
+            const conditionBoundary = getConditionBoundaryNotes(experiment.conditionLock, project.techniques)[0];
 
             return (
               <Card
@@ -336,9 +380,12 @@ export default function Dashboard() {
                   </div>
                   <div className="mt-3 space-y-1.5">
                     <div className="flex flex-wrap gap-1.5 text-[10px]">
-                      {['Research Mode', 'Publication-limited', 'Validation required'].map((badge) => (
+                      {['Research Mode', conditionStatus, 'Validation required'].map((badge) => (
                         <span key={badge} className="rounded-full border border-border bg-background px-2 py-0.5 font-medium text-text-muted">{badge}</span>
                       ))}
+                    </div>
+                    <div className="line-clamp-2 text-[10px] text-text-dim">
+                      {conditionBoundary}
                     </div>
                     <div className="text-[10px] font-medium text-text-dim tracking-wide">
                       Processing <span className="text-primary/60">-&gt;</span> Refinement <span className="text-primary/60">-&gt;</span> Notebook
@@ -361,7 +408,7 @@ export default function Dashboard() {
                       Review
                     </Link>
                     <Link
-                      to={getNotebookPath(project)}
+                      to={`${getNotebookPath(project)}&experiment=${experiment.id}`}
                       onClick={(event) => event.stopPropagation()}
                       className="inline-flex h-8 items-center justify-center rounded-md border border-border px-2 text-xs font-medium text-text-muted hover:bg-surface-hover hover:text-text-main transition-colors whitespace-nowrap"
                     >
@@ -393,7 +440,7 @@ export default function Dashboard() {
       onClose={() => setExperimentModalOpen(false)}
       onCreated={() => {
         setLocalExperiments(getLocalExperiments());
-        setFeedback('Experiment and dataset added');
+        setFeedback('Experiment, dataset, and condition record added');
         window.setTimeout(() => setFeedback(''), 1800);
       }}
     />

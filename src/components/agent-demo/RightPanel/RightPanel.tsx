@@ -8,6 +8,12 @@ import { SampleContextCard } from '../../demo/SampleContextCard';
 import { ExecutionStepItem } from '../CenterColumn/ExecutionStepItem';
 import { LockedScientificContext } from '../../locked-context/LockedScientificContext';
 import { getLockedContext } from '../../../data/lockedContext';
+import {
+  type ExperimentConditionLock,
+  getConditionBoundaryNotes,
+  getConditionLockStatusLabel,
+  getLatestExperimentConditionLock,
+} from '../../../data/experimentConditionLock';
 
 // Inline chemical formula utility
 function formatChemicalFormula(input: string): React.ReactNode {
@@ -144,11 +150,11 @@ function getScientificSummary(technique: string) {
           },
           {
             label: 'Evidence',
-            content: 'Fe-O stretching frequency ratio ν₁/ν₂ = 1.39 consistent with inverse spinel. Cu²⁺-O band at 610 cm⁻¹ confirms copper incorporation in octahedral sites. No CuO signature at 530 cm⁻¹.',
+            content: 'Fe-O stretching frequency ratio ν₁/ν₂ = 1.39 is consistent with inverse spinel context. Cu²⁺-O band at 610 cm⁻¹ supports copper incorporation in octahedral sites. No dominant CuO signature is observed at 530 cm⁻¹.',
           },
           {
             label: 'Interpretation',
-            content: 'Cation distribution Cu₀.₂Fe₀.₈[Cu₀.₈Fe₁.₂]O₄ supported by vibrational analysis. Surface hydroxyl groups (3400 cm⁻¹) suggest active catalytic sites. Support interaction preserved.',
+            content: 'Cation-distribution interpretation remains validation-limited. Surface hydroxyl groups (3400 cm⁻¹) suggest possible catalytic-site context. Support interaction requires review.',
           },
         ],
         claimStatus: 'supported',
@@ -163,7 +169,7 @@ function getScientificSummary(technique: string) {
           },
           {
             label: 'Evidence',
-            content: 'A₁g symmetric breathing mode at 690 cm⁻¹ (vs. 670 cm⁻¹ for Fe₃O₄) indicates Cu substitution effect. T₂g mode splitting (Δν = 145 cm⁻¹) confirms octahedral site distortion from Jahn-Teller Cu²⁺.',
+            content: 'A₁g symmetric breathing mode at 690 cm⁻¹ (vs. 670 cm⁻¹ for Fe₃O₄) indicates possible Cu substitution effect. T₂g mode splitting (Δν = 145 cm⁻¹) supports octahedral site distortion from Jahn-Teller Cu²⁺.',
           },
           {
             label: 'Interpretation',
@@ -178,7 +184,7 @@ function getScientificSummary(technique: string) {
         blocks: [
           {
             label: 'Oxidation States',
-            content: 'Cu 2p₃/₂ at 933.8 eV with satellite at 942 eV confirms Cu²⁺. Fe 2p₃/₂ shows mixed Fe³⁺ (711.2 eV) and Fe²⁺ (709.4 eV) with 3:1 ratio. O 1s deconvolution reveals lattice oxygen (530.1 eV) and surface hydroxyl (531.8 eV).',
+            content: 'Cu 2p₃/₂ at 933.8 eV with satellite at 942 eV supports Cu²⁺ surface context. Fe 2p₃/₂ suggests mixed Fe³⁺ (711.2 eV) and Fe²⁺ (709.4 eV) with 3:1 ratio. O 1s deconvolution suggests lattice oxygen (530.1 eV) and surface hydroxyl (531.8 eV).',
           },
           {
             label: 'Evidence',
@@ -186,7 +192,7 @@ function getScientificSummary(technique: string) {
           },
           {
             label: 'Interpretation',
-            content: 'Surface composition Cu₁.₃Fe₁.₇O₄ vs. bulk CuFe₂O₄ suggests reconstruction. Absence of metallic Cu (932.5 eV) confirms oxide stability. Hydroxyl coverage θ_OH = 0.4 ML indicates hydrated surface for catalysis.',
+            content: 'Surface composition Cu₁.₃Fe₁.₇O₄ vs. bulk CuFe₂O₄ suggests possible reconstruction. Absence of metallic Cu (932.5 eV) supports oxide-stability context. Hydroxyl coverage θ_OH = 0.4 ML indicates hydrated surface context for catalysis.',
           },
         ],
         claimStatus: 'supported',
@@ -561,8 +567,8 @@ function getLiteratureEvidence(technique: string, projectName?: string): Literat
         source: 'Journal of Catalysis',
         relevance: 'Supporting literature relation',
         keyEvidence: 'XRD shows CuFe₂O₄ lattice parameter a = 8.37 Å on SBA-15 support (vs. 8.39 Å bulk). XPS Cu 2p₃/₂ at 933.9 eV with surface Cu/Fe = 0.78 (vs. bulk 0.50). FTIR Si-O-Si band at 1048 cm⁻¹ indicates support interaction. Spinel (311) peak preserved after loading.',
-        consistencyCheck: 'Our a = 8.38 Å intermediate between their supported (8.37 Å) and bulk values, consistent with partial support interaction. Our Cu/Fe = 0.76 matches their surface enrichment trend. Our FTIR shoulder at 1050 cm⁻¹ confirms Si-O-Si signature.',
-        impactOnDecision: 'Validates spinel structure retention on support. Confirms Cu surface segregation is not artifact but thermodynamic effect. Support interaction detected but does not alter bulk crystal structure.',
+        consistencyCheck: 'Our a = 8.38 Å intermediate between their supported (8.37 Å) and bulk values, consistent with partial support interaction. Our Cu/Fe = 0.76 matches their surface enrichment trend. Our FTIR shoulder at 1050 cm⁻¹ supports Si-O-Si context.',
+        impactOnDecision: 'Supports spinel structure retention on support. Cu surface segregation remains a surface-sensitive interpretation that requires review. Support interaction is observed but does not establish bulk crystal-structure change.',
         externalLink: '#',
       },
       {
@@ -571,7 +577,7 @@ function getLiteratureEvidence(technique: string, projectName?: string): Literat
         year: '2022',
         source: 'Materials Chemistry and Physics',
         relevance: 'Review',
-        keyEvidence: 'Reports I(311)/I(220) = 3.1 for CuFe₂O₄/SBA-15 from Rietveld refinement, indicating random powder orientation. Cation distribution Cu₀.₂Fe₀.₈[Cu₀.₈Fe₁.₂]O₄ confirmed. However, observes reduction in crystallite size (28-32 nm) vs. bulk (35-40 nm) due to confinement effects.',
+        keyEvidence: 'Reports I(311)/I(220) = 3.1 for CuFe₂O₄/SBA-15 from Rietveld refinement, indicating random powder orientation. Cation-distribution interpretation remains validation-limited. However, observes reduction in crystallite size (28-32 nm) vs. bulk (35-40 nm) due to confinement effects.',
         consistencyCheck: 'Our I(311)/I(220) = 2.8 differs from their 3.1, suggesting mild (111) preferred orientation (March-Dollase r = 1.15) not accounted for in their analysis. CONFLICT: Our crystallite size = 35 nm shows no confinement effect, possibly due to different synthesis temperature or loading method.',
         impactOnDecision: 'Supports inverse spinel cation distribution (+0.01). Texture difference flags potential sample preparation variation but does not affect phase assignment. Crystallite size discrepancy neutral impact (both in catalytically active range).',
         externalLink: '#',
@@ -587,8 +593,8 @@ function getLiteratureEvidence(technique: string, projectName?: string): Literat
         source: 'Advanced Materials',
         relevance: 'Supporting literature relation',
         keyEvidence: 'Reports A₁g Raman mode at 688 cm⁻¹ for CuFe₂O₄ with Cu²⁺ octahedral occupancy. XRD lattice parameter a = 8.377 Å from Rietveld refinement. Crystallite size 32-38 nm from Scherrer analysis correlates with catalytic activity.',
-        consistencyCheck: 'Our A₁g = 690 cm⁻¹ matches within ±2 cm⁻¹ (instrumental resolution). Our a = 8.38 Å agrees within error bars. Our crystallite size 35 nm falls in reported range, validating Scherrer methodology.',
-        impactOnDecision: 'Strengthens inverse spinel assignment. Confirms Cu²⁺ octahedral site preference from Raman-structure correlation. Validates crystallite size as catalytically relevant (30-40 nm optimal range).',
+        consistencyCheck: 'Our A₁g = 690 cm⁻¹ matches within ±2 cm⁻¹ (instrumental resolution). Our a = 8.38 Å agrees within error bars. Our crystallite size 35 nm falls in the reported screening range; Scherrer-derived size remains method-limited.',
+        impactOnDecision: 'Supports inverse spinel assignment. Cu²⁺ octahedral site preference remains a Raman-structure interpretation that requires validation. Crystallite-size relevance remains contextual.',
         externalLink: '#',
       },
       {
@@ -597,9 +603,9 @@ function getLiteratureEvidence(technique: string, projectName?: string): Literat
         year: '2022',
         source: 'Journal of Solid State Chemistry',
         relevance: 'Supporting literature relation',
-        keyEvidence: 'Provides reference d-spacings: d₃₁₁ = 2.532 Å, d₄₄₀ = 1.481 Å, d₅₁₁ = 1.615 Å for pure CuFe₂O₄. Raman T₂g splitting Δν = 142 cm⁻¹ attributed to Jahn-Teller Cu²⁺ distortion in octahedral sites. Absence of CuO band at 530 cm⁻¹ used as phase purity criterion.',
-        consistencyCheck: 'Our d₃₁₁ = 2.53 Å matches exactly. Our T₂g splitting = 145 cm⁻¹ within ±3 cm⁻¹. No CuO signature detected in our data, confirming phase purity. Consistent with reference pattern across all metrics.',
-        impactOnDecision: 'Effect on claim boundary: Validates crystallographic indexing. Confirms Jahn-Teller interpretation of Raman splitting. Supports single-phase interpretation by ruling out CuO contamination.',
+        keyEvidence: 'Provides reference d-spacings: d₃₁₁ = 2.532 Å, d₄₄₀ = 1.481 Å, d₅₁₁ = 1.615 Å for CuFe₂O₄ reference context. Raman T₂g splitting Δν = 142 cm⁻¹ is attributed to Jahn-Teller Cu²⁺ distortion in octahedral sites. Absence of a CuO band at 530 cm⁻¹ is treated as screening context only.',
+        consistencyCheck: 'Our d₃₁₁ = 2.53 Å matches the reference relation. Our T₂g splitting = 145 cm⁻¹ is within ±3 cm⁻¹. No dominant CuO signature is observed in this demo data, but phase purity remains validation-limited.',
+        impactOnDecision: 'Effect on claim boundary: Supports crystallographic indexing. Provides contextual support for Jahn-Teller interpretation of Raman splitting. Consistent with no dominant secondary phase in this demo pattern; phase purity remains validation-limited.',
         externalLink: '#',
       },
       {
@@ -623,7 +629,7 @@ function getLiteratureEvidence(technique: string, projectName?: string): Literat
         year: '2023',
         source: 'Journal of Magnetism and Magnetic Materials',
         relevance: 'High',
-        whyItMatters: 'Confirms NiFe₂O₄ spinel structure with XRD patterns matching current evidence',
+        whyItMatters: 'Supports NiFe₂O₄ spinel structure context with XRD patterns matching current evidence',
         externalLink: '#',
       },
       {
@@ -654,7 +660,7 @@ function getLiteratureEvidence(technique: string, projectName?: string): Literat
         year: '2022',
         source: 'Materials Research Bulletin',
         relevance: 'High',
-        whyItMatters: 'Confirms spinel structure and provides reference for peak positions',
+        whyItMatters: 'Supports spinel structure context and provides reference for peak positions',
         externalLink: '#',
       },
     ];
@@ -667,7 +673,7 @@ function getLiteratureEvidence(technique: string, projectName?: string): Literat
         year: '2023',
         source: 'Chemistry of Materials',
         relevance: 'High',
-        whyItMatters: 'Validates Fe₃O₄ structure and mixed Fe²⁺/Fe³⁺ oxidation states',
+        whyItMatters: 'Provides Fe₃O₄ structure and mixed Fe²⁺/Fe³⁺ oxidation-state context',
         externalLink: '#',
       },
       {
@@ -699,16 +705,89 @@ function getLiteratureEvidence(technique: string, projectName?: string): Literat
     query,
     provider: 'mock',
     papers,
-    agentSummary: `**Cross-study comparison:** Three independent groups (Liu 2023, Chen 2022, Anderson 2021) report CuFe₂O₄ lattice parameters spanning 8.37-8.39 Å, with our 8.38 Å falling at the distribution center. This tight clustering (σ = 0.01 Å) across different synthesis methods rules out systematic preparation artifacts and validates our crystallographic assignment.
+    agentSummary: `**Cross-study comparison:** Three independent groups (Liu 2023, Chen 2022, Anderson 2021) report CuFe₂O₄ lattice parameters spanning 8.37-8.39 Å, with our 8.38 Å falling at the distribution center. This tight clustering (σ = 0.01 Å) across different synthesis methods supports the crystallographic assignment while preparation artifacts remain a review item.
 
 **Convergent evidence:** Raman A₁g mode position shows remarkable consistency: Liu (688 cm⁻¹), our data (690 cm⁻¹), literature range (685-695 cm⁻¹). This 1% variation despite different instruments and sample histories indicates robust structure-property correlation, strengthening inverse spinel interpretation.
 
-**Resolved discrepancy:** Anderson's Fe³⁺/Fe²⁺ = 3.2 conflicts with our 2.8 and stoichiometric expectation (2.0). Analysis: Their ex-situ XPS after air exposure likely oxidized surface Fe²⁺ → Fe³⁺. Our value closer to ideal suggests fresher surface or inert transfer. This explains discrepancy without invalidating either dataset—both measure real but different surface states.
+**Resolved discrepancy:** Anderson's Fe³⁺/Fe²⁺ = 3.2 conflicts with our 2.8 and stoichiometric expectation (2.0). Analysis: Their ex-situ XPS after air exposure likely oxidized surface Fe²⁺ → Fe³⁺. Our value closer to ideal suggests fresher surface or inert transfer. This frames the discrepancy as surface-sensitive context rather than a bulk-composition conclusion.
 
-**Decision impact:** Supporting papers (Liu, Chen, Zhang) provide strong independent validation of lattice parameters, Raman modes, and XPS binding energies. Partial conflicts (Anderson Fe ratio, Kumar crystallite size) are explainable by experimental conditions and do not affect the primary structural assignment.
+**Decision impact:** Supporting papers (Liu, Chen, Zhang) provide contextual support for lattice parameters, Raman modes, and XPS binding energies. Partial conflicts (Anderson Fe ratio, Kumar crystallite size) are condition-sensitive and keep the primary structural assignment validation-limited.
 
-**Critical insight:** Multi-laboratory convergence on Cu surface enrichment (1.2-1.4×) across three studies suggests universal thermodynamic driving force rather than measurement artifact. This elevates surface reconstruction from observation to validated phenomenon, justifying inclusion in structural model.`,
+**Critical insight:** Multi-laboratory convergence on Cu surface enrichment (1.2-1.4×) across three studies suggests a possible thermodynamic trend rather than a single measurement artifact. Surface reconstruction remains a validation-limited interpretation that requires reviewed XPS context before inclusion in a stronger structural model.`,
   };
+}
+
+function ExperimentConditionAgentCard({
+  status,
+  notes,
+  conditionLock,
+}: {
+  status: string;
+  notes: string[];
+  conditionLock?: ExperimentConditionLock | null;
+}) {
+  const measurement = conditionLock?.measurementConditions;
+  const processing = conditionLock?.processingConditions;
+  const validation = conditionLock?.validationConditions;
+  const blockedClaims = [
+    'phase purity',
+    'publication-level phase claim',
+    ...(validation?.crossTechniqueRequired?.some((technique) => technique.toUpperCase() === 'XPS')
+      ? ['surface oxidation-state assignment without reviewed XPS validation']
+      : []),
+  ];
+
+  return (
+    <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-xs font-bold uppercase tracking-wider text-amber-300">
+            Experiment Condition Lock
+          </h3>
+          <p className="mt-1 text-sm font-semibold text-slate-100">{status}</p>
+          {conditionLock?.userConfirmed && (
+            <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-200">
+              Status: Locked by user
+            </p>
+          )}
+        </div>
+        <span className="rounded border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-200">
+          condition-aware
+        </span>
+      </div>
+      <p className="mt-2 text-xs leading-relaxed text-slate-400">
+        Agent interpretation keeps synthesis, measurement, processing, and validation assumptions tied to the user-provided experiment record.
+      </p>
+      {conditionLock?.userConfirmed && (
+        <div className="mt-3 grid gap-2 text-xs leading-relaxed text-slate-400">
+          <div>
+            <span className="font-semibold text-slate-200">Measurement:</span>{' '}
+            {measurement?.instrument ?? 'pending confirmation'}, {measurement?.radiationOrSource ?? 'pending confirmation'}, {measurement?.scanRange ?? 'pending confirmation'}
+          </div>
+          <div>
+            <span className="font-semibold text-slate-200">Processing:</span>{' '}
+            baseline correction {processing?.baselineCorrection ?? 'pending confirmation'}; peak detection by {processing?.peakDetection ?? 'pending confirmation'}
+          </div>
+          <div>
+            <span className="font-semibold text-slate-200">Validation:</span>{' '}
+            refinement, reference validation, and replicate evidence {validation?.refinementRequired || validation?.referenceValidationRequired || validation?.replicateRequired ? 'required' : 'pending confirmation'}
+          </div>
+          <div>
+            <span className="font-semibold text-slate-200">Blocked claims:</span>{' '}
+            {blockedClaims.join('; ')}
+          </div>
+        </div>
+      )}
+      <ul className="mt-3 space-y-1.5 text-xs leading-relaxed text-slate-400">
+        {notes.slice(0, 4).map((note) => (
+          <li key={note} className="flex gap-2">
+            <span className="text-amber-300">-</span>
+            <span>{note}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 export function RightPanel({
@@ -736,6 +815,12 @@ export function RightPanel({
 
   // Get locked context for this project
   const lockedContext = projectId ? getLockedContext(projectId) : null;
+  const experimentConditionLock = projectId ? getLatestExperimentConditionLock(projectId) : null;
+  const experimentConditionStatus = getConditionLockStatusLabel(experimentConditionLock);
+  const experimentConditionNotes = getConditionBoundaryNotes(
+    experimentConditionLock,
+    technique ? [technique] : [],
+  );
 
   // Evidence relations for structural reasoning
   const evidenceRelations = [
@@ -745,7 +830,7 @@ export function RightPanel({
       source: 'XRD',
       relation: 'supports',
       impact: 'positive',
-      explanation: 'All 7 major reflections (220, 311, 400, 422, 511, 440, 533) match CuFe₂O₄ reference within Δ2θ ≤ 0.15°. Lattice parameter a = 8.38 Å from Nelson-Riley extrapolation confirms cubic Fd-3m symmetry. Primary evidence supports structural assignment.',
+      explanation: 'All 7 major reflections (220, 311, 400, 422, 511, 440, 533) match CuFe₂O₄ reference within Δ2θ ≤ 0.15°. Lattice parameter a = 8.38 Å from Nelson-Riley extrapolation supports an Fd-3m assignment. Primary evidence supports structural assignment with validation requirements.',
     },
     {
       id: 'intensity-corr',
@@ -761,7 +846,7 @@ export function RightPanel({
       source: 'XRD',
       relation: 'contextualizes',
       impact: 'positive',
-      explanation: '18 out of 21 expected reflections observed (85.7% completeness). Missing peaks have I/I₀ < 5% in reference, below detection threshold. Contextual evidence provides additional structural validation.',
+      explanation: '18 out of 21 expected reflections observed (85.7% completeness). Missing peaks have I/I₀ < 5% in reference, below detection threshold. Contextual evidence provides additional structural support.',
     },
     {
       id: 'anomalous-peak',
@@ -773,27 +858,27 @@ export function RightPanel({
     },
     {
       id: 'raman-validation',
-      label: 'Raman Mode Validation',
+      label: 'Raman Mode Context',
       source: 'Raman',
       relation: 'supports',
       impact: 'positive',
-      explanation: 'A₁g symmetric breathing mode at 690 cm⁻¹ matches CuFe₂O₄ reference (685-695 cm⁻¹ range). T₂g mode splitting Δν = 145 cm⁻¹ confirms Jahn-Teller Cu²⁺ distortion in octahedral sites. Independent structural validation supports assignment.',
+      explanation: 'A₁g symmetric breathing mode at 690 cm⁻¹ matches CuFe₂O₄ reference context (685-695 cm⁻¹ range). T₂g mode splitting Δν = 145 cm⁻¹ supports Jahn-Teller Cu²⁺ distortion in octahedral sites. Independent structural context supports assignment.',
     },
     {
       id: 'xps-validation',
-      label: 'XPS Oxidation State Validation',
+      label: 'XPS Oxidation-State Context',
       source: 'XPS',
       relation: 'supports',
       impact: 'positive',
-      explanation: 'Cu 2p₃/₂ at 933.8 eV with satellite confirms Cu²⁺. Fe 2p₃/₂ shows Fe³⁺/Fe²⁺ = 2.8 consistent with inverse spinel stoichiometry (expected 2.0-3.0 range). Chemical state evidence supports structural model.',
+      explanation: 'Cu 2p₃/₂ at 933.8 eV with satellite supports Cu²⁺ surface context. Fe 2p₃/₂ shows Fe³⁺/Fe²⁺ = 2.8 consistent with inverse spinel surface context. Chemical-state evidence supports, but does not establish, the structural model.',
     },
     {
       id: 'literature-consensus',
-      label: 'Literature Cross-Validation',
+      label: 'Reference Context Review',
     source: 'Agent + Literature',
       relation: 'supports',
       impact: 'positive',
-      explanation: 'Multi-laboratory convergence: Liu 2023 (a = 8.377 Å), Chen 2022 (A₁g = 688 cm⁻¹), Zhang 2023 (Cu surface enrichment 1.2-1.4×) independently validate our measurements. Literature evidence supports structural assignment.',
+      explanation: 'Multi-laboratory convergence: Liu 2023 (a = 8.377 Å), Chen 2022 (A₁g = 688 cm⁻¹), Zhang 2023 (Cu surface enrichment 1.2-1.4×) provides contextual support for the measurements. Reference evidence supports structural assignment with validation requirements.',
     },
   ];
 
@@ -846,9 +931,9 @@ export function RightPanel({
     {
       phase: 'CuFe₂O₄ (Spinel)',
       peakAlignment: 'Consistent',
-      structuralFit: 'Ready',
+      structuralFit: 'Supported',
       completeness: '18/21',
-      evaluation: 'Ready',
+      evaluation: 'Requires validation',
       result: 'Match',
     },
     {
@@ -1000,7 +1085,7 @@ export function RightPanel({
                           <div className="flex items-center gap-1.5">
                             {candidate.result === 'Match' ? (
                               <span className="px-1.5 py-0.5 rounded bg-emerald-400/10 border border-emerald-400/30 text-emerald-300 text-[9px] font-bold">
-                                Match
+                                Reference match
                               </span>
                             ) : (
                               <span className="px-1.5 py-0.5 rounded bg-red-400/10 border border-red-400/30 text-red-300 text-[9px] font-bold">
@@ -1084,7 +1169,7 @@ export function RightPanel({
                 <div>
                   <div className="text-xs font-semibold text-slate-400 mb-1.5">Interpretation:</div>
                   <div className="text-xs text-emerald-400">
-                    Multiple independent evidence streams converge on the same structural assignment. Cross-technique validation (XRD + Raman + XPS) provides robust support for the phase identification.
+                  Multiple independent evidence streams support the same structural assignment. Cross-technique evidence (XRD + Raman + XPS) provides contextual support for the phase identification.
                   </div>
                 </div>
               </div>
@@ -1097,13 +1182,13 @@ export function RightPanel({
                   <span className="text-slate-300 font-medium">Crystallographic consistency:</span> The observed d-spacings (d₃₁₁ = 2.53 Å, d₄₄₀ = 1.48 Å) align with cubic spinel lattice within instrumental resolution (±0.02 Å). Peak intensity ratios deviate &lt;8% from powder diffraction file, suggesting minimal preferred orientation.
                 </p>
                 <p>
-                  <span className="text-slate-300 font-medium">Phase purity assessment:</span> Integrated intensity analysis across 2θ = 10-80° accounts for 97.3% of total scattering. Residual 2.7% distributed as background noise rather than coherent secondary phase reflections, supporting single-phase interpretation.
+                  <span className="text-slate-300 font-medium">Phase-purity screening note:</span> Integrated intensity analysis across 2θ = 10-80° accounts for 97.3% of total scattering. Residual 2.7% is distributed as background noise rather than dominant secondary phase reflections; phase purity remains validation-limited.
                 </p>
                 <p>
                   <span className="text-slate-300 font-medium">Competing hypotheses:</span> Fe₃O₄ magnetite rejected due to absence of characteristic (111) reflection at 18.3° and incompatible lattice parameter (a_magnetite = 8.39 Å vs. a_observed = 8.38 Å). CuO tenorite ruled out by missing monoclinic signature at 38.7°.
                 </p>
                 <p className="text-slate-500 text-[10px] pt-2 border-t border-slate-800">
-                  <span className="text-violet-400">Interpretation:</span> Cross-validated peak positions against 3 independent databases (ICDD, COD, AMCSD). Multi-technique convergence (XRD + Raman + XPS) supports the spinel assignment.
+                  <span className="text-violet-400">Interpretation:</span> Compared peak positions against bundled reference context. Multi-technique convergence (XRD + Raman + XPS) supports the spinel assignment with validation requirements.
                 </p>
               </div>
             </Section>
@@ -1139,7 +1224,7 @@ export function RightPanel({
                       activeEvidenceId === 'peak-alignment' ? 'bg-blue-400/10 border border-blue-400/30' : ''
                     }`}>
                       <CheckCircle2 size={12} className="text-emerald-400 mt-0.5 shrink-0" />
-                      <span><span className="text-slate-300">Crystallographic match:</span> 7/7 major reflections indexed to Fd-3m, a = 8.38 Å</span>
+                      <span><span className="text-slate-300">Crystallographic match:</span> 7/7 major reflections support Fd-3m assignment, a = 8.38 Å</span>
                     </li>
                     <li className={`flex items-start gap-2 p-2 rounded transition-all ${
                       activeEvidenceId === 'intensity-corr' ? 'bg-blue-400/10 border border-blue-400/30' : ''
@@ -1151,13 +1236,13 @@ export function RightPanel({
                       activeEvidenceId === 'raman-validation' || activeEvidenceId === 'xps-validation' ? 'bg-blue-400/10 border border-blue-400/30' : ''
                     }`}>
                       <CheckCircle2 size={12} className="text-emerald-400 mt-0.5 shrink-0" />
-                      <span><span className="text-slate-300">Spectroscopic convergence:</span> Raman A₁g at 690 cm⁻¹, XPS Cu²⁺ satellite confirm cation ordering</span>
+                      <span><span className="text-slate-300">Spectroscopic convergence:</span> Raman A₁g at 690 cm⁻¹ and XPS Cu²⁺ satellite provide cation-ordering context</span>
                     </li>
                     <li className={`flex items-start gap-2 p-2 rounded transition-all ${
                       activeEvidenceId === 'literature-consensus' ? 'bg-blue-400/10 border border-blue-400/30' : ''
                     }`}>
                       <span className="text-violet-400 shrink-0">◆</span>
-                      <span><span className="text-slate-300">Supporting literature:</span> Literature consensus (5 studies, 2021-2023) independently confirms structural parameters</span>
+                      <span><span className="text-slate-300">Supporting literature:</span> Literature context (5 studies, 2021-2023) supports structural parameters</span>
                     </li>
                   </ul>
                 </div>
@@ -1175,6 +1260,9 @@ export function RightPanel({
 
         {activeTab === 'evidence' && (
           <>
+            <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-xs leading-relaxed text-amber-100">
+              Condition lock keeps interpretation validation-limited until refinement, replicate, and required cross-technique evidence are reviewed.
+            </div>
             {/* Conflict Analysis */}
             <Section title="Conflict Analysis">
               <div className="rounded-lg bg-slate-800/30 border border-slate-700 p-3 space-y-2">
@@ -1218,7 +1306,7 @@ export function RightPanel({
                   <span className="text-emerald-300 font-mono">Convergence observed</span>
                 </div>
                 <div className="text-[10px] text-slate-500 -mt-2 ml-4">
-                  XRD + Raman + XPS all converge on inverse spinel structure
+                  XRD + Raman + XPS provide supportive context for an inverse spinel interpretation
                 </div>
                 <div className="pt-3 border-t border-slate-700">
                   <div className="text-[11px] text-slate-400 mb-2">
@@ -1226,7 +1314,7 @@ export function RightPanel({
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-semibold text-slate-300">Status:</span>
-                    <span className="text-lg text-emerald-300 font-bold">Ready</span>
+                    <span className="text-lg text-amber-300 font-bold">Ready with validation requirements</span>
                   </div>
                 </div>
               </div>
@@ -1254,15 +1342,15 @@ export function RightPanel({
                   <span className="text-emerald-300 font-mono">Convergence observed</span>
                 </div>
                 <div className="text-[10px] text-slate-500 -mt-2 ml-4">
-                  XRD + Raman + XPS all converge on inverse spinel structure
+                  XRD, Raman, and XPS provide supportive context for the spinel assignment; validation remains required
                 </div>
                 <div className="pt-3 border-t border-slate-700">
                   <div className="text-[11px] text-slate-400 mb-2">
-                    Multiple independent evidence streams support the same structural interpretation
+                    Multiple evidence streams support the working structural interpretation within validation boundaries
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-semibold text-slate-300">Status:</span>
-                    <span className="text-lg text-emerald-300 font-bold">Ready</span>
+                    <span className="text-lg text-amber-300 font-bold">Requires validation</span>
                   </div>
                 </div>
               </div>
@@ -1277,7 +1365,7 @@ export function RightPanel({
                     <span className="text-sm font-semibold text-slate-300">Crystallographic Alignment</span>
                   </div>
                   <div className="text-xs text-slate-400 ml-6">
-                    All 7 major reflections (220, 311, 400, 422, 511, 440, 533) match CuFe₂O₄ reference (ICDD 00-034-0425) within Δ2θ ≤ 0.15°. Lattice parameter a = 8.38 ± 0.01 Å from Nelson-Riley extrapolation confirms cubic Fd-3m symmetry. Zero systematic peak shifts rule out solid solution formation.
+                    All 7 major reflections (220, 311, 400, 422, 511, 440, 533) match bundled CuFe₂O₄ reference context within Δ2θ ≤ 0.15°. Lattice parameter a = 8.38 ± 0.01 Å from Nelson-Riley extrapolation supports cubic Fd-3m assignment. Solid-solution exclusion requires additional validation.
                   </div>
                 </div>
                 
@@ -1297,7 +1385,7 @@ export function RightPanel({
                     <span className="text-sm font-semibold text-slate-300">Multi-Technique Convergence</span>
                   </div>
                   <div className="text-xs text-slate-400 ml-6">
-                    XRD (bulk structure), Raman (cation ordering), and XPS (oxidation states) independently support inverse spinel Cu₀.₂Fe₀.₈[Cu₀.₈Fe₁.₂]O₄. Cross-validation eliminates systematic measurement errors.
+                    XRD (bulk structure), Raman (cation ordering), and XPS (surface oxidation states) provide independent support for inverse spinel context. Systematic measurement errors remain review items.
                   </div>
                 </div>
               </div>
@@ -1309,7 +1397,7 @@ export function RightPanel({
                 <div className="flex items-start gap-2">
                   <div className="w-2 h-2 rounded-full bg-amber-400 mt-1.5 shrink-0" />
                   <div className="text-xs text-slate-400">
-                    <span className="text-slate-300 font-medium">Unresolved weak reflections:</span> Two peaks at 2θ = 62.3° and 64.1° cannot be indexed to Fd-3m spinel. Possible origins include CuO trace impurity, Cu-Fe ordering superlattice (P4₃32 symmetry), or instrumental artifacts. Below XRD detection limit for definitive assignment.
+                    <span className="text-slate-300 font-medium">Unresolved weak reflections:</span> Two peaks at 2θ = 62.3° and 64.1° cannot be indexed to Fd-3m spinel. Possible origins include CuO trace impurity, Cu-Fe ordering superlattice (P4₃32 symmetry), or instrumental artifacts. Below XRD detection limit for stronger assignment.
                   </div>
                 </div>
                 <div className="flex items-start gap-2">
@@ -1415,6 +1503,11 @@ export function RightPanel({
             <SampleContextCard />
             <DataAvailabilityPanel />
             <TechniqueCoveragePanel />
+            <ExperimentConditionAgentCard
+              status={experimentConditionStatus}
+              notes={experimentConditionNotes}
+              conditionLock={experimentConditionLock}
+            />
             <EvidenceRequirementsTable compact />
           </div>
         )}
@@ -1462,7 +1555,7 @@ export function RightPanel({
                 <div className="text-[10px] text-slate-500">
                   {parameterMode === 'hybrid' ? (
                     <>
-                      <span className="text-blue-400 font-semibold">Hybrid Mode:</span> You can manually adjust parameters below. The system provides recommendations and validates changes.
+                      <span className="text-blue-400 font-semibold">Hybrid Mode:</span> You can manually adjust parameters below. The system provides recommendations and flags changes for review.
                     </>
                   ) : (
                     <>
@@ -1566,6 +1659,13 @@ export function RightPanel({
                 />
               </div>
             )}
+            <div className="mb-6">
+              <ExperimentConditionAgentCard
+                status={experimentConditionStatus}
+                notes={experimentConditionNotes}
+                conditionLock={experimentConditionLock}
+              />
+            </div>
 
             {/* Analysis Configuration */}
             <Section title={getTechniqueParameters(technique).analysisConfig.title}>
@@ -1743,7 +1843,7 @@ export function RightPanel({
                     <div className="flex items-start gap-2">
                       <CheckCircle2 size={12} className="text-purple-400 mt-0.5 shrink-0" />
                       <div className="text-xs text-slate-400">
-                        <span className="text-slate-300">Interpretation:</span> Cross-validate peak assignments against crystallographic databases
+                        <span className="text-slate-300">Interpretation:</span> Review peak assignments against bundled crystallographic context
                       </div>
                     </div>
                     <div className="flex items-start gap-2">
@@ -1772,8 +1872,8 @@ export function RightPanel({
               <div className="rounded-lg bg-slate-800/30 border border-slate-700 p-3 space-y-3">
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-400">Ready:</span>
-                    <span className="text-emerald-300 font-mono font-semibold">Primary + Supporting</span>
+                    <span className="text-slate-400">Ready with boundaries:</span>
+                    <span className="text-emerald-300 font-mono font-semibold">Primary + Supporting reviewed</span>
                   </div>
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-slate-400">In Progress:</span>
@@ -1855,8 +1955,8 @@ export function RightPanel({
                 <LogEntry
                   timestamp="00:01.567"
                   level="info"
-                  message="Database search initiated"
-                  details="Querying ICDD (450k entries), COD (500k entries), AMCSD (25k entries) for Cu-Fe-O system"
+                  message="Bundled reference context review initiated"
+                  details="Checking deterministic Cu-Fe-O reference context for peak-position relations and validation boundaries"
                 />
                 <LogEntry
                   timestamp="00:02.891"
@@ -1885,20 +1985,26 @@ export function RightPanel({
                 <LogEntry
                   timestamp="00:05.123"
                   level="info"
-                  message="Cross-technique validation started"
-                  details="Comparing XRD phase assignment with Raman modes and XPS oxidation states"
+                  message="Cross-technique evidence review started"
+                  details="Comparing XRD phase assignment with Raman modes and XPS oxidation-state context; validation remains required"
+                />
+                <LogEntry
+                  timestamp="00:05.789"
+                  level="info"
+                  message="Check Experiment Conditions"
+                  details="Confirm locked measurement, processing, and validation constraints before interpretation."
                 />
                 <LogEntry
                   timestamp="00:06.456"
-                  level="success"
-                  message="Raman validation: PASS"
-                  details="A₁g mode at 690 cm⁻¹ matches CuFe₂O₄ reference (expected: 685-695 cm⁻¹). T₂g splitting confirms Cu²⁺ Jahn-Teller distortion."
+                  level="info"
+                  message="Raman evidence reviewed: supportive local-symmetry context"
+                  details="A₁g mode at 690 cm⁻¹ aligns with CuFe₂O₄ reference context (expected: 685-695 cm⁻¹). T₂g splitting supports, but does not establish, Cu²⁺ Jahn-Teller interpretation."
                 />
                 <LogEntry
                   timestamp="00:07.234"
-                  level="success"
-                  message="XPS validation: PASS"
-                  details="Cu 2p₃/₂ at 933.8 eV with satellite confirms Cu²⁺. Fe 2p₃/₂ shows Fe³⁺/Fe²⁺ = 2.8 consistent with inverse spinel."
+                  level="info"
+                  message="XPS evidence reviewed: supportive context, review required"
+                  details="Cu 2p₃/₂ at 933.8 eV with satellite supports Cu²⁺ surface context. Fe 2p₃/₂ context remains surface-sensitive and does not establish bulk composition."
                 />
                 <LogEntry
                   timestamp="00:07.567"
@@ -1910,7 +2016,7 @@ export function RightPanel({
                   timestamp="00:09.891"
                   level="success"
                   message="Interpretation received"
-                  details="Key points: Fd-3m symmetry confirmed, inverse spinel cation distribution validated, multi-technique convergence supports assignment."
+                  details="Key points: Fd-3m assignment is supported by observed reflections, cation-distribution interpretation remains validation-limited, and multi-technique convergence supports assignment."
                 />
                 <LogEntry
                   timestamp="00:10.234"
@@ -1932,21 +2038,21 @@ export function RightPanel({
                 />
                 <LogEntry
                   timestamp="00:15.456"
-                  level="success"
-                  message="Publication context prepared"
-                  details="Cross-study validation: lattice parameter consensus (8.37-8.39 Å), Raman mode agreement (688-690 cm⁻¹). Resolved Fe³⁺/Fe²⁺ discrepancy with Anderson 2021."
+                  level="info"
+                  message="Reference context prepared"
+                  details="Cross-study context: lattice parameter range (8.37-8.39 Å), Raman mode agreement (688-690 cm⁻¹). Fe³⁺/Fe²⁺ discrepancy remains surface-sensitive and validation-limited."
                 />
                 <LogEntry
                   timestamp="00:15.789"
                   level="info"
                   message="Evidence relation assessment"
-                  details="Primary evidence: structural match. Validation gap: unindexed peaks require follow-up. Cross-technique convergence: multi-technique support observed"
+                  details="Primary evidence: structural support. Validation gap: unindexed peaks require follow-up. Cross-technique convergence: multi-technique support observed"
                 />
                 <LogEntry
                   timestamp="00:16.012"
                   level="success"
-                  message="Interpretation ready"
-                  details="Phase assignment: CuFe2O4 inverse spinel (Fd-3m, a=8.38 A). Status: Requires validation. Recommended validation: HR-TEM for 62.3 degree anomaly."
+                  message="Interpretation ready with validation requirements"
+                  details="Working assignment: CuFe2O4 inverse spinel context (Fd-3m, a=8.38 A). Status: Requires validation. Recommended validation: HR-TEM for 62.3 degree anomaly."
                 />
               </div>
             </Section>

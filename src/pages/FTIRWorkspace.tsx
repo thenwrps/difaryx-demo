@@ -10,7 +10,8 @@ import {
 import { DashboardLayout } from '../components/layout/DashboardLayout';
 import { Graph } from '../components/ui/Graph';
 import { ParameterDrawer } from '../components/workspace/ParameterDrawer';
-import { ftirDemoData, FTIR_DEMO_DATASETS, getFtirDemoDataset } from '../data/ftirDemoData';
+import { ftirDemoData, FTIR_DEMO_DATASETS, getFtirDemoDataset, getFtirProjectDatasetId } from '../data/ftirDemoData';
+import { getProject } from '../data/demoProjects';
 import { runFtirProcessing } from '../agents/ftirAgent/runner';
 import { getWorkspaceEntryMode, getSampleDatasetName } from '../utils/workspaceEntry';
 import { DatasetInfoBar } from '../components/workspace/DatasetInfoBar';
@@ -18,6 +19,8 @@ import { EmptyWorkspaceState } from '../components/workspace/EmptyWorkspaceState
 
 export default function FTIRWorkspace() {
   const [searchParams] = useSearchParams();
+  const project = getProject(searchParams.get('project'));
+  const projectDatasetId = getFtirProjectDatasetId(project.id);
   
   // Entry mode detection
   const entryMode = getWorkspaceEntryMode(searchParams, 'ftir');
@@ -28,7 +31,7 @@ export default function FTIRWorkspace() {
   const [datasetName, setDatasetName] = useState<string>('');
   
   const [activeTab, setActiveTab] = useState<'spectrum' | 'bandList' | 'functionalGroups'>('spectrum');
-  const [selectedDatasetId, setSelectedDatasetId] = useState(ftirDemoData.id);
+  const [selectedDatasetId, setSelectedDatasetId] = useState(projectDatasetId ?? ftirDemoData.id);
   
   // Parameter state management
   const [autoMode, setAutoMode] = useState(true);
@@ -44,9 +47,11 @@ export default function FTIRWorkspace() {
   useEffect(() => {
     if (!entryMode) {
       // Project mode - use existing behavior
+      const projectDataset = getFtirDemoDataset(projectDatasetId);
+      setSelectedDatasetId(projectDataset.id);
       setHasDatasetLoaded(true);
       setDatasetSource('project');
-      setDatasetName(selectedDataset.fileName);
+      setDatasetName(projectDataset.fileName);
       return;
     }
 
@@ -67,7 +72,7 @@ export default function FTIRWorkspace() {
       setHasDatasetLoaded(false);
       setDatasetSource(null);
     }
-  }, [entryMode, selectedDataset.fileName]);
+  }, [entryMode, projectDatasetId]);
   
   // Handlers for empty state
   const handleLoadSample = () => {
@@ -214,7 +219,7 @@ export default function FTIRWorkspace() {
             technique="FTIR"
             source={datasetSource}
             datasetName={datasetName}
-            projectName={undefined}
+            projectName={datasetSource === 'project' ? project.name : undefined}
           />
         )}
         

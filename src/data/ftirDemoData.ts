@@ -271,10 +271,23 @@ export const ftirDemoData: FtirDataset = {
   ],
 };
 
+export const fe3o4FtirDemoData: FtirDataset = {
+  ...ftirDemoData,
+  id: 'fe3o4-ftir-demo-001',
+  label: 'Fe3O4 nanoparticle FTIR',
+  sampleName: 'Fe3O4 nanoparticle sample',
+  fileName: 'fe3o4_nanoparticles_ftir.csv',
+};
+
 /**
  * Export all demo datasets
  */
-export const FTIR_DEMO_DATASETS = [ftirDemoData];
+export const FTIR_DEMO_DATASETS = [ftirDemoData, fe3o4FtirDemoData];
+
+export function getFtirProjectDatasetId(projectId?: string | null): string | null {
+  if (projectId === 'fe3o4-nanoparticles') return fe3o4FtirDemoData.id;
+  return null;
+}
 
 /**
  * Helper function to get demo dataset by ID

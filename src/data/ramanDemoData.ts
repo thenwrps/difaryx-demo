@@ -184,10 +184,23 @@ export const ramanDemoData: RamanDataset = {
   ],
 };
 
+export const fe3o4RamanDemoData: RamanDataset = {
+  ...ramanDemoData,
+  id: 'fe3o4-raman-demo-001',
+  label: 'Fe3O4 nanoparticle Raman',
+  sampleName: 'Fe3O4 nanoparticle sample',
+  fileName: 'fe3o4_nanoparticles_raman.csv',
+};
+
 /**
  * Export all demo datasets
  */
-export const RAMAN_DEMO_DATASETS = [ramanDemoData];
+export const RAMAN_DEMO_DATASETS = [ramanDemoData, fe3o4RamanDemoData];
+
+export function getRamanProjectDatasetId(projectId?: string | null): string | null {
+  if (projectId === 'fe3o4-nanoparticles') return fe3o4RamanDemoData.id;
+  return null;
+}
 
 /**
  * Helper function to get demo dataset by ID

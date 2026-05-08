@@ -433,8 +433,9 @@ export default function XRDWorkspace() {
     agentResult?.interpretation.confidenceLevel === 'high'
       ? 'Validation boundaries'
       : evidenceStatus;
+  const xrdAssignment = projectCompatibility?.assignment ?? project.phase;
   const claimBoundaryText =
-    'The observed XRD pattern supports CuFe2O4 spinel phase assignment, with validation still required before publication-level phase-purity claims.';
+    `The observed XRD pattern supports ${xrdAssignment} as a working phase assignment, with validation still required before publication-level phase-purity claims.`;
 
   const graphPeakMarkers = (agentResult?.detectedPeaks ?? []).map((peak) => {
     // Find HKL assignment from primary candidate
