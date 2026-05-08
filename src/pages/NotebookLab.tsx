@@ -44,6 +44,7 @@ import {
   getXrdProjectCompatibility,
   isDatasetCompatibleWithProject,
 } from '../data/xrdDemoDatasets';
+import { getLockedContext } from '../data/lockedContext';
 
 const NOTEBOOK_TEMPLATE_MODES: NotebookTemplateMode[] = ['research', 'rd', 'analytical'];
 
@@ -413,6 +414,7 @@ export default function NotebookLab() {
   };
 
   const exportMarkdown = () => {
+    const lockedContext = getLockedContext(project.id);
     const evidenceMarkdown = keyEvidenceItems.map((item) => `- ${item}`).join('\n');
     const validationMarkdown = projectNotebookContent.validationNotes.map((item) => `- ${item}`).join('\n');
     const traceMarkdown = technicalTrace.map((step, index) => `${index + 1}. ${sanitizeTraceStep(step)}`).join('\n');
@@ -422,12 +424,24 @@ export default function NotebookLab() {
         'Requires validation: matched processing result is required before claim-boundary review.',
       ]
     ).map((line) => `- ${line}`).join('\n');
+    const lockedContextMarkdown = lockedContext
+      ? `## Locked Scientific Context
+
+Sample Identity: ${lockedContext.sampleIdentity}
+Technique: ${lockedContext.technique}
+Source Dataset: ${lockedContext.sourceDataset}
+Source Processing Path: ${lockedContext.sourceProcessingPath}
+Reference Scope: ${lockedContext.referenceScope}
+Claim Boundary: ${lockedContext.claimBoundary}
+
+`
+      : '';
     const markdown = `# DIFARYX Notebook Report
 
 ## Experiment
 ${projectNotebookContent.experimentTitle}
 
-## Source Workflow
+${lockedContextMarkdown}## Source Workflow
 XRD processing + interpretation refinement
 
 ## Pipeline
@@ -611,6 +625,16 @@ ${sourceRunLines}
                 <span>Source: Processing Result → Interpretation Refinement → Notebook Entry</span>
               </div>
               <h1 className="text-lg font-bold">{notebook.title}</h1>
+              {(() => {
+                const lockedContext = getLockedContext(project.id);
+                return lockedContext ? (
+                  <div className="mt-2 rounded border border-amber-500/30 bg-amber-500/5 px-3 py-2">
+                    <p className="text-[10px] font-semibold text-amber-700">
+                      Locked context preserved: sample identity, source dataset, processing path, and claim boundary were not modified.
+                    </p>
+                  </div>
+                ) : null;
+              })()}
               <div className="mt-2 flex max-w-4xl flex-wrap gap-1.5">
                 {[
                   ['Mode', notebookTemplate.label],

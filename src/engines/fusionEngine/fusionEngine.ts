@@ -901,11 +901,11 @@ function generateSpinelFerriteResult(
   ];
   
   const decision =
-    'Proceed with spinel ferrite structural assignment for downstream analysis and reporting.';
+    'Use spinel ferrite assignment as a working interpretation; phase purity and surface-state claims remain validation-limited.';
   
   return {
     conclusion:
-      'Convergent multi-technique evidence supports spinel ferrite structure with characteristic vibrational and diffraction signatures.',
+      'Linked XRD, Raman, and FTIR evidence supports a spinel-ferrite working interpretation, while XPS surface-state validation remains under review.',
     basis,
     crossTech,
     limitations,

@@ -147,7 +147,6 @@ export const CLAIM_BOUNDARY = {
   supported: [
     'CuFe₂O₄ spinel phase assignment',
     'Literature-consistent lattice relation',
-    'Cross-technique convergence with Raman/XPS context',
   ],
   requiresValidation: [
     'Phase purity',
@@ -159,8 +158,12 @@ export const CLAIM_BOUNDARY = {
     'Publication-level phase-pure confirmation',
     'Validated bulk oxidation-state distribution',
   ],
-  contextual: [] as string[],
-  pending: [] as string[],
+  contextual: [
+    'Raman/FTIR support features',
+  ],
+  pending: [
+    'XPS surface-state validation',
+  ],
 };
 
 export const VALIDATION_NOTES = [

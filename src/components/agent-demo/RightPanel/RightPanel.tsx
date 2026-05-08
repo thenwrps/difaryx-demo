@@ -6,6 +6,8 @@ import { EvidenceRequirementsTable } from '../../demo/EvidenceRequirementsTable'
 import { CharacterizationObjectiveCard } from '../../demo/CharacterizationObjectiveCard';
 import { SampleContextCard } from '../../demo/SampleContextCard';
 import { ExecutionStepItem } from '../CenterColumn/ExecutionStepItem';
+import { LockedScientificContext } from '../../locked-context/LockedScientificContext';
+import { getLockedContext } from '../../../data/lockedContext';
 
 // Inline chemical formula utility
 function formatChemicalFormula(input: string): React.ReactNode {
@@ -97,6 +99,7 @@ interface ExecutionStep {
 interface RightPanelProps {
   technique?: string;
   projectName?: string;
+  projectId?: string;
   activeTab?: TabType;
   currentStep: number;
   totalSteps: number;
@@ -711,6 +714,7 @@ function getLiteratureEvidence(technique: string, projectName?: string): Literat
 export function RightPanel({
   technique = 'XRD',
   projectName,
+  projectId,
   activeTab: controlledActiveTab,
   currentStep,
   totalSteps,
@@ -729,6 +733,9 @@ export function RightPanel({
   const [editingSection, setEditingSection] = useState<string | null>(null);
   const [editedValues, setEditedValues] = useState<Record<string, string>>({});
   const activeTab = controlledActiveTab ?? internalActiveTab;
+
+  // Get locked context for this project
+  const lockedContext = projectId ? getLockedContext(projectId) : null;
 
   // Evidence relations for structural reasoning
   const evidenceRelations = [
@@ -1543,6 +1550,21 @@ export function RightPanel({
                   })}
                 </div>
               </Section>
+            )}
+
+            {/* Locked Scientific Context */}
+            {lockedContext && (
+              <div className="border-b border-border px-3 py-3">
+                <LockedScientificContext
+                  sampleIdentity={lockedContext.sampleIdentity}
+                  technique={lockedContext.technique}
+                  sourceDataset={lockedContext.sourceDataset}
+                  sourceProcessingPath={lockedContext.sourceProcessingPath}
+                  referenceScope={lockedContext.referenceScope}
+                  claimBoundary={lockedContext.claimBoundary}
+                  variant="full"
+                />
+              </div>
             )}
 
             {/* Analysis Configuration */}

@@ -18,6 +18,8 @@ import {
   type XrdDemoDataset,
 } from '../data/xrdDemoDatasets';
 import { demoProjects, getNotebookPath, getProject } from '../data/demoProjects';
+import { LockedScientificContext } from '../components/locked-context/LockedScientificContext';
+import { getLockedContext } from '../data/lockedContext';
 import {
   runXrdPhaseIdentificationAgent,
   xrdAgentToolSchemas,
@@ -599,6 +601,24 @@ export default function XRDWorkspace() {
                   <div className="mt-0.5 text-[10px] font-semibold text-primary">{workflowFeedback}</div>
                 )}
               </div>
+
+              {/* Locked Scientific Context */}
+              {(() => {
+                const lockedContext = getLockedContext(project.id);
+                return lockedContext ? (
+                  <div className="border-b border-border px-3 py-1.5">
+                    <LockedScientificContext
+                      sampleIdentity={lockedContext.sampleIdentity}
+                      technique={lockedContext.technique}
+                      sourceDataset={lockedContext.sourceDataset}
+                      sourceProcessingPath={lockedContext.sourceProcessingPath}
+                      referenceScope={lockedContext.referenceScope}
+                      claimBoundary={lockedContext.claimBoundary}
+                      variant="compact"
+                    />
+                  </div>
+                ) : null;
+              })()}
 
               {/* Actions: compact row */}
               <div className="px-2.5 py-1.5 space-y-1 shrink-0">

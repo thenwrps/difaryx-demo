@@ -63,12 +63,19 @@ export function CenterColumn({
       {/* Card 1: XRD Phase Identification */}
       <div className="flex min-h-0 flex-col gap-3 rounded-lg border border-slate-800 bg-[#0F172A] p-4">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-lg font-bold text-white">
-            {context === 'XRD' && 'XRD Phase Identification'}
-            {context === 'XPS' && 'XPS Surface Chemistry'}
-            {context === 'FTIR' && 'FTIR Bonding Analysis'}
-            {context === 'Raman' && 'Raman Structural Fingerprint'}
-          </h2>
+          <div>
+            <h2 className="text-lg font-bold text-white">
+              {context === 'XRD' && 'XRD Phase Identification'}
+              {context === 'XPS' && 'XPS Surface Chemistry'}
+              {context === 'FTIR' && 'FTIR Bonding Analysis'}
+              {context === 'Raman' && 'Raman Structural Fingerprint'}
+            </h2>
+            {context === 'XRD' && (
+              <p className="mt-1 text-[11px] text-slate-400">
+                Primary structural evidence workflow. Raman, FTIR, XPS, and literature layers provide validation context.
+              </p>
+            )}
+          </div>
           <span className="px-3 py-1 rounded-full bg-emerald-400/10 border border-emerald-400/30 text-emerald-300 text-xs font-bold">
             Signal Loaded
           </span>

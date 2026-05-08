@@ -1562,6 +1562,7 @@ export default function AgentDemo() {
         <RightPanel
           technique={agentState.context}
           projectName={selectedProject.name}
+          projectId={selectedProject.id}
           currentStep={agentState.reasoningState.currentStepIndex}
           totalSteps={stages.length}
           executionSteps={executionSteps}

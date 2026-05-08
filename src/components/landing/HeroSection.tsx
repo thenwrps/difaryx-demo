@@ -215,7 +215,7 @@ export default function HeroSection() {
               From Fragmented Workflows to Unified Scientific Decisions
             </h1>
             <p className="mb-8 max-w-[620px] text-[16px] leading-[30px] text-slate-600 lg:text-[18px]">
-              DIFARYX integrates multi-technique data, eliminates manual workflows, and enables controllable, reproducible scientific analysis.
+              DIFARYX integrates multi-technique data, eliminates manual workflows, and enables validation-aware, reproducible scientific decisions.
             </p>
 
             <div className="flex flex-col items-start gap-3">

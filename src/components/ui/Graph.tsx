@@ -42,6 +42,9 @@ interface GraphProps {
   baselineData?: ExternalPoint[];
   /** Peak position markers */
   peakMarkers?: PeakMarker[];
+  /** Optional axis labels for uploaded or externally mapped signals */
+  xAxisLabel?: string;
+  yAxisLabel?: string;
 }
 
 // ── Internal data types ──────────────────────────────────────────────
@@ -351,6 +354,8 @@ export function Graph({
   externalData,
   baselineData,
   peakMarkers,
+  xAxisLabel,
+  yAxisLabel,
 }: GraphProps) {
   const useExternal = !!externalData && externalData.length > 0;
 
@@ -364,20 +369,26 @@ export function Graph({
   );
 
   const settings = SETTINGS[type];
+  const displayXLabel = xAxisLabel ?? settings.xLabel;
+  const displayYLabel = yAxisLabel ?? settings.yLabel;
 
   if (useExternal) {
     // External data rendering mode
     const yValues = externalChartData.map((d) => d.observed);
+    const xValues = externalChartData.map((d) => d.x);
+    const xMin = Math.min(...xValues);
+    const xMax = Math.max(...xValues);
     const yMin = Math.min(...yValues);
     const yMax = Math.max(...yValues);
     const yPadding = (yMax - yMin) * 0.1 || 5;
     const yDomain: [number, number] = [
-      Math.max(0, yMin - yPadding),
+      yMin - yPadding,
       yMax + yPadding,
     ];
+    const xPadding = xMin === xMax ? 1 : 0;
     const xDomain: [number, number] = [
-      externalChartData[0]?.x ?? settings.range[0],
-      externalChartData[externalChartData.length - 1]?.x ?? settings.range[1],
+      Number.isFinite(xMin) ? xMin - xPadding : settings.range[0],
+      Number.isFinite(xMax) ? xMax + xPadding : settings.range[1],
     ];
 
     const markers = peakMarkers ?? [];
@@ -394,7 +405,7 @@ export function Graph({
               tick={{ fill: '#94a3b8', fontSize: 12 }}
               tickLine={{ stroke: '#64748b' }}
               axisLine={{ stroke: '#334155' }}
-              label={{ value: settings.xLabel, position: 'bottom', fill: '#94a3b8', fontSize: 12 }}
+              label={{ value: displayXLabel, position: 'bottom', fill: '#94a3b8', fontSize: 12 }}
               type="number"
               domain={xDomain}
               reversed={settings.reversed}
@@ -404,7 +415,7 @@ export function Graph({
               tick={{ fill: '#94a3b8', fontSize: 12 }}
               tickLine={{ stroke: '#64748b' }}
               axisLine={{ stroke: '#334155' }}
-              label={{ value: settings.yLabel, angle: -90, position: 'left', fill: '#94a3b8', fontSize: 12 }}
+              label={{ value: displayYLabel, angle: -90, position: 'left', fill: '#94a3b8', fontSize: 12 }}
               domain={yDomain}
               allowDataOverflow
               tickFormatter={(v) => (Math.abs(v) < 0.5 ? '0' : String(Math.round(v)))}
@@ -414,7 +425,7 @@ export function Graph({
                 typeof value === 'number' ? value.toFixed(2) : value,
                 tooltipNames[String(name)] ?? name,
               ]}
-              labelFormatter={(value) => `${settings.xLabel}: ${Number(value).toFixed(2)}`}
+              labelFormatter={(value) => `${displayXLabel}: ${Number(value).toFixed(2)}`}
               contentStyle={{
                 backgroundColor: '#0f172a',
                 borderColor: 'rgba(148,163,184,0.25)',
@@ -452,7 +463,7 @@ export function Graph({
             />
             )}
 
-            {/* Reference peak sticks (ultra subtle, publication-ready) */}
+            {/* Reference peak sticks for bounded visual review */}
             {markers.map((m, i) => {
               const isSelected = m.role === 'selected';
               const isLinked = m.role === 'linked';
@@ -554,7 +565,7 @@ export function Graph({
             tick={{ fill: '#94a3b8', fontSize: 12 }}
             tickLine={{ stroke: '#64748b' }}
             axisLine={{ stroke: '#334155' }}
-            label={{ value: settings.xLabel, position: 'bottom', fill: '#94a3b8', fontSize: 12 }}
+            label={{ value: displayXLabel, position: 'bottom', fill: '#94a3b8', fontSize: 12 }}
             type="number"
             domain={settings.range}
             reversed={settings.reversed}
@@ -564,7 +575,7 @@ export function Graph({
             tick={{ fill: '#94a3b8', fontSize: 12 }}
             tickLine={{ stroke: '#64748b' }}
             axisLine={{ stroke: '#334155' }}
-            label={{ value: settings.yLabel, angle: -90, position: 'left', fill: '#94a3b8', fontSize: 12 }}
+            label={{ value: displayYLabel, angle: -90, position: 'left', fill: '#94a3b8', fontSize: 12 }}
             domain={yDomain}
             allowDataOverflow
             tickFormatter={(v) => (Math.abs(v) < 0.5 ? '0' : String(Math.round(v)))}
@@ -574,7 +585,7 @@ export function Graph({
               typeof value === 'number' ? value.toFixed(2) : value,
               tooltipNames[String(name)] ?? name,
             ]}
-            labelFormatter={(value) => `${settings.xLabel}: ${Number(value).toFixed(2)}`}
+            labelFormatter={(value) => `${displayXLabel}: ${Number(value).toFixed(2)}`}
             contentStyle={{
               backgroundColor: '#0f172a',
               borderColor: 'rgba(148,163,184,0.25)',

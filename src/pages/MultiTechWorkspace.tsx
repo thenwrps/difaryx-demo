@@ -1,10 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowRight, BookOpen, CheckCircle2, FileText, Layers3, Play, Save } from 'lucide-react';
+import { AlertTriangle, ArrowRight, BookOpen, CheckCircle2, FileText, LockKeyhole, Play, Save, Upload } from 'lucide-react';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Graph } from '../components/ui/Graph';
+import { LockedScientificContext } from '../components/locked-context/LockedScientificContext';
 import {
   DEFAULT_PROJECT_ID,
   Technique,
@@ -20,6 +21,24 @@ import {
   createProcessingResultFromXrdDemo,
   saveProcessingResult,
 } from '../data/workflowPipeline';
+import {
+  AXIS_DEFAULTS_BY_TECHNIQUE,
+  BETA_TECHNIQUES,
+  CLAIM_BOUNDARY_BY_TECHNIQUE,
+  EVIDENCE_ROLE_BY_TECHNIQUE,
+  FEATURE_TABLE_TITLES,
+  INSUFFICIENT_EVIDENCE_MESSAGE,
+  QUALITY_LABELS,
+  createUploadedSignalRun,
+  getUploadedSignalStorageStatus,
+  mapUploadedSignalColumns,
+  parseUploadedSignalText,
+  readUploadedSignalRuns,
+  saveUploadedSignalRun,
+  type ParsedUploadedSignalSuccess,
+  type Technique as UploadedTechnique,
+  type UploadedSignalRun,
+} from '../data/uploadedSignalRuns';
 
 // Cross-tech evidence types
 interface CrossTechEvidence {
@@ -176,7 +195,7 @@ const demoClaims: CrossTechClaim[] = [
     description: 'FTIR carbonate bands suggest surface contamination or CO₂ adsorption',
     linkedEvidenceIds: ['ftir-carbonate'],
     interpretation: 'FTIR bands at 1380 cm⁻¹ and 1580 cm⁻¹ are assigned to carbonate or carboxylate species on the surface. These may arise from atmospheric CO₂ adsorption or residual organic species from synthesis. Surface carbonates can affect catalytic activity and surface charge.',
-    evidenceBasis: 'Carbonate C-O stretching modes typically appear at 1300–1600 cm⁻¹. The observed bands match literature values for surface-bound carbonate or carboxylate. Absence of corresponding XPS C 1s analysis limits definitive assignment.',
+    evidenceBasis: 'Carbonate C-O stretching modes typically appear at 1300–1600 cm⁻¹. The observed bands match literature values for surface-bound carbonate or carboxylate. Absence of corresponding XPS C 1s analysis keeps assignment validation-limited.',
     limitations: 'FTIR cannot distinguish between carbonate, bicarbonate, and carboxylate without isotopic labeling. Surface vs bulk contribution unclear. May be sample-preparation artifact rather than intrinsic property.',
     recommendedValidation: 'XPS C 1s and O 1s for chemical-state analysis. Thermal treatment to assess stability. In situ FTIR with CO₂ exposure to confirm adsorption mechanism.',
   },
@@ -267,7 +286,7 @@ function runCrossTechReview(context: {
       'Raman selection rules may obscure certain modes',
       'Surface species (hydroxyl, carbonate) may be ambient artifacts',
     ],
-    decision: `Proceed with spinel ferrite structural assignment for ${projectName}. Recommend validation experiments to confirm surface vs bulk consistency and assess impact of surface species on functional properties.`,
+    decision: `Use spinel ferrite assignment as a working interpretation for ${projectName}; phase purity and surface-state claims remain validation-limited. Recommend validation experiments to confirm surface vs bulk consistency.`,
     recommendedValidation: [
       'High-resolution TEM for direct lattice imaging',
       'Depth-profiling XPS for surface vs bulk oxidation states',
@@ -425,7 +444,7 @@ function runFusionReasoning(context: {
       'Raman selection rules may obscure certain modes',
       'Surface species (hydroxyl, carbonate) may be ambient artifacts',
     ],
-    decision: `Proceed with spinel ferrite structural assignment for ${projectName}. Recommend validation experiments to confirm surface vs bulk consistency and assess impact of surface species on functional properties.`,
+    decision: `Use spinel ferrite assignment as a working interpretation for ${projectName}; phase purity and surface-state claims remain validation-limited. Recommend validation experiments to confirm surface vs bulk consistency.`,
     recommendedValidation: [
       'High-resolution TEM for direct lattice imaging',
       'Depth-profiling XPS for surface vs bulk oxidation states',
@@ -518,7 +537,7 @@ ${techniques.length} techniques provide complementary evidence. Raman and XRD in
 - In situ characterization under controlled atmosphere
 
 ## Decision
-Proceed with spinel ferrite structural assignment for ${projectName}. Recommend validation experiments to confirm surface vs bulk consistency and assess impact of surface species on functional properties.
+Use spinel ferrite assignment as a working interpretation for ${projectName}; phase purity and surface-state claims remain validation-limited. Recommend validation experiments to confirm surface vs bulk consistency.
 `;
 }
 
@@ -534,9 +553,9 @@ function generateCrossTechConsistency(claim: CrossTechClaim, evidence: CrossTech
   } else if (claim.id === 'surface-hydroxyl') {
     return 'FTIR is the primary technique for detecting surface hydroxyl/water species. XPS could provide complementary O 1s analysis but is not included in current dataset. Other techniques do not directly probe surface hydration.';
   } else if (claim.id === 'carbonate-surface') {
-    return 'FTIR carbonate bands are observed, but corresponding XPS C 1s analysis is absent. Raman does not show clear carbonate features. Single-technique observation limits definitive assignment.';
+    return 'FTIR carbonate bands are observed, but corresponding XPS C 1s analysis is absent. Raman does not show clear carbonate features. Single-technique observation keeps assignment validation-limited.';
   } else if (claim.id === 'carbonaceous-residue') {
-    return 'Raman shows no evidence of carbonaceous species. FTIR carbonate bands do not correspond to Raman-active carbon. XPS C 1s would provide definitive surface carbon speciation but is not included.';
+    return 'Raman shows no evidence of carbonaceous species. FTIR carbonate bands do not correspond to Raman-active carbon. XPS C 1s would provide stronger surface carbon speciation but is not included.';
   }
   
   return `${techniques.length} technique${techniques.length === 1 ? '' : 's'} provide${techniques.length === 1 ? 's' : ''} evidence for this interpretation. Cross-technique consistency supports the conclusion.`;
@@ -544,7 +563,7 @@ function generateCrossTechConsistency(claim: CrossTechClaim, evidence: CrossTech
 
 function generateDecision(claim: CrossTechClaim): string {
   if (claim.id === 'spinel-ferrite') {
-    return 'Proceed with spinel ferrite structural assignment for downstream analysis and reporting.';
+    return 'Use spinel ferrite assignment as a working interpretation; phase purity and surface-state claims remain validation-limited.';
   } else if (claim.id === 'oxidation-state') {
     return 'Accept Cu²⁺/Fe³⁺ oxidation states as working model; recommend depth-profiling for bulk validation.';
   } else if (claim.id === 'metal-oxygen') {
@@ -557,7 +576,7 @@ function generateDecision(claim: CrossTechClaim): string {
     return 'No action required for carbonaceous contamination; proceed with current dataset.';
   }
   
-  return 'Proceed with current interpretation; recommend validation experiments for definitive assignment.';
+  return 'Proceed with current interpretation; recommend validation experiments before stronger assignment.';
 }
 
 function parseLimitations(text: string): string[] {
@@ -603,6 +622,61 @@ const matrixCells: MatrixCell[] = [
   { claimId: 'carbonaceous-residue', technique: 'FTIR', status: 'Ambiguous' },
 ];
 
+function getUploadedGraphType(technique: UploadedTechnique): 'xrd' | 'xps' | 'ftir' | 'raman' {
+  if (technique === 'XPS') return 'xps';
+  if (technique === 'FTIR') return 'ftir';
+  if (technique === 'Raman') return 'raman';
+  return 'xrd';
+}
+
+function formatUploadedRunTime(value: string) {
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(new Date(value));
+  } catch {
+    return value;
+  }
+}
+
+function getUploadedTechniqueLimitations(technique: UploadedTechnique): string[] {
+  if (technique === 'XPS') {
+    return [
+      'Binding-energy calibration should be reviewed before oxidation-state interpretation.',
+      'Surface-sensitive XPS evidence cannot establish bulk composition or phase identity alone.',
+    ];
+  }
+
+  if (technique === 'FTIR') {
+    return [
+      'Band assignments are qualitative in this beta workflow.',
+      'Support and bonding context cannot independently establish crystalline phase purity.',
+    ];
+  }
+
+  if (technique === 'Raman') {
+    return [
+      'Fluorescence, baseline, and noise can mask or shift mode regions.',
+      'Local vibrational consistency does not replace crystallographic assignment.',
+    ];
+  }
+
+  if (technique === 'Unknown') {
+    return [
+      'Technique is unknown, so only generic signal feature inspection is available.',
+      'No material-specific claim is generated from this upload.',
+    ];
+  }
+
+  return [
+    'Peak positions support phase-assignment review only within the selected reference scope.',
+    'Phase purity remains validation-limited.',
+  ];
+}
+
 export default function MultiTechWorkspace() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -617,6 +691,175 @@ export default function MultiTechWorkspace() {
   const [reviewOutput, setReviewOutput] = useState<FusionResult | null>(null);
   const [isTechniqueDropdownOpen, setIsTechniqueDropdownOpen] = useState(false);
   const [workflowFeedback, setWorkflowFeedback] = useState('');
+  const [uploadedFileName, setUploadedFileName] = useState('');
+  const [parsedUpload, setParsedUpload] = useState<ParsedUploadedSignalSuccess | null>(null);
+  const [uploadError, setUploadError] = useState('');
+  const [uploadErrorQuality, setUploadErrorQuality] = useState<UploadedSignalRun['evidenceQuality'] | null>(null);
+  const [selectedUploadTechnique, setSelectedUploadTechnique] = useState<UploadedTechnique>('Unknown');
+  const [sampleIdentity, setSampleIdentity] = useState('');
+  const [xAxisLabel, setXAxisLabel] = useState(AXIS_DEFAULTS_BY_TECHNIQUE.Unknown.xAxisLabel);
+  const [yAxisLabel, setYAxisLabel] = useState(AXIS_DEFAULTS_BY_TECHNIQUE.Unknown.yAxisLabel);
+  const [xColumn, setXColumn] = useState(1);
+  const [yColumn, setYColumn] = useState(2);
+  const [referenceScope, setReferenceScope] = useState('');
+  const [latestUploadedRun, setLatestUploadedRun] = useState<UploadedSignalRun | null>(null);
+  const [uploadedRuns, setUploadedRuns] = useState<UploadedSignalRun[]>(() => readUploadedSignalRuns());
+  const [uploadStorageStatus, setUploadStorageStatus] = useState(() => getUploadedSignalStorageStatus());
+  const [handoffPrepared, setHandoffPrepared] = useState(false);
+  const [uploadFeedback, setUploadFeedback] = useState('');
+
+  const claimBoundary = CLAIM_BOUNDARY_BY_TECHNIQUE[selectedUploadTechnique];
+  const activeUploadQuality = latestUploadedRun?.evidenceQuality ?? uploadErrorQuality;
+  const canAnalyzeUpload = Boolean(
+    parsedUpload &&
+    sampleIdentity.trim() &&
+    xAxisLabel.trim() &&
+    yAxisLabel.trim() &&
+    xColumn !== yColumn,
+  );
+  const uploadGraphRun = latestUploadedRun ?? null;
+  const uploadMatrixRows = BETA_TECHNIQUES.map((technique) => {
+    const isUploaded = latestUploadedRun?.technique === technique;
+    const isSelectedPending = !latestUploadedRun && parsedUpload && selectedUploadTechnique === technique;
+
+    return {
+      technique,
+      evidenceRole: EVIDENCE_ROLE_BY_TECHNIQUE[technique],
+      status: isUploaded ? 'Uploaded' : isSelectedPending ? 'Context required' : 'Not uploaded',
+      boundary: CLAIM_BOUNDARY_BY_TECHNIQUE[technique],
+    };
+  });
+
+  const showUploadFallback =
+    latestUploadedRun &&
+    (!latestUploadedRun.evidenceQuality.canInterpret || latestUploadedRun.technique === 'Unknown');
+  const contextReady = Boolean(sampleIdentity.trim() && selectedUploadTechnique && xAxisLabel.trim() && yAxisLabel.trim());
+  const mappingReady = Boolean(parsedUpload && xColumn !== yColumn);
+  const uploadWorkflowStatuses = [
+    { label: 'File selected', ready: Boolean(uploadedFileName), fallback: 'No file selected' },
+    { label: 'Signal parsed', ready: Boolean(parsedUpload), fallback: uploadError ? 'Parse blocked' : 'Parse pending' },
+    { label: `Technique: ${selectedUploadTechnique}`, ready: selectedUploadTechnique !== 'Unknown', fallback: 'Technique unknown' },
+    { label: 'Columns mapped', ready: mappingReady, fallback: parsedUpload ? 'Mapping required' : 'Pending parse' },
+    { label: 'Context locked', ready: Boolean(latestUploadedRun), fallback: contextReady ? 'Ready to lock' : 'Context required' },
+    { label: 'Quality assessed', ready: Boolean(latestUploadedRun?.evidenceQuality), fallback: 'Gate pending' },
+    { label: 'Handoff preview', ready: handoffPrepared, fallback: latestUploadedRun ? 'Preview available' : 'Pending analysis' },
+  ];
+
+  const setTemporaryUploadFeedback = (message: string) => {
+    setUploadFeedback(message);
+    window.setTimeout(() => setUploadFeedback(''), 2200);
+  };
+
+  const handleUploadedTechniqueChange = (technique: UploadedTechnique) => {
+    setSelectedUploadTechnique(technique);
+    setXAxisLabel(AXIS_DEFAULTS_BY_TECHNIQUE[technique].xAxisLabel);
+    setYAxisLabel(AXIS_DEFAULTS_BY_TECHNIQUE[technique].yAxisLabel);
+  };
+
+  const handleUploadFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    setLatestUploadedRun(null);
+    setHandoffPrepared(false);
+    setUploadError('');
+    setUploadErrorQuality(null);
+    setParsedUpload(null);
+    setXColumn(1);
+    setYColumn(2);
+
+    if (!file) {
+      setUploadedFileName('');
+      return;
+    }
+
+    setUploadedFileName(file.name);
+
+    try {
+      const text = await file.text();
+      const parsed = parseUploadedSignalText(file.name, text);
+
+      if (!parsed.ok) {
+        setUploadError(parsed.error);
+        setUploadErrorQuality(parsed.evidenceQuality);
+        return;
+      }
+
+      setParsedUpload(parsed);
+      setXColumn(parsed.columnMapping.xColumn);
+      setYColumn(parsed.columnMapping.yColumn);
+      handleUploadedTechniqueChange(parsed.suggestedTechnique);
+
+      if (!sampleIdentity.trim()) {
+        setSampleIdentity(file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' '));
+      }
+    } catch {
+      setUploadError('DIFARYX could not read the selected file in the browser.');
+      setUploadErrorQuality({
+        state: 'insufficient_numeric_data',
+        label: QUALITY_LABELS.insufficient_numeric_data,
+        canInterpret: false,
+        messages: [
+          'Interpretation is bounded by current evidence coverage.',
+          'The selected file could not be read by the public-beta upload workflow.',
+        ],
+      });
+    }
+  };
+
+  const handleConfirmContextAndAnalyze = () => {
+    if (!parsedUpload || !canAnalyzeUpload) return;
+    const mappedPoints = mapUploadedSignalColumns(parsedUpload, xColumn, yColumn);
+
+    const run = createUploadedSignalRun({
+      fileName: parsedUpload.fileName,
+      technique: selectedUploadTechnique,
+      sampleIdentity,
+      xAxisLabel,
+      yAxisLabel,
+      referenceScope,
+      points: mappedPoints,
+    });
+
+    setLatestUploadedRun(run);
+    setUploadedRuns((current) => [
+      run,
+      ...current.filter((existingRun) => existingRun.id !== run.id),
+    ].slice(0, 12));
+    const saved = saveUploadedSignalRun(run);
+    setUploadStorageStatus(getUploadedSignalStorageStatus());
+    const feedbackMessage = saved
+      ? (run.evidenceQuality.canInterpret
+        ? 'Bounded feature extraction ready; beta run saved'
+        : 'Evidence gate applied; beta run saved')
+      : (run.evidenceQuality.canInterpret
+        ? 'Bounded feature extraction ready in this session'
+        : 'Evidence gate applied in this session');
+
+    setHandoffPrepared(false);
+    setTemporaryUploadFeedback(feedbackMessage);
+  };
+
+  const handleAddUploadedRunToEvidenceBundle = () => {
+    if (!latestUploadedRun) return;
+
+    setUploadedRuns((current) => [
+      latestUploadedRun,
+      ...current.filter((run) => run.id !== latestUploadedRun.id),
+    ].slice(0, 12));
+
+    const saved = saveUploadedSignalRun(latestUploadedRun);
+    setUploadStorageStatus(getUploadedSignalStorageStatus());
+    setTemporaryUploadFeedback(
+      saved
+        ? 'Uploaded signal added to evidence bundle'
+        : 'Uploaded signal retained in this session; browser storage was unavailable',
+    );
+  };
+
+  const handlePrepareNotebookEntry = () => {
+    if (!latestUploadedRun) return;
+    setHandoffPrepared(true);
+    setTemporaryUploadFeedback('Notebook/Report handoff preview prepared');
+  };
 
   // Compute graph highlights for a technique
   const getGraphHighlights = (technique: Technique): GraphHighlight[] => {
@@ -939,6 +1182,521 @@ ${result.decision}
           </div>
         </div>
 
+        <Card id="beta-upload" className="mb-3 overflow-hidden">
+          <div className="border-b border-border bg-surface-hover/40 px-4 py-3">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-bold text-text-main">Upload Experimental Signal</h2>
+                  <span className="rounded border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
+                    Public beta
+                  </span>
+                </div>
+                <p className="mt-1 max-w-3xl text-[11px] text-text-muted">
+                  Parse real XRD, XPS, FTIR, Raman, or unknown signal files into a bounded multi-technique evidence workflow.
+                </p>
+                <p className="mt-1 text-[10px] text-text-muted">
+                  Uploaded runs remain separate from bundled CuFe2O4 demo evidence and use only user-confirmed context.
+                </p>
+              </div>
+              <label className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-white transition-colors hover:bg-primary/90">
+                <Upload size={14} /> Upload experimental signal
+                <input
+                  type="file"
+                  accept=".csv,.txt,.xy,.dat,text/csv,text/plain"
+                  className="sr-only"
+                  onChange={handleUploadFileChange}
+                />
+              </label>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {uploadWorkflowStatuses.map((item) => (
+                <span
+                  key={item.label}
+                  className={`rounded border px-2 py-1 text-[10px] font-semibold ${
+                    item.ready
+                      ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700'
+                      : 'border-border bg-background text-text-muted'
+                  }`}
+                >
+                  {item.ready ? item.label : item.fallback}
+                </span>
+              ))}
+            </div>
+            {(!uploadStorageStatus.available || uploadStorageStatus.corrupted) && (
+              <p className="mt-2 text-[10px] text-amber-700">{uploadStorageStatus.message}</p>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 p-3 xl:grid-cols-[320px_1fr]">
+            <div className="space-y-3">
+              <div className="rounded-lg border border-border bg-background p-3">
+                <h3 className="text-xs font-bold text-text-main">Scientific context confirmation</h3>
+                <div className="mt-3 space-y-3">
+                  <div>
+                    <label className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">
+                      Technique
+                    </label>
+                    <select
+                      value={selectedUploadTechnique}
+                      onChange={(event) => handleUploadedTechniqueChange(event.target.value as UploadedTechnique)}
+                      className="mt-1 h-9 w-full rounded border border-border bg-surface px-3 text-sm text-text-main outline-none focus:border-primary"
+                    >
+                      {BETA_TECHNIQUES.map((technique) => (
+                        <option key={technique} value={technique}>
+                          {technique}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">
+                      Sample identity
+                    </label>
+                    <input
+                      value={sampleIdentity}
+                      onChange={(event) => setSampleIdentity(event.target.value)}
+                      placeholder="Required before analysis"
+                      className="mt-1 h-9 w-full rounded border border-border bg-surface px-3 text-sm text-text-main outline-none placeholder:text-text-muted/60 focus:border-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">
+                      Source dataset / file name
+                    </label>
+                    <div className="mt-1 rounded border border-border bg-surface px-3 py-2 text-xs text-text-main">
+                      {uploadedFileName || 'No file selected'}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-1">
+                    <div>
+                      <label className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">
+                        X-axis label
+                      </label>
+                      <input
+                        value={xAxisLabel}
+                        onChange={(event) => setXAxisLabel(event.target.value)}
+                        className="mt-1 h-9 w-full rounded border border-border bg-surface px-3 text-sm text-text-main outline-none focus:border-primary"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">
+                        Y-axis label
+                      </label>
+                      <input
+                        value={yAxisLabel}
+                        onChange={(event) => setYAxisLabel(event.target.value)}
+                        className="mt-1 h-9 w-full rounded border border-border bg-surface px-3 text-sm text-text-main outline-none focus:border-primary"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">
+                      Reference scope, optional
+                    </label>
+                    <input
+                      value={referenceScope}
+                      onChange={(event) => setReferenceScope(event.target.value)}
+                      placeholder="Example: internal screening, calibration review, support interaction"
+                      className="mt-1 h-9 w-full rounded border border-border bg-surface px-3 text-sm text-text-main outline-none placeholder:text-text-muted/60 focus:border-primary"
+                    />
+                  </div>
+                  <div className="rounded border border-amber-500/30 bg-amber-500/5 p-2">
+                    <div className="text-[10px] font-semibold uppercase tracking-wider text-amber-700">
+                      Claim boundary
+                    </div>
+                    <p className="mt-1 text-xs leading-relaxed text-text-main">{claimBoundary}</p>
+                  </div>
+                  <Button
+                    type="button"
+                    className="w-full gap-2"
+                    onClick={handleConfirmContextAndAnalyze}
+                    disabled={!canAnalyzeUpload}
+                  >
+                    <LockKeyhole size={14} /> Confirm context and analyze
+                  </Button>
+                  {!canAnalyzeUpload && (
+                    <p className="text-[10px] leading-relaxed text-text-muted">
+                      Upload a supported numeric signal and confirm sample identity, technique, and axis labels before analysis.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <LockedScientificContext
+                sampleIdentity={sampleIdentity || 'Pending user confirmation'}
+                technique={selectedUploadTechnique}
+                sourceDataset={uploadedFileName || 'Pending upload'}
+                sourceProcessingPath={`Public beta upload / numeric columns X:${xColumn}, Y:${yColumn}`}
+                referenceScope={referenceScope || 'User-provided beta upload context'}
+                claimBoundary={claimBoundary}
+                variant="compact"
+              />
+              <div className="rounded border border-border bg-background p-2 text-[10px] leading-relaxed text-text-muted">
+                <p>User-confirmed context is treated as a locked scientific constraint.</p>
+                <p>DIFARYX may test analytical paths, but source context remains unchanged.</p>
+                <p>Suggested changes require explicit user action.</p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_320px]">
+                <div className="rounded-lg border border-border bg-background p-3">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <h3 className="text-xs font-bold text-text-main">Column mapping summary</h3>
+                      <p className="mt-1 text-[11px] text-text-muted">
+                        Default mapping uses the first numeric column as X and second numeric column as Y.
+                      </p>
+                    </div>
+                    {parsedUpload && (
+                      <span className="rounded bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                        Parsed
+                      </span>
+                    )}
+                  </div>
+                  {parsedUpload && (
+                    <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      <div>
+                        <label className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">
+                          X column
+                        </label>
+                        <select
+                          value={xColumn}
+                          onChange={(event) => setXColumn(Number(event.target.value))}
+                          className="mt-1 h-8 w-full rounded border border-border bg-surface px-2 text-xs text-text-main outline-none focus:border-primary"
+                        >
+                          {Array.from({ length: parsedUpload.numericColumnCount }, (_, index) => index + 1).map((column) => (
+                            <option key={column} value={column}>
+                              Numeric column {column}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">
+                          Y column
+                        </label>
+                        <select
+                          value={yColumn}
+                          onChange={(event) => setYColumn(Number(event.target.value))}
+                          className="mt-1 h-8 w-full rounded border border-border bg-surface px-2 text-xs text-text-main outline-none focus:border-primary"
+                        >
+                          {Array.from({ length: parsedUpload.numericColumnCount }, (_, index) => index + 1).map((column) => (
+                            <option key={column} value={column}>
+                              Numeric column {column}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  )}
+                  {parsedUpload && xColumn === yColumn && (
+                    <div className="mt-2 rounded border border-amber-500/30 bg-amber-500/10 p-2 text-[10px] text-amber-800">
+                      X and Y must use different numeric columns before analysis.
+                    </div>
+                  )}
+                  <div className="mt-3 grid grid-cols-1 gap-2 text-xs sm:grid-cols-3">
+                    <div className="rounded border border-border bg-surface p-2">
+                      <div className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">Rows</div>
+                      <div className="mt-1 font-bold text-text-main">{parsedUpload?.numericRows ?? 0}</div>
+                    </div>
+                    <div className="rounded border border-border bg-surface p-2">
+                      <div className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">Mapping</div>
+                      <div className="mt-1 font-bold text-text-main">
+                        {parsedUpload ? `X: col ${xColumn}, Y: col ${yColumn}` : 'Pending'}
+                      </div>
+                    </div>
+                    <div className="rounded border border-border bg-surface p-2">
+                      <div className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">Ignored</div>
+                      <div className="mt-1 font-bold text-text-main">{parsedUpload?.ignoredRows ?? 0}</div>
+                    </div>
+                  </div>
+                  {parsedUpload?.warnings.map((warning) => (
+                    <p key={warning} className="mt-2 text-[10px] text-text-muted">{warning}</p>
+                  ))}
+                  {uploadError && (
+                    <div className="mt-3 rounded border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-800">
+                      <div className="flex items-center gap-1.5 font-semibold">
+                        <AlertTriangle size={13} /> Controlled upload state
+                      </div>
+                      <p className="mt-1">{uploadError}</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-lg border border-border bg-background p-3">
+                  <h3 className="text-xs font-bold text-text-main">Evidence quality</h3>
+                  <div className="mt-2 rounded border border-border bg-surface p-2">
+                    <div className={`text-sm font-bold ${
+                      activeUploadQuality?.state === 'ready' ? 'text-emerald-600' :
+                      activeUploadQuality ? 'text-amber-600' : 'text-text-muted'
+                    }`}>
+                      {activeUploadQuality?.label ?? 'Context required'}
+                    </div>
+                    <div className="mt-1 text-[10px] text-text-muted">
+                      Interpretation is bounded by current evidence coverage.
+                    </div>
+                  </div>
+                  <ul className="mt-2 space-y-1 text-[10px] leading-relaxed text-text-muted">
+                    {(activeUploadQuality?.messages ?? [
+                      'Upload and confirm context before evidence-quality gating.',
+                    ]).map((message) => (
+                      <li key={message} className="flex gap-1.5">
+                        <span className="text-primary">-</span>
+                        <span>{message}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  {uploadStorageStatus.corrupted && (
+                    <div className="mt-2 rounded border border-amber-500/30 bg-amber-500/10 p-2 text-[10px] leading-relaxed text-amber-800">
+                      {uploadStorageStatus.message}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-border bg-background p-3">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <h3 className="text-xs font-bold text-text-main">Uploaded signal plot</h3>
+                    <p className="mt-1 text-[11px] text-text-muted">
+                      The plot uses the selected technique and locked axis labels.
+                    </p>
+                  </div>
+                  {latestUploadedRun && (
+                    <span className="rounded bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                      {latestUploadedRun.technique} uploaded
+                    </span>
+                  )}
+                </div>
+                <div className="mt-3 h-64 rounded-md border border-border bg-surface p-2">
+                  {uploadGraphRun ? (
+                    <Graph
+                      type={getUploadedGraphType(uploadGraphRun.technique)}
+                      height="100%"
+                      externalData={uploadGraphRun.points}
+                      showCalculated={false}
+                      showResidual={false}
+                      showLegend={false}
+                      xAxisLabel={uploadGraphRun.xAxisLabel}
+                      yAxisLabel={uploadGraphRun.yAxisLabel}
+                      peakMarkers={uploadGraphRun.extractedFeatures.map((feature) => ({
+                        position: feature.position,
+                        intensity: feature.intensity,
+                        label: feature.label,
+                        role: 'selected',
+                      }))}
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-center text-xs text-text-muted">
+                      Upload a supported signal, confirm locked context, then analyze to plot the uploaded dataset.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                <div className="rounded-lg border border-border bg-background p-3">
+                  <h3 className="text-xs font-bold text-text-main">
+                    {latestUploadedRun ? FEATURE_TABLE_TITLES[latestUploadedRun.technique] : 'Extracted features'}
+                  </h3>
+                  {latestUploadedRun && latestUploadedRun.extractedFeatures.length > 0 ? (
+                    <div className="mt-3 overflow-x-auto">
+                      <table className="w-full text-[10px]">
+                        <thead>
+                          <tr className="border-b border-border text-left text-text-muted">
+                            <th className="py-1.5 pr-2 font-semibold">Feature</th>
+                            <th className="py-1.5 pr-2 font-semibold">Position</th>
+                            <th className="py-1.5 pr-2 font-semibold">Relative</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {latestUploadedRun.extractedFeatures.slice(0, 10).map((feature) => (
+                            <tr key={feature.id}>
+                              <td className="py-2 pr-2 text-text-main">
+                                <div className="font-semibold">{feature.label}</div>
+                                <div className="mt-0.5 text-[9px] leading-relaxed text-text-muted">{feature.context}</div>
+                              </td>
+                              <td className="py-2 pr-2 font-mono text-text-main">{feature.position}</td>
+                              <td className="py-2 pr-2 text-text-main">{feature.relativeIntensity}%</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="mt-3 text-xs leading-relaxed text-text-muted">
+                      {latestUploadedRun ? INSUFFICIENT_EVIDENCE_MESSAGE : 'No uploaded signal has been analyzed yet.'}
+                    </p>
+                  )}
+                  {showUploadFallback && (
+                    <div className="mt-3 rounded border border-amber-500/30 bg-amber-500/10 p-2 text-[10px] leading-relaxed text-amber-800">
+                      {latestUploadedRun.technique === 'Unknown'
+                        ? CLAIM_BOUNDARY_BY_TECHNIQUE.Unknown
+                        : INSUFFICIENT_EVIDENCE_MESSAGE}
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-lg border border-border bg-background p-3">
+                  <h3 className="text-xs font-bold text-text-main">Claim boundary</h3>
+                  <div className="mt-3 rounded border border-border bg-surface p-2 text-xs leading-relaxed text-text-main">
+                    {latestUploadedRun?.claimBoundary[0] ?? claimBoundary}
+                  </div>
+                  <div className="mt-3">
+                    <div className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">Technique limitations</div>
+                    <ul className="mt-2 space-y-1 text-[10px] leading-relaxed text-text-muted">
+                      {getUploadedTechniqueLimitations(latestUploadedRun?.technique ?? selectedUploadTechnique).map((item) => (
+                        <li key={item} className="flex gap-1.5">
+                          <span className="text-primary">-</span>
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={handleAddUploadedRunToEvidenceBundle}
+                      disabled={!latestUploadedRun}
+                    >
+                      <CheckCircle2 size={13} /> Add to evidence bundle
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={handlePrepareNotebookEntry}
+                      disabled={!latestUploadedRun}
+                    >
+                      <Save size={13} /> Prepare Notebook entry
+                    </Button>
+                  </div>
+                  {uploadFeedback && (
+                    <p className="mt-2 text-[10px] font-semibold text-primary">{uploadFeedback}</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-border bg-background p-3">
+                <h3 className="text-xs font-bold text-text-main">Notebook/Report handoff preview</h3>
+                {latestUploadedRun ? (
+                  <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-[1fr_280px]">
+                    <div className="rounded border border-border bg-surface p-3">
+                      <div className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
+                        {[
+                          ['File name', latestUploadedRun.fileName],
+                          ['Technique', latestUploadedRun.technique],
+                          ['Sample identity', latestUploadedRun.sampleIdentity],
+                          ['Evidence quality', latestUploadedRun.evidenceQuality.label],
+                          ['Locked source context', 'Source context was preserved during analysis.'],
+                          ['Beta limitation', 'Uploaded-data interpretation is beta-limited and bounded by current evidence coverage.'],
+                        ].map(([label, value]) => (
+                          <div key={label} className="rounded border border-border bg-background p-2">
+                            <div className="text-[9px] font-semibold uppercase tracking-wider text-text-muted">{label}</div>
+                            <div className="mt-1 text-text-main">{value}</div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-3 rounded border border-border bg-background p-2">
+                        <div className="text-[9px] font-semibold uppercase tracking-wider text-text-muted">Extracted features</div>
+                        <div className="mt-1 text-xs text-text-main">
+                          {latestUploadedRun.extractedFeatures.length > 0
+                            ? latestUploadedRun.extractedFeatures.slice(0, 5).map((feature) => feature.label).join('; ')
+                            : INSUFFICIENT_EVIDENCE_MESSAGE}
+                        </div>
+                      </div>
+                      <div className="mt-3 rounded border border-amber-500/30 bg-amber-500/5 p-2">
+                        <div className="text-[9px] font-semibold uppercase tracking-wider text-amber-700">Claim boundary</div>
+                        <div className="mt-1 text-xs leading-relaxed text-text-main">{latestUploadedRun.claimBoundary.join(' ')}</div>
+                      </div>
+                    </div>
+                    <div className="rounded border border-border bg-surface p-3">
+                      <div className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">Handoff status</div>
+                      <div className={`mt-2 text-sm font-bold ${handoffPrepared ? 'text-emerald-600' : 'text-text-main'}`}>
+                        {handoffPrepared ? 'Notebook entry prepared' : 'Preview ready'}
+                      </div>
+                      <p className="mt-1 text-[10px] leading-relaxed text-text-muted">
+                        This preview packages upload-derived signal evidence for the existing Notebook/Report flow without mixing in canonical demo evidence.
+                      </p>
+                      <ul className="mt-3 space-y-1 text-[10px] leading-relaxed text-text-muted">
+                        <li>File name: {latestUploadedRun.fileName}</li>
+                        <li>Locked context: {latestUploadedRun.lockedContext.referenceScope}</li>
+                        <li>Features: {latestUploadedRun.extractedFeatures.length}</li>
+                        <li>Evidence gate: {latestUploadedRun.evidenceQuality.label}</li>
+                        <li>Limitations retained for report/export review.</li>
+                      </ul>
+                      <Link to={`/notebook?project=${project.id}&source=uploaded-beta&template=analytical`}>
+                        <Button variant="outline" size="sm" className="mt-3 w-full gap-1.5">
+                          <BookOpen size={13} /> Continue to Notebook
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="mt-3 text-xs text-text-muted">
+                    Confirm context and analyze an uploaded signal to prepare a report-ready preview.
+                  </p>
+                )}
+              </div>
+
+              <div className="rounded-lg border border-border bg-background p-3">
+                <h3 className="text-xs font-bold text-text-main">Multi-technique public-beta coverage</h3>
+                <div className="mt-3 overflow-x-auto">
+                  <table className="w-full text-[10px]">
+                    <thead>
+                      <tr className="border-b border-border text-left text-text-muted">
+                        <th className="py-2 pr-3 font-semibold">Technique</th>
+                        <th className="py-2 pr-3 font-semibold">Evidence role</th>
+                        <th className="py-2 pr-3 font-semibold">Current status</th>
+                        <th className="py-2 pr-3 font-semibold">Boundary</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {uploadMatrixRows.map((row) => (
+                        <tr key={row.technique}>
+                          <td className="py-2 pr-3 font-bold text-text-main">{row.technique}</td>
+                          <td className="py-2 pr-3 text-text-muted">{row.evidenceRole}</td>
+                          <td className="py-2 pr-3">
+                            <span className={`rounded px-2 py-0.5 font-semibold ${
+                              row.status === 'Uploaded'
+                                ? 'bg-emerald-500/10 text-emerald-700'
+                                : row.status === 'Context required'
+                                ? 'bg-amber-500/10 text-amber-700'
+                                : 'bg-surface-hover text-text-muted'
+                            }`}>
+                              {row.status}
+                            </span>
+                          </td>
+                          <td className="py-2 pr-3 leading-relaxed text-text-muted">{row.boundary}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {uploadedRuns.length > 0 && (
+                  <div className="mt-3 rounded border border-border bg-surface p-2">
+                    <div className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">Saved beta uploads</div>
+                    <p className="mt-1 text-[10px] text-text-muted">{uploadStorageStatus.message}</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {uploadedRuns.slice(0, 4).map((run) => (
+                        <span key={run.id} className="rounded border border-border bg-background px-2 py-1 text-[10px] text-text-muted">
+                          {run.technique} - {run.fileName} - {formatUploadedRunTime(run.createdAt)}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </Card>
+
         {/* Main 2-column layout: Left (2x2 graphs) | Right (vertical sections) */}
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_380px]">
           {/* Left Panel: 2x2 synchronized evidence grid */}
@@ -1025,7 +1783,7 @@ ${result.decision}
                 <div>
                   <div className="text-[9px] font-semibold uppercase tracking-wider text-primary">Interpretation</div>
                   <p className="mt-1 text-[10px] leading-relaxed text-text-main">
-                    {reviewOutput?.conclusion || 'Convergent multi-technique evidence supports spinel ferrite structure with characteristic vibrational and diffraction signatures.'}
+                    {reviewOutput?.conclusion || 'Linked XRD, Raman, and FTIR evidence supports a spinel-ferrite working interpretation, while XPS surface-state validation remains under review.'}
                   </p>
                 </div>
                 <div>
@@ -1083,7 +1841,7 @@ ${result.decision}
                 <div>
                   <div className="text-[9px] font-semibold uppercase tracking-wider text-primary">Claim Boundary</div>
                   <p className="mt-1 text-[10px] font-semibold text-text-main">
-                    {reviewOutput?.decision || 'Proceed with spinel ferrite structural assignment for downstream analysis and reporting.'}
+                    {reviewOutput?.decision || 'Use spinel ferrite assignment as a working interpretation; phase purity and surface-state claims remain validation-limited.'}
                   </p>
                 </div>
               </div>
