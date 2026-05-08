@@ -1,16 +1,183 @@
-# React + Vite
+# DIFARYX
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+DIFARYX turns experimental characterization signals into evidence-linked scientific reasoning, bounded decisions, and report-ready outputs. The current repository is a deterministic frontend demo for materials characterization workflows, with an XRD workspace, a multi-technique workspace, Agent Mode, Notebook Lab, History, Settings, and a public-beta uploaded-signal workflow for XRD, XPS, FTIR, and Raman.
 
-Currently, two official plugins are available:
+## Why This Matters
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Scientific teams often move from raw instrument output to discussion text through fragmented manual steps. DIFARYX focuses on the gap between signal inspection and defensible scientific decisions:
 
-## React Compiler
+- Experimental data is spread across files, instruments, and technique-specific tools.
+- Interpretation often requires manual comparison across XRD, XPS, FTIR, Raman, and supporting context.
+- Traceability from signal feature to claim, limitation, and report text is weak.
+- AI-generated scientific text can overstate what the evidence supports.
+- Moving from processing result to notebook discussion or report section is slow and inconsistent.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+DIFARYX treats each signal-derived observation as evidence with provenance, evidence quality, and claim boundaries before it is handed to an agent, notebook, or report surface.
 
-## Expanding the ESLint configuration
+## Core Workflow
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Primary reviewer story:
+
+`Signal -> Compute -> Reason -> Literature / Validation -> Decision -> Report`
+
+Current internal handoff model:
+
+`ProcessingResult -> AgentDiscussionRefinement -> NotebookEntry -> ReportSection`
+
+The current demo uses local deterministic logic for processing, reasoning states, notebook previews, and report handoff. The literature and validation stage is represented as bounded workflow language and validation-pending claim boundaries; live literature retrieval and backend validation services are future integration points.
+
+## Current Demo Routes
+
+| Route | What reviewers should see |
+| --- | --- |
+| `/` | Public DIFARYX concept page and workflow story. |
+| `/dashboard` | Product overview with demo projects, readiness, graph previews, and agent entry points. |
+| `/workspace` | Workspace entry surface that routes reviewers into technique review. |
+| `/workspace/xrd` | XRD graph review, processing controls, feature detection, evidence saving, and exports. |
+| `/workspace/multi` | Multi-technique evidence hub and public-beta uploaded-signal workflow. |
+| `/demo/agent` | Deterministic Agent Mode with goal, graph, execution log, evidence, reasoning, and decision. |
+| `/notebook` | Notebook Lab with evidence summary, caveats, provenance, and report/export preview. |
+| `/history` | Deterministic run history and workspace provenance. |
+| `/settings` | Local demo settings for profile, data handling, export, and reasoning preferences. |
+
+Additional technique routes exist for `/workspace/xps`, `/workspace/ftir`, and `/workspace/raman`.
+
+## Multi-Technique Public Beta Upload Core
+
+The `/workspace/multi` route supports uploaded experimental signal workflows for:
+
+- XRD
+- XPS
+- FTIR
+- Raman
+- Unknown signal inspection
+
+Supported local file types:
+
+- `.csv`
+- `.txt`
+- `.xy`
+- `.dat`
+
+Workflow:
+
+`Upload signal -> Select or detect technique -> Map columns -> Confirm scientific context -> Lock context -> Plot signal -> Extract technique-specific features -> Run evidence quality gate -> Generate claim boundary -> Send bounded result to Agent / Notebook / Report`
+
+The upload beta accepts comma, tab, semicolon, and whitespace-delimited numeric data. It ignores empty lines and nonnumeric header/comment lines, defaults to the first numeric column as X and the second numeric column as Y, and allows X/Y column remapping before analysis.
+
+Uploaded runs are stored only in the browser under `difaryx.uploadedSignalRuns.v1` when localStorage is available. Stored runs are capped and compacted for demo safety. If browser storage is unavailable or contains malformed saved data, the upload workflow remains usable in memory.
+
+## Technique-Specific Claim Boundaries
+
+| Technique | Evidence role | Boundary |
+| --- | --- | --- |
+| XRD | Crystal structure / phase evidence | Supports phase-evidence review, but does not make a phase purity claim without reference validation. |
+| XPS | Surface composition / oxidation-state evidence | Surface-sensitive evidence only; it cannot establish bulk composition or bulk phase identity alone. |
+| FTIR | Bonding / functional-group / support evidence | Provides qualitative bonding and functional-group context, not standalone structural assignment. |
+| Raman | Vibrational fingerprint / local structure | Supports local vibrational or structural consistency, but does not replace crystallographic assignment. |
+| Unknown | Generic signal inspection | Supports feature inspection only; no material-specific claim is generated. |
+
+## Scientific Guardrails
+
+- Uploaded runs remain separate from bundled CuFe2O4 demo evidence.
+- Sample identity is not inferred without user-confirmed context.
+- User-confirmed source context is treated as a locked scientific constraint.
+- Evidence quality gates run before interpretation handoff.
+- Claim boundaries are generated before Notebook / Report preview.
+- Unsupported or weak uploads produce a bounded blocked state instead of material-specific interpretation.
+- Output language favors bounded terms such as "supports", "is consistent with", "requires validation", "evidence-limited", "context-confirmed", "reference validation pending", and "cannot establish".
+
+The upload beta does not use live backend storage, live model execution, Google Scholar scraping, or licensed reference database integration.
+
+## Notebook And Report Handoff
+
+Notebook and report surfaces receive structured, bounded context rather than raw untracked conclusions. For uploaded signals, the handoff preview includes:
+
+- File name
+- Technique
+- Sample identity
+- Locked context
+- Extracted features
+- Evidence quality
+- Claim boundary
+- Limitations
+
+The current upload handoff is intentionally preview-based. It packages upload-derived signal evidence for the existing Notebook / Report flow without mixing in canonical demo evidence.
+
+## Deterministic Demo Disclosure
+
+This repository is a frontend demo. It uses deterministic local logic and bundled demo data so reviewers can replay the same workflow without a production backend, authentication service, cloud storage, or external API.
+
+The uploaded-signal public beta is local-browser scoped. It demonstrates parsing, mapping, feature extraction, quality gating, claim boundaries, and handoff context, but it does not run live literature validation or production scientific reference matching.
+
+## Future Google Cloud, Gemini, ADK, And MCP Path
+
+DIFARYX is prepared for a future agentic architecture without requiring those services for the current demo:
+
+- Gemini can support bounded reasoning and literature-grounded interpretation.
+- Cloud Run can host analysis services for signal processing and evidence review.
+- Vertex AI Search can support retrieval over literature, internal notebooks, SOPs, and validated knowledge bases.
+- ADK-style orchestration can coordinate context, processing, analysis, retrieval, reasoning, decision, notebook, and report agents.
+- MCP-style tools can expose signal analysis, evidence review, notebook generation, and report generation as inspectable capabilities.
+
+The current demo keeps those integrations as an architecture path, not as implemented backend behavior.
+
+## Run Locally
+
+Install dependencies if needed:
+
+```powershell
+npm.cmd install
+```
+
+Start the local Vite app:
+
+```powershell
+npm.cmd run dev
+```
+
+Build the production bundle:
+
+```powershell
+npm.cmd run build
+```
+
+Run the upload beta smoke test:
+
+```powershell
+npm.cmd run smoke:upload-beta
+```
+
+Check diff hygiene:
+
+```powershell
+git diff --check
+```
+
+## Upload Beta Smoke Test
+
+`npm.cmd run smoke:upload-beta` runs `test-upload-beta.mjs`, which validates:
+
+- Valid CSV upload fixture parsing.
+- Numeric X/Y arrays and XRD technique assignment.
+- X/Y column mapping for plotting and feature extraction.
+- XRD bounded claim boundary.
+- No CuFe2O4 demo assumption injection into uploaded-run output.
+- Invalid nonnumeric fixture handling without a crash.
+- No ready-for-agent or report-ready state for invalid upload evidence.
+- Persistence cap at 8 saved runs.
+- Persisted signal point cap at 1200 points.
+- Corrupted localStorage handling.
+- Forbidden upload wording guardrails.
+
+## Reviewer Notes
+
+- DIFARYX is a scientific reasoning platform, not an XRD-only analyzer.
+- The current demo is deterministic and frontend-only.
+- The public-beta upload workflow is local-browser scoped.
+- Scientific outputs are evidence-limited and require validation before stronger claims.
+- INANZ, if discussed separately, is a separate product and is not a DIFARYX module.
+
+## Submission Copy
+
+Concise Google AI Challenge / Google Cloud Rapid Agent Hackathon copy is available in `docs/google-submission-copy.md`.
