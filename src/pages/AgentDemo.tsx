@@ -56,7 +56,6 @@ import { CenterColumn } from '../components/agent-demo/CenterColumn';
 import { RightPanel } from '../components/agent-demo/RightPanel';
 import { evaluate as evaluateFusionEngine, createEvidenceNodes, type EvidenceNode, type FusionResult, type PeakInput } from '../engines/fusionEngine';
 import {
-  getConditionLockStatusLabel,
   getLatestExperimentConditionLock,
 } from '../data/experimentConditionLock';
 
@@ -913,9 +912,7 @@ export default function AgentDemo() {
   const selectedDataset = selectedOption.dataset;
   const selectedProject = selectedOption.project;
   const experimentConditionLock = getLatestExperimentConditionLock(selectedProject.id);
-  const experimentConditionLabel = experimentConditionLock?.userConfirmed
-    ? getConditionLockStatusLabel(experimentConditionLock)
-    : 'Not locked';
+  const experimentConditionTopBarLabel = experimentConditionLock?.userConfirmed ? 'Locked' : 'Not locked';
   const contextConfig = CONTEXT_CONFIG[agentState.context];
   const stages = contextConfig.stages;
   const xrdAnalysis = useMemo(
@@ -1428,7 +1425,7 @@ export default function AgentDemo() {
 
           <div className="flex h-[32px] w-full min-w-0 items-center gap-2 rounded-lg border border-amber-400/25 bg-amber-400/5 px-2.5 text-[10px] font-semibold uppercase tracking-wider text-amber-200">
             <span className="shrink-0 text-amber-300">Conditions:</span>
-            <span className="truncate text-amber-100">{experimentConditionLabel}</span>
+            <span className="truncate text-amber-100">{experimentConditionTopBarLabel}</span>
           </div>
 
           <div className="flex h-[32px] w-full min-w-0 items-center gap-2 rounded-lg border border-slate-800 bg-[#070B12] px-2">

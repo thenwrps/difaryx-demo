@@ -122,6 +122,16 @@ export interface DemoDataset {
 export interface DemoExperiment {
   id: string;
   projectId: string;
+  projectSource?: 'existing' | 'new';
+  projectName?: string;
+  researchDomain?: string;
+  projectObjective?: string;
+  techniqueScope?: Technique[];
+  templateMode?: 'research' | 'rd' | 'analytical';
+  modeSetup?: Record<string, string>;
+  datasetSource?: 'bundled' | 'upload' | 'later';
+  datasetRole?: 'primary' | 'supporting' | 'replicate' | 'validation';
+  expectedOutput?: string;
   title: string;
   sampleName: string;
   materialSystem: string;
@@ -444,7 +454,48 @@ export const demoProjects: DemoProject[] = [
 ];
 
 export function getProject(projectId?: string | null) {
-  return demoProjects.find((project) => project.id === projectId) ?? demoProjects[0];
+  const demoProject = demoProjects.find((project) => project.id === projectId);
+  if (demoProject) return demoProject;
+
+  const localExperiment = getLocalExperiments().find((experiment) => experiment.projectId === projectId);
+  if (localExperiment?.projectSource === 'new') {
+    const techniqueScope = localExperiment.techniqueScope?.length
+      ? localExperiment.techniqueScope
+      : [localExperiment.technique];
+
+    return {
+      id: localExperiment.projectId,
+      name: localExperiment.projectName ?? localExperiment.sampleName,
+      material: localExperiment.materialSystem,
+      techniques: techniqueScope,
+      status: 'Demo dataset ready',
+      claimStatus: 'partial',
+      validationState: 'requires_validation',
+      phase: localExperiment.materialSystem,
+      lastUpdated: 'local draft',
+      createdDate: localExperiment.date,
+      summary: localExperiment.projectObjective ?? localExperiment.notes,
+      xrdPeaks: [
+        { position: 18.4, intensity: 34, label: '(111)' },
+        { position: 30.2, intensity: 52, label: '(220)' },
+        { position: 35.6, intensity: 92, label: '(311)' },
+        { position: 43.3, intensity: 55, label: '(400)' },
+        { position: 57.2, intensity: 42, label: '(511)' },
+      ],
+      evidence: ['Local project dataset is ready for processing; interpretation requires validation.'],
+      recommendations: ['Process the selected signal before review or export.'],
+      notebook: {
+        title: localExperiment.title,
+        pipeline: ['Project created locally.', 'Dataset source selected.', 'Experiment conditions locked by user.'],
+        peakDetection: 'Feature detection is pending workspace processing.',
+        phaseIdentification: 'No material-specific claim is generated before processing evidence is reviewed.',
+      },
+      history: [],
+      workspace: techniqueScope.length > 1 ? 'multi' : 'xrd',
+    } satisfies DemoProject;
+  }
+
+  return demoProjects[0];
 }
 
 function readLocalList<T>(key: string): T[] {
@@ -915,6 +966,9 @@ export function getDatasetsByTechnique(projectId: string, technique: Technique) 
 
 export function getDataset(datasetId?: string | null) {
   if (!datasetId) return null;
+
+  const localDataset = getLocalDatasets().find((dataset) => dataset.id === datasetId);
+  if (localDataset) return localDataset;
 
   for (const project of demoProjects) {
     const dataset = getProjectDatasets(project.id).find((item) => item.id === datasetId);

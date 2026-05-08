@@ -764,6 +764,11 @@ export default function MultiTechWorkspace() {
     { label: 'Quality assessed', ready: Boolean(latestUploadedRun?.evidenceQuality), fallback: 'Gate pending' },
     { label: 'Handoff preview', ready: handoffPrepared, fallback: latestUploadedRun ? 'Preview available' : 'Pending analysis' },
   ];
+  const compactUploadStatus = [
+    uploadedFileName ? 'File selected' : 'No file selected',
+    'Conditions not attached',
+    latestUploadedRun?.evidenceQuality ? 'Gate assessed' : 'Gate pending',
+  ].join(' · ');
 
   const setTemporaryUploadFeedback = (message: string) => {
     setUploadFeedback(message);
@@ -1205,7 +1210,7 @@ ${result.decision}
 
         <Card id="beta-upload" className="mb-2 overflow-hidden">
           <div className={`${uploadPanelExpanded ? 'border-b' : ''} border-border bg-surface-hover/40 px-3 py-2`}>
-            <div className="grid grid-cols-1 items-center gap-2 xl:grid-cols-[260px_minmax(0,1fr)_auto]">
+            <div className="grid grid-cols-1 items-center gap-2 xl:grid-cols-[230px_minmax(0,1fr)_auto]">
               <div>
                 <div className="flex items-center gap-2">
                   <h2 className="text-sm font-bold text-text-main">Add supporting dataset</h2>
@@ -1215,20 +1220,26 @@ ${result.decision}
                 </div>
                 <p className="mt-0.5 text-[10px] text-text-muted">Attach another technique, replicate, or validation signal.</p>
               </div>
-              <div className="flex flex-wrap gap-1.5">
-                {uploadWorkflowStatuses.map((item) => (
-                  <span
-                    key={item.label}
-                    className={`rounded border px-2 py-1 text-[10px] font-semibold ${
-                      item.ready
-                        ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700'
-                        : 'border-border bg-background text-text-muted'
-                    }`}
-                  >
-                    {item.ready ? item.label : item.fallback}
-                  </span>
-                ))}
-              </div>
+              {uploadPanelExpanded ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {uploadWorkflowStatuses.map((item) => (
+                    <span
+                      key={item.label}
+                      className={`rounded border px-2 py-1 text-[10px] font-semibold ${
+                        item.ready
+                          ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700'
+                          : 'border-border bg-background text-text-muted'
+                      }`}
+                    >
+                      {item.ready ? item.label : item.fallback}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <div className="truncate rounded border border-border bg-background px-2 py-1.5 text-[11px] font-semibold text-text-muted">
+                  {compactUploadStatus}
+                </div>
+              )}
               <div className="flex flex-wrap items-center gap-2">
                 <label className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-white transition-colors hover:bg-primary/90">
                   <Upload size={14} /> Upload action
@@ -1253,11 +1264,11 @@ ${result.decision}
             {(!uploadStorageStatus.available || uploadStorageStatus.corrupted) && (
               <p className="mt-2 text-[10px] text-amber-700">{uploadStorageStatus.message}</p>
             )}
-            <div className="mt-1.5 rounded border border-border bg-background/80 px-2 py-1.5 text-[10px] leading-relaxed text-text-muted">
+            <p className="mt-1 text-[10px] leading-relaxed text-text-muted">
               <span className="font-semibold text-text-main">Experiment condition lock: {conditionLockStatus}.</span>{' '}
               Supporting uploads do not inherit synthesis, measurement, processing, or validation conditions unless
               explicitly tied to the current experiment record.
-            </div>
+            </p>
           </div>
 
           {uploadPanelExpanded && (

@@ -36,7 +36,7 @@ B,still not numeric
 ## Exact Route Order
 
 1. `/` or `/dashboard`
-2. Open `New Experiment` and point out the Experiment Conditions step
+2. Open `New Experiment` and step through Project -> Mode -> Data -> Conditions -> Review
 3. `/demo/agent`
 4. Open the Claim Boundary tab
 5. `/workspace/multi`
@@ -55,10 +55,15 @@ If starting from a fresh browser profile, open `/login` first and continue into 
 - XRD, XPS, FTIR, and Raman appear in the evidence matrix.
 - `Add supporting dataset` appears as a compact public-beta upload card, not the whole page.
 - The supporting upload card is collapsed by default and shows `No file selected`, condition status, gate status, and `Upload action`.
-- New Experiment exposes an `Experiment Conditions` section with sample preparation, measurement, processing, and validation groups.
+- New Experiment uses a five-step setup: `Project`, `Mode`, `Data`, `Conditions`, and `Review`.
+- `Project` supports either an existing demo project or a local new-project record with material system, research domain, objective, and technique scope.
+- `Mode` shows Research, R&D, and Analytical setup fields with bounded handoff outputs.
+- `Data` distinguishes bundled demo dataset, upload metadata, and supporting dataset later.
+- `Conditions` exposes sample preparation, measurement, processing, validation groups, and technique-aware condition presets.
 - `Lock experiment conditions for this run` records the condition status before experiment creation.
 - After locking, the modal shows `Conditions locked` and `Locked by user`.
-- Agent Mode top bar shows `CONDITIONS: Locked · Validation-limited` for the primary Exp-042 demo path.
+- `Review` summarizes project type, mode, technique, data source, scientific context, condition lock status, claim boundary, and expected output.
+- Agent Mode top bar shows `CONDITIONS: Locked` for the primary Exp-042 demo path.
 - Agent Claim Boundary shows Experiment Condition Lock, blocked claims, and the validation requirements.
 - `No file selected` appears before upload.
 - After upload, `public-beta-xrd.csv` appears as the selected file.
@@ -97,9 +102,9 @@ Confirm visible uploaded-run language stays bounded:
 
 "The workspace is multi-technique, covering XRD, XPS, FTIR, and Raman. Each technique has an evidence role and a claim boundary."
 
-**0:30 - New Experiment Condition Lock**
+**0:30 - New Experiment Workflow**
 
-"Before interpretation, New Experiment can lock user-provided sample preparation, measurement, processing, and validation conditions for reproducibility."
+"New Experiment creates a scientific workflow record through Project, Mode, Data, Conditions, and Review. It supports new local projects, mode-specific setup, and condition locking before interpretation."
 
 **0:45 - Agent Mode Condition Boundary**
 
@@ -152,4 +157,5 @@ If the browser file picker fails during recording:
 - Confirm the graph is not cramped.
 - Confirm the claim boundary is visible near the evidence quality and feature table.
 - Confirm the invalid fixture shows a blocked state and does not prepare a handoff.
+- Confirm the New Experiment review step blocks creation until project setup, data source, and condition lock are complete.
 - Confirm Agent Mode and Notebook Lab show Exp-042 as condition-locked and validation-limited.

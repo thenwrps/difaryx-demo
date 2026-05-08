@@ -130,6 +130,14 @@ export default function Dashboard() {
             const spectraPreviews = getDashboardSpectraPreviews(project.id);
             const hasSpectraPreview = !hasXrdDemoData && spectraPreviews.length > 0;
             const hasDashboardEvidence = hasXrdDemoData || hasSpectraPreview;
+            const bundledDatasetSummary = project.id === 'fe3o4-nanoparticles'
+              ? 'FTIR/Raman demo signals are available for bonding-context and vibrational-evidence review.'
+              : `${spectraPreviews.join('/')} demo signals are available. Processing evidence is still required before review or export.`;
+            const cardRoute = hasXrdDemoData
+              ? `/workspace?project=${project.id}`
+              : hasSpectraPreview
+                ? `/workspace/${currentTechnique.toLowerCase()}?project=${project.id}`
+                : `/workspace/xrd?project=${project.id}`;
             const graphData = hasSpectraPreview
               ? makeTechniquePattern(project, currentTechnique)
               : undefined;
@@ -137,24 +145,24 @@ export default function Dashboard() {
             const dashboardStatus = hasXrdDemoData
               ? formatDashboardClaimStatus(project.claimStatus)
               : hasSpectraPreview
-                ? formatDashboardClaimStatus(project.claimStatus)
-                : 'No matched dataset';
+                ? 'Demo dataset ready'
+                : 'Dataset required';
             const dashboardSummary = hasXrdDemoData
               ? project.summary
               : hasSpectraPreview
-                ? project.summary
-                : 'No processed XRD result linked to this project.';
+                ? bundledDatasetSummary
+                : 'Processing evidence is not linked to this project yet.';
             const dashboardBadges = hasXrdDemoData
               ? ['Research Mode', 'Publication-limited', 'Validation required']
               : hasSpectraPreview
-                ? ['Research Mode', 'Publication-limited', 'Validation required']
+                ? ['Research Mode', 'Ready for processing', 'Validation pending']
                 : ['Research Mode', 'Requires dataset', 'Validation pending'];
             
             return (
             <Card 
               key={project.id} 
               className="cursor-pointer hover:border-primary/50 transition-colors group flex flex-col h-full"
-              onClick={() => navigate(hasDashboardEvidence ? `/workspace?project=${project.id}` : `/workspace/xrd?project=${project.id}`)}
+              onClick={() => navigate(cardRoute)}
             >
               <div className="p-4 border-b border-border bg-surface-hover/30 flex justify-between items-start">
                 <div>
@@ -165,7 +173,7 @@ export default function Dashboard() {
                 </div>
                 <div className="text-right">
                   <div className={`text-sm font-bold ${
-                    !hasDashboardEvidence ? 'text-amber-600' :
+                    hasSpectraPreview || !hasDashboardEvidence ? 'text-amber-600' :
                     project.claimStatus === 'strongly_supported' ? 'text-emerald-600' :
                     project.claimStatus === 'supported' ? 'text-cyan' :
                     project.claimStatus === 'partial' ? 'text-amber-500' :
@@ -195,7 +203,7 @@ export default function Dashboard() {
                   ) : (
                     <div className="flex h-full flex-col items-center justify-center rounded-md border border-dashed border-amber-500/30 bg-amber-500/5 px-4 text-center">
                       <AlertTriangle size={18} className="mb-2 text-amber-600" />
-                      <p className="text-xs font-semibold text-text-main">No matched XRD dataset</p>
+                      <p className="text-xs font-semibold text-text-main">Dataset required</p>
                       <p className="mt-1 max-w-[180px] text-[11px] leading-relaxed text-text-muted">
                         Load compatible data to generate evidence.
                       </p>
@@ -225,7 +233,11 @@ export default function Dashboard() {
                         </button>
                       ))}
                     </div>
-                    {!hasDashboardEvidence ? (
+                    {hasSpectraPreview ? (
+                      <span className="text-xs text-amber-600 flex items-center gap-1">
+                        <AlertTriangle size={12} /> Requires processing
+                      </span>
+                    ) : !hasDashboardEvidence ? (
                       <span className="text-xs text-amber-600 flex items-center gap-1">
                         <AlertTriangle size={12} /> Requires dataset
                       </span>
@@ -236,7 +248,7 @@ export default function Dashboard() {
                       </span>
                     ) : (
                       <span className="text-xs text-primary flex items-center gap-1">
-                        <FileText size={12} /> Report-ready
+                        <FileText size={12} /> {project.id === 'nife2o4' ? 'Discussion-ready' : 'Report-ready'}
                       </span>
                     )}
                   </div>
@@ -247,9 +259,13 @@ export default function Dashboard() {
                       ))}
                     </div>
                     <div className="text-[10px] font-medium text-text-dim tracking-wide">
-                      {hasDashboardEvidence ? (
+                      {hasXrdDemoData ? (
                         <>
                           Processing <span className="text-primary/60">-&gt;</span> Refinement <span className="text-primary/60">-&gt;</span> Notebook
+                        </>
+                      ) : hasSpectraPreview ? (
+                        <>
+                          Demo dataset ready <span className="text-primary/60">/</span> Processing evidence required
                         </>
                       ) : (
                         <>
@@ -260,7 +276,7 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <div className="mt-auto pt-4 grid grid-cols-4 gap-1.5 border-t border-border min-h-[52px]">
-                  {hasDashboardEvidence ? (
+                  {hasXrdDemoData ? (
                     <>
                       <Link
                         to={`/workspace/${currentTechnique.toLowerCase()}?project=${project.id}`}
@@ -288,6 +304,45 @@ export default function Dashboard() {
                         disabled
                         onClick={(event) => event.stopPropagation()}
                         title="Report route is not enabled in this demo. Export-ready sections are generated from notebook entries."
+                        className="inline-flex h-8 items-center justify-center rounded-md border border-border px-2 text-xs font-medium text-text-muted opacity-50 whitespace-nowrap"
+                      >
+                        Export
+                      </button>
+                    </>
+                  ) : hasSpectraPreview ? (
+                    <>
+                      <Link
+                        to={`/workspace/${currentTechnique.toLowerCase()}?project=${project.id}`}
+                        onClick={(event) => event.stopPropagation()}
+                        className="inline-flex h-8 items-center justify-center rounded-md border border-primary bg-primary/10 px-2 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors whitespace-nowrap"
+                      >
+                        Analyze
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setExperimentProjectId(project.id);
+                          setExperimentModalOpen(true);
+                        }}
+                        className="inline-flex h-8 items-center justify-center rounded-md border border-border px-2 text-xs font-medium text-text-muted hover:bg-surface-hover hover:text-text-main transition-colors whitespace-nowrap"
+                      >
+                        Add Data
+                      </button>
+                      <button
+                        type="button"
+                        disabled
+                        onClick={(event) => event.stopPropagation()}
+                        title="Requires processed evidence before review."
+                        className="inline-flex h-8 items-center justify-center rounded-md border border-border px-2 text-xs font-medium text-text-muted opacity-50 whitespace-nowrap"
+                      >
+                        Review
+                      </button>
+                      <button
+                        type="button"
+                        disabled
+                        onClick={(event) => event.stopPropagation()}
+                        title="Requires processed evidence before export."
                         className="inline-flex h-8 items-center justify-center rounded-md border border-border px-2 text-xs font-medium text-text-muted opacity-50 whitespace-nowrap"
                       >
                         Export

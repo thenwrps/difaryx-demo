@@ -812,12 +812,12 @@ ${sourceRunLines}
             </div>
           )}
 
-          <div className="p-4 max-w-6xl w-full mx-auto space-y-4">
-            <section className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,0.95fr)_minmax(280px,0.85fr)_minmax(280px,0.95fr)]">
+          <div className="p-3 max-w-6xl w-full mx-auto space-y-3">
+            <section className="grid grid-cols-1 gap-2.5 lg:grid-cols-[minmax(0,0.95fr)_minmax(280px,0.85fr)_minmax(280px,0.95fr)]">
               <div className="min-w-0">
-                <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-text-muted">Characterization Overview</div>
+                <div className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-text-muted">Characterization Overview</div>
                 {hasMatchedNotebookData ? (
-                  <div className="max-h-[300px] overflow-y-auto rounded-xl">
+                  <div className="max-h-[288px] overflow-y-auto rounded-xl">
                     <AIInsightPanel result={getProjectInsight(project)} />
                   </div>
                 ) : (
@@ -842,14 +842,14 @@ ${sourceRunLines}
                     Locked at: {formatConditionLockTimestamp(experimentConditionLock)}
                   </div>
                 </div>
-                <div className="mt-3 max-h-40 space-y-1.5 overflow-y-auto pr-1">
+                <div className="mt-2 space-y-1">
                   {experimentConditionLines.map((line) => (
-                    <div key={line} className="rounded-md border border-border bg-background px-2.5 py-1.5 text-[11px] leading-relaxed text-text-muted">
+                    <div key={line} className="rounded-md border border-border bg-background px-2 py-1 text-[11px] leading-relaxed text-text-muted">
                       {line}
                     </div>
                   ))}
                 </div>
-                <div className="mt-2 rounded-md border border-amber-500/20 bg-amber-500/5 p-2">
+                <div className="mt-2 rounded-md border border-amber-500/20 bg-amber-500/5 p-1.5">
                   <div className="text-[10px] font-semibold uppercase tracking-wider text-amber-700">Condition-aware claim boundary</div>
                   <ul className="mt-1 space-y-0.5 text-[11px] leading-relaxed text-text-muted">
                     {experimentConditionBoundaryNotes.slice(0, 3).map((note) => (
@@ -858,9 +858,9 @@ ${sourceRunLines}
                   </ul>
                 </div>
               </div>
-              <div className="min-w-0 rounded-xl border border-primary/20 bg-surface p-3">
+              <div className="min-w-0 rounded-xl border border-primary/20 bg-surface p-2.5">
                 <div className="text-xs font-semibold uppercase tracking-wider text-primary">Refined Discussion / Report Preview</div>
-                <div className="mt-2 rounded-md border border-border bg-background p-3">
+                <div className="mt-2 rounded-md border border-border bg-background p-2.5">
                   <div className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">
                     {notebookTemplateDetails.primaryLabel}
                   </div>
@@ -870,7 +870,7 @@ ${sourceRunLines}
                       : 'No matched processing result is linked to this notebook entry.'}
                   </p>
                 </div>
-                <div className="mt-2 rounded-md border border-border bg-background p-3">
+                <div className="mt-2 rounded-md border border-border bg-background p-2.5">
                   <div className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">Report section</div>
                   <p className="mt-2 text-xs leading-relaxed text-text-main">
                     {hasMatchedNotebookData
@@ -878,7 +878,7 @@ ${sourceRunLines}
                       : 'No report-oriented section is available until a matched processing result is linked to this project.'}
                   </p>
                 </div>
-                <div className="mt-2 rounded-md border border-primary/20 bg-primary/5 p-2">
+                <div className="mt-2 rounded-md border border-primary/20 bg-primary/5 p-1.5">
                   <div className="text-[10px] font-semibold uppercase tracking-wider text-primary">Discussion readiness</div>
                   <p className="mt-1 text-xs font-semibold text-text-main">
                     {displayNotebookStatus}: {hasMatchedNotebookData ? notebookTemplateDetails.output : 'Load compatible data before report-ready discussion.'}
@@ -888,7 +888,7 @@ ${sourceRunLines}
             </section>
 
             {!hasMatchedNotebookData && (
-              <section className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-5">
+              <section className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
                 <div className="text-[11px] font-bold uppercase tracking-wider text-amber-700">Notebook status</div>
                 <h3 className="mt-1 text-base font-bold text-text-main">No matched processing result</h3>
                 <p className="mt-2 text-sm leading-relaxed text-text-muted">

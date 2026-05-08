@@ -13,17 +13,20 @@ Use this pack for the locked primary demo path before recording or judging revie
 
 1. **Dashboard + New Experiment**
    - Show the dashboard with `+ New Experiment` visible.
-   - Open the modal far enough to show `Experiment Setup`, `Interpretation Mode`, and `Dataset`.
+   - Open the modal and capture the stepper: `Project`, `Mode`, `Data`, `Conditions`, and `Review`.
+   - Capture either Existing project setup or New project setup with project objective and technique scope.
 
-2. **New Experiment Condition Lock**
-   - Show `Experiment Conditions`.
+2. **New Experiment Mode And Condition Lock**
+   - Show the `Mode` step with Research, R&D, and Analytical setup fields.
+   - Show the `Conditions` step with technique-aware condition presets.
    - Show the lock action: `Lock experiment conditions for this run`.
    - After locking, capture `Conditions locked` and `Locked by user`.
    - Capture at least one sample preparation, measurement, processing, and validation field.
+   - Capture the `Review` step summary with condition lock status, claim boundary, and expected output.
 
 3. **Agent Mode Condition Badge**
    - Open `/demo/agent`.
-   - Capture the top bar with `CONDITIONS: Locked · Validation-limited`.
+   - Capture the top bar with `CONDITIONS: Locked`.
    - Keep the graph and final interpretation area visible if possible.
 
 4. **Agent Claim Boundary**
