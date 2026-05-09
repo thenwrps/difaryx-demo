@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle,
@@ -121,6 +121,13 @@ export default function XRDWorkspace() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [activeStep, setActiveStep] = useState<string | null>(null);
   const [workflowFeedback, setWorkflowFeedback] = useState('');
+
+  // Upload notice (replaces blocking alert)
+  const [uploadNotice, setUploadNotice] = useState<string | null>(null);
+  const showUploadNotice = useCallback((msg: string) => {
+    setUploadNotice(msg);
+    setTimeout(() => setUploadNotice(null), 4000);
+  }, []);
 
   // Handle Auto Mode toggle
   const handleAutoModeChange = (enabled: boolean) => {
@@ -286,7 +293,7 @@ export default function XRDWorkspace() {
     // 2. Parse CSV/TXT/XY file
     // 3. Validate data format
     // 4. Load into workspace
-    alert('Available in the connected beta workflow. Load the demo dataset to try the workspace.');
+    showUploadNotice('Available in the connected beta workflow. Load the demo dataset to try the workspace.');
   };
 
   // Agent result (recomputes when dataset or parameters change in manual mode)
@@ -476,6 +483,29 @@ export default function XRDWorkspace() {
 
   return (
     <DashboardLayout>
+      {/* Non-blocking upload notice toast */}
+      {uploadNotice && (
+        <div style={{
+          position: 'fixed', top: 24, left: '50%', transform: 'translateX(-50%)',
+          zIndex: 9999, maxWidth: 480, width: '90%',
+          background: 'linear-gradient(135deg, rgba(30,41,59,0.97), rgba(15,23,42,0.97))',
+          border: '1px solid rgba(99,102,241,0.3)', borderRadius: 10,
+          padding: '12px 20px', color: '#e2e8f0',
+          fontSize: 13, lineHeight: 1.5, fontFamily: 'Inter, system-ui, sans-serif',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+          display: 'flex', alignItems: 'center', gap: 10,
+          animation: 'fadeInDown 0.25s ease-out',
+        }}>
+          <span style={{ color: '#818cf8', fontSize: 16, flexShrink: 0 }}>ℹ</span>
+          <span style={{ flex: 1 }}>{uploadNotice}</span>
+          <button
+            onClick={() => setUploadNotice(null)}
+            style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 16, padding: '0 2px', lineHeight: 1 }}
+            aria-label="Dismiss"
+          >×</button>
+        </div>
+      )}
+
       {/* Show empty state when no dataset is loaded */}
       {!hasDatasetLoaded && entryMode && (
         <EmptyWorkspaceState

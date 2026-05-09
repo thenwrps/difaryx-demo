@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle,
@@ -39,6 +39,13 @@ export default function FTIRWorkspace() {
   // Drawer state management
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [activeStep, setActiveStep] = useState<string | null>(null);
+
+  // Upload notice (replaces blocking alert)
+  const [uploadNotice, setUploadNotice] = useState<string | null>(null);
+  const showUploadNotice = useCallback((msg: string) => {
+    setUploadNotice(msg);
+    setTimeout(() => setUploadNotice(null), 4000);
+  }, []);
   
   // Get selected dataset
   const selectedDataset = getFtirDemoDataset(selectedDatasetId);
@@ -86,7 +93,7 @@ export default function FTIRWorkspace() {
 
   const handleUploadDataset = () => {
     // Upload functionality placeholder
-    alert('Available in the connected beta workflow. Load the demo dataset to try the workspace.');
+    showUploadNotice('Upload is available in the connected beta workflow. Load the demo dataset to try the workspace.');
   };
   
   // Run FTIR processing with current parameters
@@ -124,7 +131,7 @@ export default function FTIRWorkspace() {
   
   const confidenceBadge = processingResult.interpretation.confidenceLevel;
   const reviewStatus = confidenceBadge === 'high' ? 'Supported' : confidenceBadge === 'medium' ? 'Requires validation' : 'Validation-limited';
-  
+
   // Handle Auto Mode toggle
   const handleAutoModeChange = (enabled: boolean) => {
     setAutoMode(enabled);
@@ -132,50 +139,50 @@ export default function FTIRWorkspace() {
       setDrawerOpen(false);
     }
   };
-  
+
   // Handle opening drawer for a specific step
   const handleOpenDrawer = (stepId: string) => {
     setActiveStep(stepId);
     setDrawerOpen(true);
   };
-  
+
   // Handle closing drawer
   const handleCloseDrawer = () => {
     setDrawerOpen(false);
   };
-  
+
   // Handle applying parameter changes
   const handleApplyParameters = () => {
     setDrawerOpen(false);
   };
-  
+
   // Handle resetting parameters to defaults
   const handleResetParameters = () => {
     // TODO: Reset parameters
   };
-  
+
   // Handle parameter changes
   const handleParameterChange = (paramId: string, value: any) => {
     // TODO: Handle parameter changes
   };
-  
+
   // Processing status for FTIR steps
   const processingStatus = [
     {
       id: 'baselineCorrection',
       label: 'Baseline Correction',
       status: 'complete' as const,
-      summary: autoMode ? 'Polynomial (order=3)' : 'Polynomial (order=3)'
+      summary: autoMode ? 'ALS baseline, lambda=1e5' : 'ALS baseline, lambda=1e5'
     },
     {
       id: 'smoothing',
       label: 'Smoothing',
       status: 'complete' as const,
-      summary: autoMode ? 'Savitzky-Golay (window=9)' : 'Savitzky-Golay (window=9)'
+      summary: autoMode ? 'Savitzky-Golay (window=7)' : 'Savitzky-Golay (window=7)'
     },
     {
-      id: 'bandDetection',
-      label: 'Band Detection',
+      id: 'peakDetection',
+      label: 'Peak Detection',
       status: 'complete' as const,
       summary: autoMode ? `${totalBands} bands detected` : `${totalBands} bands detected`
     },
@@ -186,21 +193,44 @@ export default function FTIRWorkspace() {
       summary: autoMode ? `${matchedBands}/${totalBands} matched` : `${matchedBands}/${totalBands} matched`
     },
     {
-      id: 'functionalGroupMatching',
-      label: 'Functional Group Matching',
+      id: 'functionalGroupAnalysis',
+      label: 'Functional Group Analysis',
       status: 'complete' as const,
-      summary: autoMode ? 'Evidence aggregation' : 'Evidence aggregation'
+      summary: autoMode ? 'Reference matching' : 'Reference matching'
     },
     {
-      id: 'interpretationSummary',
-      label: 'Interpretation',
+      id: 'scientificSummary',
+      label: 'Characterization Overview',
       status: 'complete' as const,
-      summary: autoMode ? 'Characterization overview' : 'Characterization overview'
+      summary: autoMode ? 'Chemical interpretation' : 'Chemical interpretation'
     }
   ];
 
   return (
     <DashboardLayout>
+      {/* Non-blocking upload notice toast */}
+      {uploadNotice && (
+        <div style={{
+          position: 'fixed', top: 24, left: '50%', transform: 'translateX(-50%)',
+          zIndex: 9999, maxWidth: 480, width: '90%',
+          background: 'linear-gradient(135deg, rgba(30,41,59,0.97), rgba(15,23,42,0.97))',
+          border: '1px solid rgba(99,102,241,0.3)', borderRadius: 10,
+          padding: '12px 20px', color: '#e2e8f0',
+          fontSize: 13, lineHeight: 1.5, fontFamily: 'Inter, system-ui, sans-serif',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+          display: 'flex', alignItems: 'center', gap: 10,
+          animation: 'fadeInDown 0.25s ease-out',
+        }}>
+          <span style={{ color: '#818cf8', fontSize: 16, flexShrink: 0 }}>ℹ</span>
+          <span style={{ flex: 1 }}>{uploadNotice}</span>
+          <button
+            onClick={() => setUploadNotice(null)}
+            style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 16, padding: '0 2px', lineHeight: 1 }}
+            aria-label="Dismiss"
+          >×</button>
+        </div>
+      )}
+
       {/* Show empty state when no dataset is loaded */}
       {!hasDatasetLoaded && entryMode && (
         <EmptyWorkspaceState

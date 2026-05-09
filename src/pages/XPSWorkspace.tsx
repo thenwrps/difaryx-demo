@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle,
@@ -45,6 +45,13 @@ export default function XPSWorkspace() {
   // Drawer state management
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [activeStep, setActiveStep] = useState<string | null>(null);
+
+  // Upload notice (replaces blocking alert)
+  const [uploadNotice, setUploadNotice] = useState<string | null>(null);
+  const showUploadNotice = useCallback((msg: string) => {
+    setUploadNotice(msg);
+    setTimeout(() => setUploadNotice(null), 4000);
+  }, []);
   
   // Get selected dataset
   const selectedDataset = getXpsDemoDataset(selectedDatasetId);
@@ -92,7 +99,41 @@ export default function XPSWorkspace() {
 
   const handleUploadDataset = () => {
     // Upload functionality placeholder
-    alert('Available in the connected beta workflow. Load the demo dataset to try the workspace.');
+    showUploadNotice('Upload is available in the connected beta workflow. Load the demo dataset to try the workspace.');
+  };
+  
+  // Handle Auto Mode toggle
+  const handleAutoModeChange = (enabled: boolean) => {
+    setAutoMode(enabled);
+    if (enabled) {
+      setDrawerOpen(false);
+    }
+  };
+
+  // Handle opening drawer for a specific step
+  const handleOpenDrawer = (stepId: string) => {
+    setActiveStep(stepId);
+    setDrawerOpen(true);
+  };
+
+  // Handle closing drawer
+  const handleCloseDrawer = () => {
+    setDrawerOpen(false);
+  };
+
+  // Handle applying parameter changes
+  const handleApplyParameters = () => {
+    setDrawerOpen(false);
+  };
+
+  // Handle resetting parameters to defaults
+  const handleResetParameters = () => {
+    // TODO: Reset parameters
+  };
+
+  // Handle parameter changes
+  const handleParameterChange = (paramId: string, value: any) => {
+    // TODO: Handle parameter changes
   };
   
   // Run XPS processing with current parameters
@@ -184,114 +225,72 @@ export default function XPSWorkspace() {
     : claimStatus === 'supported' ? 'Requires validation'
     : claimStatus === 'partial' ? 'Validation-limited'
     : 'Claim boundary';
-  
-  // Handle Auto Mode toggle
-  const handleAutoModeChange = (enabled: boolean) => {
-    setAutoMode(enabled);
-    if (enabled) {
-      // Reset to defaults when Auto Mode is enabled
-      setParameters(XPS_DEFAULT_PARAMETERS);
-      // Close drawer when Auto Mode is enabled
-      setDrawerOpen(false);
-    }
-  };
-  
-  // Handle opening drawer for a specific step
-  const handleOpenDrawer = (stepId: string) => {
-    setActiveStep(stepId);
-    setDrawerOpen(true);
-  };
-  
-  // Handle closing drawer
-  const handleCloseDrawer = () => {
-    setDrawerOpen(false);
-  };
-  
-  // Handle applying parameter changes
-  const handleApplyParameters = () => {
-    // Close the drawer after applying
-    setDrawerOpen(false);
-    // Parameters are already updated in state via handleParameterChange
-    // TODO: Connect to XPS processing logic in future step
-  };
-  
-  // Handle resetting parameters to defaults
-  const handleResetParameters = () => {
-    if (activeStep) {
-      setParameters({
-        ...parameters,
-        [activeStep]: XPS_DEFAULT_PARAMETERS[activeStep as keyof XpsParameters],
-      });
-    }
-  };
-  
-  // Handle parameter changes
-  const handleParameterChange = (paramId: string, value: any) => {
-    if (activeStep) {
-      setParameters({
-        ...parameters,
-        [activeStep]: {
-          ...(parameters as any)[activeStep],
-          [paramId]: value,
-        },
-      });
-    }
-  };
-  
+
   // Processing status for XPS steps
   const processingStatus = [
-    {
-      id: 'energyCalibration',
-      label: 'Energy Calibration',
-      status: 'complete' as const,
-      summary: autoMode 
-        ? 'C 1s ref (284.8 eV)' 
-        : `${parameters.energyCalibration.reference_peak} ref (shift=${parameters.energyCalibration.shift_value} eV)`
-    },
     {
       id: 'backgroundSubtraction',
       label: 'Background Subtraction',
       status: 'complete' as const,
-      summary: autoMode
-        ? 'Shirley method'
-        : `${parameters.backgroundSubtraction.method} (iter=${parameters.backgroundSubtraction.iterations})`
+      summary: autoMode ? 'Shirley background' : 'Shirley background'
     },
     {
       id: 'smoothing',
       label: 'Smoothing',
       status: 'complete' as const,
-      summary: autoMode
-        ? 'Moving average (window=5)'
-        : `${parameters.smoothing.method} (window=${parameters.smoothing.window_size})`
+      summary: autoMode ? 'Savitzky-Golay (window=5)' : 'Savitzky-Golay (window=5)'
     },
     {
       id: 'peakDetection',
       label: 'Peak Detection',
       status: 'complete' as const,
-      summary: autoMode
-        ? `${totalPeaks} peaks detected`
-        : `${totalPeaks} peaks (prominence=${parameters.peakDetection.prominence})`
+      summary: autoMode ? `${totalPeaks} peaks detected` : `${totalPeaks} peaks detected`
     },
     {
       id: 'peakFitting',
       label: 'Peak Fitting',
       status: 'complete' as const,
-      summary: autoMode
-        ? 'Gaussian model'
-        : `${parameters.peakFitting.model} (tol=${parameters.peakFitting.tolerance.toExponential(0)})`
+      summary: autoMode ? 'Gaussian-Lorentzian fit' : 'Gaussian-Lorentzian fit'
     },
     {
       id: 'chemicalStateAssignment',
       label: 'Chemical State Assignment',
       status: 'complete' as const,
-      summary: autoMode
-        ? `${matchedPeaks}/${totalPeaks} matched`
-        : `${matchedPeaks}/${totalPeaks} matched (${parameters.chemicalStateAssignment.database})`
+      summary: autoMode ? `${matchedPeaks}/${totalPeaks} matched` : `${matchedPeaks}/${totalPeaks} matched`
+    },
+    {
+      id: 'scientificSummary',
+      label: 'Characterization Overview',
+      status: 'complete' as const,
+      summary: autoMode ? 'Chemical interpretation' : 'Chemical interpretation'
     }
   ];
 
   return (
     <DashboardLayout>
+      {/* Non-blocking upload notice toast */}
+      {uploadNotice && (
+        <div style={{
+          position: 'fixed', top: 24, left: '50%', transform: 'translateX(-50%)',
+          zIndex: 9999, maxWidth: 480, width: '90%',
+          background: 'linear-gradient(135deg, rgba(30,41,59,0.97), rgba(15,23,42,0.97))',
+          border: '1px solid rgba(99,102,241,0.3)', borderRadius: 10,
+          padding: '12px 20px', color: '#e2e8f0',
+          fontSize: 13, lineHeight: 1.5, fontFamily: 'Inter, system-ui, sans-serif',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+          display: 'flex', alignItems: 'center', gap: 10,
+          animation: 'fadeInDown 0.25s ease-out',
+        }}>
+          <span style={{ color: '#818cf8', fontSize: 16, flexShrink: 0 }}>ℹ</span>
+          <span style={{ flex: 1 }}>{uploadNotice}</span>
+          <button
+            onClick={() => setUploadNotice(null)}
+            style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 16, padding: '0 2px', lineHeight: 1 }}
+            aria-label="Dismiss"
+          >×</button>
+        </div>
+      )}
+
       {/* Show empty state when no dataset is loaded */}
       {!hasDatasetLoaded && entryMode && (
         <EmptyWorkspaceState

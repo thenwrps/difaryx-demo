@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle,
@@ -39,6 +39,13 @@ export default function RamanWorkspace() {
   // Drawer state management
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [activeStep, setActiveStep] = useState<string | null>(null);
+
+  // Upload notice (replaces blocking alert)
+  const [uploadNotice, setUploadNotice] = useState<string | null>(null);
+  const showUploadNotice = useCallback((msg: string) => {
+    setUploadNotice(msg);
+    setTimeout(() => setUploadNotice(null), 4000);
+  }, []);
   
   // Get selected dataset
   const selectedDataset = getRamanDemoDataset(selectedDatasetId);
@@ -86,7 +93,7 @@ export default function RamanWorkspace() {
 
   const handleUploadDataset = () => {
     // Upload functionality placeholder
-    alert('Available in the connected beta workflow. Load the demo dataset to try the workspace.');
+    showUploadNotice('Upload is available in the connected beta workflow. Load the demo dataset to try the workspace.');
   };
   
   // Run Raman processing with current parameters
@@ -223,6 +230,29 @@ export default function RamanWorkspace() {
 
   return (
     <DashboardLayout>
+      {/* Non-blocking upload notice toast */}
+      {uploadNotice && (
+        <div style={{
+          position: 'fixed', top: 24, left: '50%', transform: 'translateX(-50%)',
+          zIndex: 9999, maxWidth: 480, width: '90%',
+          background: 'linear-gradient(135deg, rgba(30,41,59,0.97), rgba(15,23,42,0.97))',
+          border: '1px solid rgba(99,102,241,0.3)', borderRadius: 10,
+          padding: '12px 20px', color: '#e2e8f0',
+          fontSize: 13, lineHeight: 1.5, fontFamily: 'Inter, system-ui, sans-serif',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+          display: 'flex', alignItems: 'center', gap: 10,
+          animation: 'fadeInDown 0.25s ease-out',
+        }}>
+          <span style={{ color: '#818cf8', fontSize: 16, flexShrink: 0 }}>ℹ</span>
+          <span style={{ flex: 1 }}>{uploadNotice}</span>
+          <button
+            onClick={() => setUploadNotice(null)}
+            style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 16, padding: '0 2px', lineHeight: 1 }}
+            aria-label="Dismiss"
+          >×</button>
+        </div>
+      )}
+
       {/* Show empty state when no dataset is loaded */}
       {!hasDatasetLoaded && entryMode && (
         <EmptyWorkspaceState
@@ -344,7 +374,7 @@ export default function RamanWorkspace() {
         <main className="flex-1 flex flex-col min-w-0 overflow-hidden border-r border-border">
           <div className="flex-1 overflow-y-auto p-4">
             <div className="space-y-3">
-              {/* FTIR SPECTRUM - GRAPH FIRST */}
+              {/* RAMAN SPECTRUM - GRAPH FIRST */}
               <div className="border border-border/50 bg-surface/30">
                 {/* Tabs */}
                 <div className="flex items-center gap-4 px-3 py-1.5 border-b border-border/50 bg-surface/40">
@@ -555,6 +585,7 @@ export default function RamanWorkspace() {
                 </span>
               </div>
 
+              <div className="space-y-1.5">
                 <div>
                   <p className="text-[9px] font-semibold uppercase tracking-wide text-text-muted mb-0.5">Dominant Modes</p>
                   <p className="text-xs font-bold text-text-main">{processingResult.interpretation.dominantModes.slice(0, 2).join(', ')}</p>
@@ -569,6 +600,7 @@ export default function RamanWorkspace() {
                   <p className="text-[9px] font-semibold uppercase tracking-wide text-text-muted mb-0.5">Reliability</p>
                   <p className="text-[10px] text-text-main tabular-nums">{matchedPeaks}/{totalPeaks} matched, {totalPeaks - matchedPeaks} unassigned</p>
                 </div>
+              </div>
             </div>
 
             {/* EVIDENCE SNAPSHOT */}

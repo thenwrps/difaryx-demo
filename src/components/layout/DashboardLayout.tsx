@@ -66,7 +66,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     localStorage.removeItem('demoProfile');
     setIsDemoAuthenticated(false);
     setIsProfileOpen(false);
-    navigate('/login');
+    navigate('/signin');
   };
 
   return (

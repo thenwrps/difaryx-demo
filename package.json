@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "video:studio": "remotion studio remotion/src/Root.tsx",
+    "video:render": "remotion render remotion/src/Root.tsx GoogleAIChallengeVideo remotion/out/difaryx-google-ai-challenge.mp4",
     "smoke:upload-beta": "node test-upload-beta.mjs",
     "lint": "eslint .",
     "preview": "vite preview"
@@ -21,6 +23,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@remotion/cli": "^4.0.459",
     "@tailwindcss/postcss": "^4.2.4",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
@@ -31,7 +34,9 @@
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.5.0",
     "postcss": "^8.5.10",
+    "remotion": "^4.0.459",
     "tailwindcss": "^3.4.17",
+    "typescript": "^6.0.3",
     "vite": "^8.0.10"
   }
 }
