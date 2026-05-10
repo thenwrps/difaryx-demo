@@ -13,13 +13,16 @@ import {
   getAgentPath,
   getDataset,
   getLocalExperiments,
+  getLocalProjectNotebooks,
   getNotebookPath,
+  getNotebookTypeBadge,
   getProcessingRun,
   getProcessingRuns,
   getProject,
   getProjectInsight,
   getWorkspaceRoute,
   loadAgentRunResult,
+  type ProjectNotebook,
 } from '../data/demoProjects';
 import { DemoExportFormat, exportDemoArtifact } from '../utils/demoExport';
 import { getRun, type AgentRun } from '../data/runModel';
@@ -287,6 +290,19 @@ export default function NotebookLab() {
   const [feedback, setFeedback] = useState('');
   const [experimentModalOpen, setExperimentModalOpen] = useState(false);
   const [localExperiments, setLocalExperiments] = useState(() => getLocalExperiments());
+  const [wizardNotebooks, setWizardNotebooks] = useState<ProjectNotebook[]>(() => getLocalProjectNotebooks());
+  const activeWizardNotebook = useMemo(() => {
+    const projectParam = searchParams.get('project');
+    if (!projectParam) return null;
+    // Re-read from localStorage so navigation to a newly-created notebook always resolves
+    const freshNotebooks = getLocalProjectNotebooks();
+    const found = freshNotebooks.find((nb) => nb.id === projectParam) ?? null;
+    // Keep sidebar state in sync if a new notebook was found
+    if (found && !wizardNotebooks.find((nb) => nb.id === projectParam)) {
+      setWizardNotebooks(freshNotebooks);
+    }
+    return found;
+  }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
   const [observations, setObservations] = useState<string[]>([]);
   const [attachedRun, setAttachedRun] = useState<string | null>(null);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
@@ -613,7 +629,7 @@ ${sourceRunLines}
                   key={item.id}
                   to={getNotebookPath(item)}
                   className={`block w-full text-left px-3 py-2 rounded-md text-xs font-medium leading-snug transition-colors border ${
-                    item.id === project.id
+                    !activeWizardNotebook && item.id === project.id
                       ? 'bg-primary/10 text-primary border-primary/20'
                       : 'text-text-muted hover:bg-surface-hover hover:text-text-main border-transparent'
                   }`}
@@ -632,7 +648,7 @@ ${sourceRunLines}
                 key={experiment.id}
                 to={`/notebook?project=${experiment.projectId}&experiment=${experiment.id}`}
                 className={`block w-full text-left px-3 py-2 rounded-md text-xs font-medium leading-snug transition-colors border ${
-                  experiment.projectId === project.id && experiment.id === experimentId
+                  !activeWizardNotebook && experiment.projectId === project.id && experiment.id === experimentId
                     ? 'bg-primary/5 text-primary border-primary/20'
                     : 'text-text-muted hover:bg-surface-hover hover:text-text-main border-transparent'
                 }`}
@@ -644,119 +660,320 @@ ${sourceRunLines}
                 </span>
               </Link>
             ))}
+            {wizardNotebooks.map((nb) => {
+              const isActive = nb.id === activeWizardNotebook?.id;
+              const statusLabel = nb.workflowStatus === 'evidence_ready' ? 'Evidence ready' : 'Setup ready';
+              const statusColor = nb.workflowStatus === 'evidence_ready' ? 'text-primary' : 'text-amber-600';
+              const modeLabel = nb.mode === 'research' ? 'Research' : nb.mode === 'rd' ? 'R&D' : 'Analytical Job';
+              return (
+                <Link
+                  key={nb.id}
+                  to={`/notebook?project=${nb.id}`}
+                  className={`block w-full text-left px-3 py-2 rounded-md text-xs font-medium leading-snug transition-colors border ${
+                    isActive
+                      ? 'bg-primary/5 text-primary border-primary/20'
+                      : 'text-text-muted hover:bg-surface-hover hover:text-text-main border-transparent'
+                  }`}
+                >
+                  <span>{nb.title}</span>
+                  <span className="mt-1 block text-[10px] text-text-dim">{modeLabel}</span>
+                  <span className={`mt-0.5 block text-[10px] font-semibold ${statusColor}`}>
+                    {statusLabel}
+                  </span>
+                </Link>
+              );
+            })}
           </div>
         </div>
 
         <div className="flex-1 min-w-0 flex flex-col overflow-y-auto relative">
-          <div className="sticky top-0 z-10 bg-surface/80 backdrop-blur border-b border-border px-3 py-2 flex flex-wrap justify-between items-center gap-2">
-            <div>
-              <div className="flex items-center gap-2 text-[11px] text-text-muted mb-1">
-                <span>Created: {project.createdDate}</span>
-                <span>|</span>
-                <span>Source: Processing Result -&gt; Refinement -&gt; Notebook</span>
-              </div>
-              <h1 className="text-base font-bold">{notebook.title}</h1>
-              {(() => {
-                const lockedContext = getLockedContext(project.id);
-                return lockedContext ? (
-                  <div className="mt-1 rounded border border-amber-500/30 bg-amber-500/5 px-2.5 py-1.5">
-                    <p className="text-[10px] font-semibold text-amber-700">
-                      Locked context preserved: sample identity, source dataset, processing path, and claim boundary were not modified.
-                    </p>
-                  </div>
-                ) : null;
-              })()}
-              <div className="mt-2 flex max-w-4xl flex-wrap gap-1.5">
-                {[
-                  ['Mode', notebookTemplate.label],
-                  ['Pipeline', 'Processing -> Refinement -> Notebook -> Report'],
-                  ['Status', displayNotebookStatus],
-                  ['Condition lock', experimentConditionStatus],
-                ].map(([label, value]) => (
-                  <span
-                    key={label}
-                    className="rounded-md border border-border bg-background px-2.5 py-1 text-[11px] font-semibold text-text-muted"
-                  >
-                    <span className="text-text-dim">{label}: </span>
-                    <span className="text-text-main">{value}</span>
+          {activeWizardNotebook ? (
+            <div className="flex-1 p-6 max-w-4xl mx-auto w-full">
+              {/* Header */}
+              <div className="mb-6">
+                <div className="flex items-center gap-2 text-[11px] text-text-muted mb-2">
+                  <span>Created: {new Date(activeWizardNotebook.createdDate).toLocaleDateString()}</span>
+                  <span>|</span>
+                  <span>Mode: {activeWizardNotebook.mode === 'research' ? 'Research' : activeWizardNotebook.mode === 'rd' ? 'R&D' : 'Analytical Job'}</span>
+                  <span>|</span>
+                  <span className={activeWizardNotebook.workflowStatus === 'evidence_ready' ? 'text-primary font-semibold' : 'text-amber-600 font-semibold'}>
+                    {activeWizardNotebook.workflowStatus === 'evidence_ready' ? 'Evidence ready' : 'Setup ready'}
                   </span>
-                ))}
+                </div>
+                <h1 className="text-base font-bold text-text-main">{activeWizardNotebook.title}</h1>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {[
+                    ['Type', getNotebookTypeBadge(activeWizardNotebook.mode)],
+                    ['Status', activeWizardNotebook.workflowStatus === 'evidence_ready' ? 'Evidence ready' : 'Setup ready'],
+                  ].map(([label, value]) => (
+                    <span key={label} className="rounded-md border border-border bg-background px-2.5 py-1 text-[11px] font-semibold text-text-muted">
+                      <span className="text-text-dim">{label}: </span>
+                      <span className="text-text-main">{value}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Workflow pipeline */}
+              <div className="mb-4 rounded-lg border border-border bg-surface p-4">
+                <h2 className="text-xs font-bold uppercase tracking-wider text-text-dim mb-2">Workflow</h2>
+                <p className="text-[11px] text-text-muted leading-relaxed">
+                  {activeWizardNotebook.mode === 'research'
+                    ? 'Research Objective → Experimental Context → Evidence Workspace → Agent Reasoning → Validation Gap → Next Experiment / Decision → Decision Log → Notebook Memory → Report'
+                    : activeWizardNotebook.mode === 'rd'
+                    ? 'R&D Objective → Development Context → Evidence Workspace → Agent Reasoning → Validation Gap → Next Action / Decision → Decision Log → Notebook Memory → Report'
+                    : 'Analytical Objective → Analytical Context → Evidence Workspace → Agent Reasoning → Validation Gap → Result Decision / Disposition → Decision Log → Notebook Memory → Report'}
+                </p>
+              </div>
+
+              {/* Objective */}
+              {(() => {
+                const sf = activeWizardNotebook.setupFields ?? {};
+                const objectiveText =
+                  activeWizardNotebook.objective?.trim() ||
+                  (activeWizardNotebook.mode === 'research'
+                    ? sf['projectDescription'] || sf['scientificQuestion'] || ''
+                    : activeWizardNotebook.mode === 'rd'
+                    ? sf['projectDescription'] || sf['productGoal'] || sf['decisionNeeded'] || ''
+                    : sf['jobDescription'] || sf['analysisPurpose'] || '');
+                const objectiveLabel =
+                  activeWizardNotebook.mode === 'research' ? 'Research Objective'
+                  : activeWizardNotebook.mode === 'rd' ? 'R&D Objective'
+                  : 'Analytical Objective';
+                return (
+                  <div className="mb-4 rounded-lg border border-border bg-surface p-4">
+                    <h2 className="text-xs font-bold uppercase tracking-wider text-text-dim mb-2">{objectiveLabel}</h2>
+                    {objectiveText ? (
+                      <p className="text-sm text-text-main leading-relaxed">{objectiveText}</p>
+                    ) : (
+                      <p className="text-xs text-text-muted italic">No objective text was provided during setup.</p>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* Setup fields — context section, non-empty values only */}
+              {(() => {
+                const sf = activeWizardNotebook.setupFields ?? {};
+                // For each mode, pick the context fields (exclude the one already shown as objective)
+                const contextKeys =
+                  activeWizardNotebook.mode === 'research'
+                    ? ['sampleSystem', 'plannedTechniques', 'scientificQuestion', 'projectDescription']
+                    : activeWizardNotebook.mode === 'rd'
+                    ? ['productGoal', 'targetKpi', 'decisionNeeded', 'projectDescription']
+                    : ['sampleSubmitted', 'analysisPurpose', 'methodSop', 'jobDescription'];
+                const entries = contextKeys
+                  .map((k) => [k, sf[k]] as [string, string])
+                  .filter(([, v]) => v && v.trim());
+                if (entries.length === 0) return null;
+                const contextLabel =
+                  activeWizardNotebook.mode === 'research' ? 'Experimental Context'
+                  : activeWizardNotebook.mode === 'rd' ? 'Development Context'
+                  : 'Analytical Context';
+                const keyLabels: Record<string, string> = {
+                  projectDescription: 'Project Description',
+                  scientificQuestion: 'Scientific Question',
+                  sampleSystem: 'Sample System',
+                  plannedTechniques: 'Planned Techniques',
+                  productGoal: 'Product / Process Goal',
+                  targetKpi: 'Target KPI',
+                  decisionNeeded: 'Decision Needed',
+                  jobDescription: 'Job / Request Description',
+                  sampleSubmitted: 'Sample Submitted',
+                  analysisPurpose: 'Analysis Purpose',
+                  methodSop: 'Method / SOP',
+                };
+                return (
+                  <div className="mb-4 rounded-lg border border-border bg-surface p-4">
+                    <h2 className="text-xs font-bold uppercase tracking-wider text-text-dim mb-3">{contextLabel}</h2>
+                    <div className="space-y-2">
+                      {entries.map(([key, value]) => (
+                        <div key={key} className="flex gap-3 text-sm">
+                          <span className="text-text-dim min-w-[140px] shrink-0">{keyLabels[key] ?? key}:</span>
+                          <span className="text-text-main">{value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Data import status */}
+              {(() => {
+                const imp = activeWizardNotebook.initialDataImport;
+                const hasFiles = imp && !imp.skipped && imp.files.length > 0;
+                return (
+                  <div className="mb-4 rounded-lg border border-border bg-surface p-4">
+                    <h2 className="text-xs font-bold uppercase tracking-wider text-text-dim mb-3">Data Import</h2>
+                    {hasFiles ? (
+                      <div className="space-y-1.5">
+                        <p className="text-xs text-primary font-semibold mb-2">
+                          {imp!.files.length} file{imp!.files.length > 1 ? 's' : ''} attached
+                        </p>
+                        {imp!.files.map((file, i) => (
+                          <div key={i} className="flex items-center gap-2 text-xs text-text-muted">
+                            <FileText size={12} className="text-primary shrink-0" />
+                            <span className="font-medium text-text-main">{file.name}</span>
+                            <span className="text-text-dim">({file.type || 'unknown'})</span>
+                            <span className="ml-auto text-[10px] text-amber-600 font-semibold uppercase">Pending parse</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-text-muted">No data attached yet. Open a workspace to begin evidence collection.</p>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* Action buttons */}
+              <div className="mb-4 flex flex-wrap gap-2">
+                <Link
+                  to="/workspace/multi"
+                  className="inline-flex h-8 items-center justify-center rounded-md border border-primary bg-primary/10 px-3 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors"
+                >
+                  Open Workspace
+                </Link>
+                <Link
+                  to="/history"
+                  className="inline-flex h-8 items-center justify-center rounded-md border border-border px-3 text-xs font-medium text-text-muted hover:bg-surface-hover hover:text-text-main transition-colors"
+                >
+                  View History
+                </Link>
+                <button
+                  type="button"
+                  disabled
+                  title="Import data files from the workspace or dashboard."
+                  className="inline-flex h-8 items-center justify-center rounded-md border border-border px-3 text-xs font-medium text-text-muted opacity-50 cursor-not-allowed"
+                >
+                  Add Data
+                </button>
+              </div>
+
+              {/* Next steps */}
+              <div className="rounded-lg border border-dashed border-primary/30 bg-primary/5 p-4">
+                <h2 className="text-xs font-bold uppercase tracking-wider text-primary mb-2">Next Steps</h2>
+                <ul className="space-y-1 text-xs text-text-muted">
+                  {activeWizardNotebook.workflowStatus !== 'evidence_ready' && (
+                    <li className="flex items-start gap-2"><ArrowRight size={12} className="mt-0.5 text-primary shrink-0" /> Add experiments or import data files to begin evidence collection.</li>
+                  )}
+                  <li className="flex items-start gap-2"><ArrowRight size={12} className="mt-0.5 text-primary shrink-0" /> Open a workspace to process evidence and generate a processing result.</li>
+                  <li className="flex items-start gap-2"><ArrowRight size={12} className="mt-0.5 text-primary shrink-0" /> Run the agent to generate a reasoning trace and decision.</li>
+                  <li className="flex items-start gap-2"><ArrowRight size={12} className="mt-0.5 text-primary shrink-0" /> Save a notebook entry to preserve the scientific memory.</li>
+                </ul>
               </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {feedback && (
-                <span className="hidden sm:inline-flex items-center rounded-md border border-primary/20 bg-primary/10 px-3 text-xs font-semibold text-primary">
-                  {feedback}
-                </span>
-              )}
-              <Button variant="outline" size="sm" className="gap-2" onClick={copyShareLink}><Share2 size={14} /> Share</Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={!hasMatchedNotebookData}
-                title={!hasMatchedNotebookData ? 'Requires matched processing result before printing.' : undefined}
-                className="gap-2"
-                onClick={printReport}
-              >
-                <FileText size={14} /> Print Report
-              </Button>
-              <div className="relative">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={!hasMatchedNotebookData}
-                  title={!hasMatchedNotebookData ? 'Requires matched processing result before export.' : undefined}
-                  className="gap-2"
-                  onClick={() => setExportMenuOpen((open) => !open)}
-                >
-                  <Download size={14} /> Export
-                </Button>
-                {exportMenuOpen && (
-                  <div className="absolute right-0 top-10 z-20 w-52 rounded-lg border border-border bg-white p-2 shadow-xl">
-                    <button
-                      type="button"
-                      onClick={() => exportNotebook('md')}
-                      className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs font-semibold text-text-main hover:bg-surface-hover"
-                    >
-                      Export Markdown
-                      <Download size={13} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => exportNotebook('png')}
-                      className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs font-semibold text-text-main hover:bg-surface-hover"
-                    >
-                      Export PNG Snapshot
-                      <Download size={13} />
-                    </button>
-                    {(['pdf', 'docx', 'csv'] as DemoExportFormat[]).map((format) => (
-                      <button
-                        key={format}
-                        type="button"
-                        disabled
-                        title="Available in the connected beta workflow."
-                        className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs font-semibold text-slate-400 cursor-not-allowed"
+          ) : (
+            <>
+              <div className="sticky top-0 z-10 bg-surface/80 backdrop-blur border-b border-border px-3 py-2 flex flex-wrap justify-between items-center gap-2">
+                <div>
+                  <div className="flex items-center gap-2 text-[11px] text-text-muted mb-1">
+                    <span>Created: {project.createdDate}</span>
+                    <span>|</span>
+                    <span>Source: Processing Result -&gt; Refinement -&gt; Notebook</span>
+                  </div>
+                  <h1 className="text-base font-bold">{notebook.title}</h1>
+                  {(() => {
+                    const lockedContext = getLockedContext(project.id);
+                    return lockedContext ? (
+                      <div className="mt-1 rounded border border-amber-500/30 bg-amber-500/5 px-2.5 py-1.5">
+                        <p className="text-[10px] font-semibold text-amber-700">
+                          Locked context preserved: sample identity, source dataset, processing path, and claim boundary were not modified.
+                        </p>
+                      </div>
+                    ) : null;
+                  })()}
+                  <div className="mt-2 flex max-w-4xl flex-wrap gap-1.5">
+                    {[
+                      ['Mode', notebookTemplate.label],
+                      ['Pipeline', 'Processing -> Refinement -> Notebook -> Report'],
+                      ['Status', displayNotebookStatus],
+                      ['Condition lock', experimentConditionStatus],
+                    ].map(([label, value]) => (
+                      <span
+                        key={label}
+                        className="rounded-md border border-border bg-background px-2.5 py-1 text-[11px] font-semibold text-text-muted"
                       >
-                        {format.toUpperCase()} Export - Connected beta workflow
-                      </button>
+                        <span className="text-text-dim">{label}: </span>
+                        <span className="text-text-main">{value}</span>
+                      </span>
                     ))}
                   </div>
-                )}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {feedback && (
+                    <span className="hidden sm:inline-flex items-center rounded-md border border-primary/20 bg-primary/10 px-3 text-xs font-semibold text-primary">
+                      {feedback}
+                    </span>
+                  )}
+                  <Button variant="outline" size="sm" className="gap-2" onClick={copyShareLink}><Share2 size={14} /> Share</Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={!hasMatchedNotebookData}
+                    title={!hasMatchedNotebookData ? 'Requires matched processing result before printing.' : undefined}
+                    className="gap-2"
+                    onClick={printReport}
+                  >
+                    <FileText size={14} /> Print Report
+                  </Button>
+                  <div className="relative">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={!hasMatchedNotebookData}
+                      title={!hasMatchedNotebookData ? 'Requires matched processing result before export.' : undefined}
+                      className="gap-2"
+                      onClick={() => setExportMenuOpen((open) => !open)}
+                    >
+                      <Download size={14} /> Export
+                    </Button>
+                    {exportMenuOpen && (
+                      <div className="absolute right-0 top-10 z-20 w-52 rounded-lg border border-border bg-white p-2 shadow-xl">
+                        <button
+                          type="button"
+                          onClick={() => exportNotebook('md')}
+                          className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs font-semibold text-text-main hover:bg-surface-hover"
+                        >
+                          Export Markdown
+                          <Download size={13} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => exportNotebook('png')}
+                          className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs font-semibold text-text-main hover:bg-surface-hover"
+                        >
+                          Export PNG Snapshot
+                          <Download size={13} />
+                        </button>
+                        {(['pdf', 'docx', 'csv'] as DemoExportFormat[]).map((format) => (
+                          <button
+                            key={format}
+                            type="button"
+                            disabled
+                            title="Available in the connected beta workflow."
+                            className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs font-semibold text-slate-400 cursor-not-allowed"
+                          >
+                            {format.toUpperCase()} Export - Connected beta workflow
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <Button variant="outline" size="sm" className="gap-2" onClick={() => setObservationOpen(true)}><Plus size={14} /> Add Observation</Button>
+                  <Button variant="outline" size="sm" className="gap-2" onClick={() => setAttachRunOpen(true)}><FileText size={14} /> Attach Data</Button>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    disabled={!hasMatchedNotebookData}
+                    title={!hasMatchedNotebookData ? 'Requires matched processing result before saving.' : undefined}
+                    className="gap-2"
+                    onClick={saveWorkflowNotebookEntry}
+                  >
+                    <Save size={14} /> Save Entry
+                  </Button>
+                </div>
               </div>
-              <Button variant="outline" size="sm" className="gap-2" onClick={() => setObservationOpen(true)}><Plus size={14} /> Add Observation</Button>
-              <Button variant="outline" size="sm" className="gap-2" onClick={() => setAttachRunOpen(true)}><FileText size={14} /> Attach Data</Button>
-              <Button
-                variant="primary"
-                size="sm"
-                disabled={!hasMatchedNotebookData}
-                title={!hasMatchedNotebookData ? 'Requires matched processing result before saving.' : undefined}
-                className="gap-2"
-                onClick={saveWorkflowNotebookEntry}
-              >
-                <Save size={14} /> Save Entry
-              </Button>
-            </div>
-          </div>
 
           {observationOpen && (
             <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/30 p-4">
@@ -1460,6 +1677,8 @@ ${sourceRunLines}
               </div>
             </details>
           </div>
+            </>
+          )}
         </div>
 
         <div className="hidden">

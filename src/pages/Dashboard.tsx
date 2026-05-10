@@ -529,8 +529,8 @@ export default function Dashboard() {
             const modeLabel = notebook.mode === 'research' ? 'Research' : notebook.mode === 'rd' ? 'R&D' : 'Analytical Job';
             const modeColor = notebook.mode === 'research' ? 'emerald' : notebook.mode === 'rd' ? 'cyan' : 'amber';
             const setupComplete = isNotebookSetupComplete(notebook);
-            const statusLabel = setupComplete ? 'Ready for experiments' : 'Setup required';
-            const statusColor = setupComplete ? 'text-primary' : 'text-amber-600';
+            const statusLabel = notebook.workflowStatus === 'evidence_ready' ? 'Evidence ready' : notebook.workflowStatus === 'setup_ready' ? 'Setup ready' : (setupComplete ? 'Ready for experiments' : 'Setup required');
+            const statusColor = notebook.workflowStatus === 'evidence_ready' ? 'text-primary' : notebook.workflowStatus === 'setup_ready' ? 'text-amber-600' : (setupComplete ? 'text-primary' : 'text-amber-600');
             const actionLabel = getNotebookActionLabel(notebook.mode);
             
             // Data status
@@ -543,8 +543,7 @@ export default function Dashboard() {
                 key={notebook.id}
                 className="cursor-pointer hover:border-primary/50 transition-colors group flex flex-col h-full"
                 onClick={() => {
-                  setFeedback('Project Notebook workspace coming soon');
-                  window.setTimeout(() => setFeedback(''), 2000);
+                  navigate(`/notebook?project=${notebook.id}`);
                 }}
               >
                 <div className="p-4 border-b border-border bg-surface-hover/30 flex justify-between items-start">
@@ -605,17 +604,13 @@ export default function Dashboard() {
                     </div>
                   </div>
                   <div className="mt-auto pt-4 grid grid-cols-4 gap-1.5 border-t border-border min-h-[52px]">
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setFeedback('Project setup coming soon');
-                        window.setTimeout(() => setFeedback(''), 2000);
-                      }}
+                    <Link
+                      to={`/notebook?project=${notebook.id}`}
+                      onClick={(event) => event.stopPropagation()}
                       className="inline-flex h-8 items-center justify-center rounded-md border border-primary bg-primary/10 px-2 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors whitespace-nowrap"
                     >
-                      Open Setup
-                    </button>
+                      Open Notebook
+                    </Link>
                     <button
                       type="button"
                       onClick={(event) => {

@@ -16,6 +16,7 @@ import { runFtirProcessing } from '../agents/ftirAgent/runner';
 import { getWorkspaceEntryMode, getSampleDatasetName } from '../utils/workspaceEntry';
 import { DatasetInfoBar } from '../components/workspace/DatasetInfoBar';
 import { EmptyWorkspaceState } from '../components/workspace/EmptyWorkspaceState';
+import { getStepParameterDefinitions, FTIR_PARAMETER_DEFINITIONS } from '../data/parameterDefinitions';
 
 export default function FTIRWorkspace() {
   const [searchParams] = useSearchParams();
@@ -35,6 +36,15 @@ export default function FTIRWorkspace() {
   
   // Parameter state management
   const [autoMode, setAutoMode] = useState(true);
+  const [parameters, setParameters] = useState<Record<string, Record<string, any>>>(() => {
+    // Build default parameters from FTIR definitions
+    const defaults: Record<string, Record<string, any>> = {};
+    Object.entries(FTIR_PARAMETER_DEFINITIONS).forEach(([stepId, defs]) => {
+      defaults[stepId] = {};
+      defs.forEach(def => { defaults[stepId][def.id] = def.defaultValue; });
+    });
+    return defaults;
+  });
   
   // Drawer state management
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -158,12 +168,22 @@ export default function FTIRWorkspace() {
 
   // Handle resetting parameters to defaults
   const handleResetParameters = () => {
-    // TODO: Reset parameters
+    if (activeStep) {
+      const defs = getStepParameterDefinitions('ftir', activeStep);
+      const stepDefaults: Record<string, any> = {};
+      defs.forEach(def => { stepDefaults[def.id] = def.defaultValue; });
+      setParameters(prev => ({ ...prev, [activeStep]: stepDefaults }));
+    }
   };
 
   // Handle parameter changes
   const handleParameterChange = (paramId: string, value: any) => {
-    // TODO: Handle parameter changes
+    if (activeStep) {
+      setParameters(prev => ({
+        ...prev,
+        [activeStep]: { ...prev[activeStep], [paramId]: value },
+      }));
+    }
   };
 
   // Processing status for FTIR steps
@@ -255,95 +275,100 @@ export default function FTIRWorkspace() {
         
         <div className="flex-1 flex overflow-hidden">
         {/* LEFT SIDEBAR */}
-        <aside className="w-72 border-r border-border bg-surface flex flex-col shrink-0">
-          <div className="p-4 border-b border-border">
-            <label className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">
-              FTIR Project
-            </label>
-            <select
-              className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-text-main focus:outline-none focus:border-primary"
-            >
-              <option>Demo Project</option>
-            </select>
-            <p className="mt-2 text-[10px] text-text-muted">Metal oxide catalyst</p>
-          </div>
-
-          <div className="p-4 border-b border-border">
-            <label className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">
-              Dataset
-            </label>
-            <select
-              value={selectedDatasetId}
-              onChange={(e) => setSelectedDatasetId(e.target.value)}
-              className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-text-main focus:outline-none focus:border-primary"
-            >
-              {FTIR_DEMO_DATASETS.map(dataset => (
-                <option key={dataset.id} value={dataset.id}>
-                  {dataset.label}
-                </option>
-              ))}
-            </select>
-            
-            <div className="mt-3 flex items-center gap-2 text-[10px] text-text-muted">
-              <Database size={14} className="shrink-0" />
+        <aside className="w-[280px] border-r border-border bg-surface flex flex-col shrink-0 overflow-hidden">
+          {/* Setup: Title + Project + Dataset */}
+          <div className="border-b border-border px-3 py-2">
+            <h1 className="text-xs font-bold text-text-main leading-tight">FTIR Workspace</h1>
+            <p className="text-[9px] text-text-muted leading-tight">Bonding context evidence review</p>
+            <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+              <div>
+                <label className="text-[9px] font-semibold uppercase tracking-wider text-text-muted">
+                  Project
+                </label>
+                <select
+                  className="mt-0.5 h-6 w-full rounded border border-border bg-background px-1.5 text-[10px] font-medium text-text-main focus:outline-none focus:border-primary"
+                >
+                  <option>Demo Project</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-[9px] font-semibold uppercase tracking-wider text-text-muted">
+                  Dataset
+                </label>
+                <select
+                  value={selectedDatasetId}
+                  onChange={(e) => setSelectedDatasetId(e.target.value)}
+                  className="mt-0.5 h-6 w-full rounded border border-border bg-background px-1.5 text-[10px] font-medium text-text-main focus:outline-none focus:border-primary"
+                >
+                  {FTIR_DEMO_DATASETS.map(dataset => (
+                    <option key={dataset.id} value={dataset.id}>
+                      {dataset.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="mt-1 flex items-center gap-1 text-[9px] text-text-muted">
+              <Database size={10} className="shrink-0" />
               <span className="truncate">{selectedDataset.fileName}</span>
             </div>
           </div>
 
-          {/* Processing Pipeline */}
-          <div className="flex-1 min-h-0 border-b border-border overflow-y-auto">
-            <div className="p-3">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">Processing</h3>
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    className="w-3 h-3" 
+          {/* Processing Pipeline — scrollable */}
+          <div className="flex-1 min-h-0 overflow-y-auto pb-1">
+            <div className="border-b border-border px-3 py-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[8px] font-bold uppercase tracking-wider text-primary">Status:</span>
+                <label className="flex items-center gap-1 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="w-3 h-3"
                     checked={autoMode}
                     onChange={(e) => handleAutoModeChange(e.target.checked)}
                   />
                   <span className="text-[9px] text-text-muted">Auto</span>
                 </label>
               </div>
-              <div className="space-y-1.5">
+            </div>
+            <div className="px-2.5 py-1.5">
+              <div className="space-y-1">
                 {processingStatus.map((step, index) => (
-                  <div key={step.id} className="border border-emerald-500/30 bg-emerald-500/10 rounded px-2 py-1.5">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <span className="flex items-center justify-center w-4 h-4 rounded-full bg-emerald-600 text-white text-[8px] font-bold shrink-0">
+                  <div key={step.id} className="border border-emerald-500/30 bg-emerald-500/10 rounded px-2 py-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="flex items-center justify-center w-3.5 h-3.5 rounded-full bg-emerald-600 text-white text-[8px] font-bold shrink-0">
                         {index + 1}
                       </span>
                       <span className="text-[10px] font-medium text-emerald-700 flex-1">{step.label}</span>
-                      <CheckCircle2 size={12} className="text-emerald-600 shrink-0" />
-                    </div>
-                    <div className="flex items-center justify-between ml-6">
-                      <p className="text-[9px] text-emerald-700/70">{step.summary}</p>
+                      <CheckCircle2 size={10} className="text-emerald-600 shrink-0" />
                       {!autoMode && (
-                        <button 
+                        <button
                           onClick={() => handleOpenDrawer(step.id)}
-                          className="text-[9px] font-semibold text-emerald-700 hover:text-emerald-800 px-1.5 py-0.5 rounded hover:bg-emerald-500/20 transition-colors"
+                          className="text-[9px] font-semibold text-emerald-700 hover:text-emerald-800 px-1 py-0.5 rounded hover:bg-emerald-500/20 transition-colors"
                         >
                           Params
                         </button>
                       )}
                     </div>
+                    <p className="text-[9px] text-emerald-700/70 ml-5 leading-tight">{step.summary}</p>
                   </div>
                 ))}
               </div>
             </div>
           </div>
 
-          <div className="p-4 border-t border-border space-y-2">
+          {/* Actions: sticky at bottom */}
+          <div className="shrink-0 border-t border-border bg-surface px-2.5 pt-2 pb-3 space-y-1">
             <Link
               to="/notebook"
-              className="flex h-9 items-center justify-between rounded-md border border-border px-3 text-sm font-medium text-text-main hover:bg-surface-hover transition-colors"
+              className="flex h-6 items-center justify-between rounded border border-border px-2 text-[10px] font-medium text-text-main hover:bg-surface-hover transition-colors"
             >
-              Open Notebook <ArrowRight size={14} />
+              Open Notebook <ArrowRight size={11} />
             </Link>
             <Link
               to="/demo/agent"
-              className="flex h-9 items-center justify-between rounded-md bg-primary text-white px-3 text-sm font-medium hover:bg-primary/90 transition-colors"
+              className="flex h-7 items-center justify-between rounded bg-primary text-white px-2 text-[10px] font-medium hover:bg-primary/90 transition-colors"
             >
-              Run Agent <ArrowRight size={14} />
+              Run Agent <ArrowRight size={11} />
             </Link>
           </div>
         </aside>
@@ -673,8 +698,8 @@ export default function FTIRWorkspace() {
         stepLabel={activeStep ? processingStatus.find(s => s.id === activeStep)?.label || '' : ''}
         methodName={activeStep ? processingStatus.find(s => s.id === activeStep)?.summary || '' : ''}
         isAutoMode={autoMode}
-        parameters={{}}
-        parameterDefinitions={[]}
+        parameters={activeStep ? (parameters[activeStep] || {}) : {}}
+        parameterDefinitions={activeStep ? getStepParameterDefinitions('ftir', activeStep) : []}
         onParameterChange={handleParameterChange}
         onApply={handleApplyParameters}
         onReset={handleResetParameters}

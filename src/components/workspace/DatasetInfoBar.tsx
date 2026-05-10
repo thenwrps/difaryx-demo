@@ -14,7 +14,7 @@ export function DatasetInfoBar({ technique, source, datasetName, projectName }: 
   const sourceConfig = {
     sample: {
       icon: Database,
-      label: 'Sample Dataset',
+      label: 'Sample',
       bgColor: 'bg-blue-50',
       borderColor: 'border-blue-200',
       textColor: 'text-blue-900',
@@ -22,7 +22,7 @@ export function DatasetInfoBar({ technique, source, datasetName, projectName }: 
     },
     upload: {
       icon: Upload,
-      label: 'Uploaded Dataset',
+      label: 'Upload',
       bgColor: 'bg-purple-50',
       borderColor: 'border-purple-200',
       textColor: 'text-purple-900',
@@ -30,7 +30,7 @@ export function DatasetInfoBar({ technique, source, datasetName, projectName }: 
     },
     project: {
       icon: FileText,
-      label: 'Project Dataset',
+      label: 'Project',
       bgColor: 'bg-gray-50',
       borderColor: 'border-gray-300',
       textColor: 'text-gray-900',
@@ -42,36 +42,36 @@ export function DatasetInfoBar({ technique, source, datasetName, projectName }: 
   const Icon = config.icon;
 
   return (
-    <div className={`w-full ${config.bgColor} ${config.borderColor} border-b shadow-sm`}>
-      <div className="px-6 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Icon size={18} className={config.iconColor} />
-          <span className={`text-sm font-bold ${config.textColor}`}>
+    <div className={`w-full ${config.bgColor} ${config.borderColor} border-b`}>
+      <div className="px-4 py-1.5 flex items-center justify-between gap-3 min-h-0">
+        <div className="flex items-center gap-2 min-w-0 overflow-hidden">
+          <Icon size={14} className={`${config.iconColor} shrink-0`} />
+          <span className={`text-[11px] font-bold ${config.textColor} shrink-0`}>
             {config.label}
           </span>
-          <span className={`text-sm ${config.textColor} opacity-50`}>•</span>
+          <span className={`text-[11px] ${config.textColor} opacity-40 shrink-0`}>·</span>
           {projectName && (
             <>
-              <span className={`text-sm font-semibold ${config.textColor}`}>
+              <span className={`text-[11px] font-semibold ${config.textColor} truncate max-w-[120px]`}>
                 {projectName}
               </span>
-              <span className={`text-sm ${config.textColor} opacity-50`}>/</span>
+              <span className={`text-[11px] ${config.textColor} opacity-40 shrink-0`}>/</span>
             </>
           )}
-          <span className={`text-sm font-semibold ${config.textColor}`}>
+          <span className={`text-[11px] font-semibold ${config.textColor} truncate max-w-[160px]`}>
             {datasetName}
           </span>
-          <span className={`text-sm ${config.textColor} opacity-50`}>•</span>
-          <span className={`text-sm font-medium ${config.textColor} opacity-75`}>
+          <span className={`text-[11px] ${config.textColor} opacity-40 shrink-0`}>·</span>
+          <span className={`text-[11px] font-medium ${config.textColor} opacity-75 shrink-0`}>
             {technique}
           </span>
         </div>
         
         <Link
           to="/workspace"
-          className={`flex items-center gap-2 px-3 py-1.5 rounded-md border ${config.borderColor} bg-white hover:bg-gray-50 transition-colors text-sm font-medium ${config.textColor}`}
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded border ${config.borderColor} bg-white hover:bg-gray-50 transition-colors text-[11px] font-medium ${config.textColor} shrink-0`}
         >
-          <ArrowLeft size={14} />
+          <ArrowLeft size={12} />
           Change Technique
         </Link>
       </div>

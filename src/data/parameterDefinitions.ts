@@ -650,6 +650,518 @@ export const XPS_DEFAULT_PARAMETERS: XpsParameters = {
 };
 
 // ============================================================================
+// FTIR Parameter Definitions
+// ============================================================================
+
+const FTIR_BASELINE_CORRECTION_DEFINITIONS: ParameterDefinition[] = [
+  {
+    id: 'method',
+    label: 'Method',
+    type: 'select',
+    defaultValue: 'ALS',
+    options: [
+      { value: 'ALS', label: 'Asymmetric Least Squares (ALS)' },
+      { value: 'Polynomial', label: 'Polynomial Fit' },
+      { value: 'Rubberband', label: 'Rubberband Baseline' }
+    ]
+  },
+  {
+    id: 'lambda',
+    label: 'Lambda',
+    type: 'number',
+    unit: 'dimensionless',
+    min: 1e2,
+    max: 1e8,
+    step: 1e4,
+    defaultValue: 1e5,
+    visibleWhen: (params) => params.method === 'ALS',
+    validate: (value) => {
+      if (typeof value === 'number' && (value < 1e2 || value > 1e8)) {
+        return 'Lambda must be between 1e2 and 1e8';
+      }
+      return null;
+    }
+  },
+  {
+    id: 'p',
+    label: 'Asymmetry (p)',
+    type: 'number',
+    unit: 'dimensionless',
+    min: 0.001,
+    max: 0.1,
+    step: 0.001,
+    defaultValue: 0.01,
+    visibleWhen: (params) => params.method === 'ALS',
+    validate: (value) => {
+      if (typeof value === 'number' && (value < 0.001 || value > 0.1)) {
+        return 'Asymmetry must be between 0.001 and 0.1';
+      }
+      return null;
+    }
+  },
+  {
+    id: 'polynomial_order',
+    label: 'Polynomial Order',
+    type: 'number',
+    unit: '',
+    min: 1,
+    max: 8,
+    step: 1,
+    defaultValue: 3,
+    visibleWhen: (params) => params.method === 'Polynomial',
+    validate: (value) => {
+      if (typeof value === 'number' && (value < 1 || value > 8)) {
+        return 'Polynomial order must be between 1 and 8';
+      }
+      return null;
+    }
+  }
+];
+
+const FTIR_SMOOTHING_DEFINITIONS: ParameterDefinition[] = [
+  {
+    id: 'method',
+    label: 'Method',
+    type: 'select',
+    defaultValue: 'Savitzky-Golay',
+    options: [
+      { value: 'Savitzky-Golay', label: 'Savitzky-Golay Filter' },
+      { value: 'Moving Average', label: 'Moving Average' }
+    ]
+  },
+  {
+    id: 'window_size',
+    label: 'Window Size',
+    type: 'number',
+    unit: '',
+    min: 3,
+    max: 25,
+    step: 2,
+    defaultValue: 7,
+    validate: (value) => {
+      if (typeof value === 'number') {
+        if (value < 3 || value > 25) return 'Window size must be between 3 and 25';
+        if (value % 2 === 0) return 'Window size must be odd';
+      }
+      return null;
+    }
+  },
+  {
+    id: 'polynomial_order',
+    label: 'Polynomial Order',
+    type: 'number',
+    unit: '',
+    min: 1,
+    max: 5,
+    step: 1,
+    defaultValue: 2,
+    visibleWhen: (params) => params.method === 'Savitzky-Golay',
+    validate: (value, allParams) => {
+      if (typeof value === 'number' && typeof allParams.window_size === 'number') {
+        if (value < 1 || value > 5) return 'Polynomial order must be between 1 and 5';
+        if (value >= allParams.window_size) return 'Polynomial order must be less than window size';
+      }
+      return null;
+    }
+  }
+];
+
+const FTIR_PEAK_DETECTION_DEFINITIONS: ParameterDefinition[] = [
+  {
+    id: 'prominence',
+    label: 'Prominence',
+    type: 'number',
+    unit: 'dimensionless',
+    min: 0.0,
+    max: 1.0,
+    step: 0.01,
+    defaultValue: 0.05,
+    validate: (value) => {
+      if (typeof value === 'number' && (value < 0.0 || value > 1.0)) {
+        return 'Prominence must be between 0.0 and 1.0';
+      }
+      return null;
+    }
+  },
+  {
+    id: 'min_distance',
+    label: 'Min Distance',
+    type: 'number',
+    unit: 'cm⁻¹',
+    min: 1,
+    max: 50,
+    step: 1,
+    defaultValue: 10,
+    validate: (value) => {
+      if (typeof value === 'number' && (value < 1 || value > 50)) {
+        return 'Min distance must be between 1 and 50 cm⁻¹';
+      }
+      return null;
+    }
+  },
+  {
+    id: 'height_threshold',
+    label: 'Height Threshold (optional)',
+    type: 'number',
+    unit: 'dimensionless',
+    min: 0.0,
+    max: 1.0,
+    step: 0.01,
+    defaultValue: null,
+    validate: (value) => {
+      if (value !== null && typeof value === 'number' && (value < 0.0 || value > 1.0)) {
+        return 'Height threshold must be between 0.0 and 1.0';
+      }
+      return null;
+    }
+  }
+];
+
+const FTIR_BAND_ASSIGNMENT_DEFINITIONS: ParameterDefinition[] = [
+  {
+    id: 'database',
+    label: 'Reference Database',
+    type: 'select',
+    defaultValue: 'SDBS',
+    options: [
+      { value: 'SDBS', label: 'SDBS (Spectral Database for Organic Compounds)' },
+      { value: 'NIST', label: 'NIST Chemistry WebBook' },
+      { value: 'Custom', label: 'Custom Reference Library' }
+    ]
+  },
+  {
+    id: 'wavenumber_tolerance',
+    label: 'Wavenumber Tolerance',
+    type: 'number',
+    unit: 'cm⁻¹',
+    min: 1,
+    max: 30,
+    step: 1,
+    defaultValue: 10,
+    validate: (value) => {
+      if (typeof value === 'number' && (value < 1 || value > 30)) {
+        return 'Tolerance must be between 1 and 30 cm⁻¹';
+      }
+      return null;
+    }
+  },
+  {
+    id: 'use_intensity',
+    label: 'Use Intensity in Matching',
+    type: 'boolean',
+    defaultValue: false
+  }
+];
+
+const FTIR_FUNCTIONAL_GROUP_ANALYSIS_DEFINITIONS: ParameterDefinition[] = [
+  {
+    id: 'region_focus',
+    label: 'Spectral Region Focus',
+    type: 'select',
+    defaultValue: 'full',
+    options: [
+      { value: 'full', label: 'Full spectrum (400–4000 cm⁻¹)' },
+      { value: 'fingerprint', label: 'Fingerprint region (400–1500 cm⁻¹)' },
+      { value: 'functional', label: 'Functional group region (1500–4000 cm⁻¹)' }
+    ]
+  },
+  {
+    id: 'min_confidence',
+    label: 'Min Assignment Confidence',
+    type: 'number',
+    unit: 'dimensionless',
+    min: 0.0,
+    max: 1.0,
+    step: 0.05,
+    defaultValue: 0.5,
+    validate: (value) => {
+      if (typeof value === 'number' && (value < 0.0 || value > 1.0)) {
+        return 'Confidence must be between 0.0 and 1.0';
+      }
+      return null;
+    }
+  }
+];
+
+const FTIR_SCIENTIFIC_SUMMARY_DEFINITIONS: ParameterDefinition[] = [
+  {
+    id: 'interpretation_mode',
+    label: 'Interpretation Mode',
+    type: 'select',
+    defaultValue: 'conservative',
+    options: [
+      { value: 'conservative', label: 'Conservative (validation-limited)' },
+      { value: 'exploratory', label: 'Exploratory (hypothesis-driven)' }
+    ]
+  },
+  {
+    id: 'include_caveats',
+    label: 'Include Validation Caveats',
+    type: 'boolean',
+    defaultValue: true
+  }
+];
+
+export const FTIR_PARAMETER_DEFINITIONS: Record<string, ParameterDefinition[]> = {
+  baselineCorrection: FTIR_BASELINE_CORRECTION_DEFINITIONS,
+  smoothing: FTIR_SMOOTHING_DEFINITIONS,
+  peakDetection: FTIR_PEAK_DETECTION_DEFINITIONS,
+  bandAssignment: FTIR_BAND_ASSIGNMENT_DEFINITIONS,
+  functionalGroupAnalysis: FTIR_FUNCTIONAL_GROUP_ANALYSIS_DEFINITIONS,
+  scientificSummary: FTIR_SCIENTIFIC_SUMMARY_DEFINITIONS
+};
+
+// ============================================================================
+// Raman Parameter Definitions
+// ============================================================================
+
+const RAMAN_BASELINE_CORRECTION_DEFINITIONS: ParameterDefinition[] = [
+  {
+    id: 'method',
+    label: 'Method',
+    type: 'select',
+    defaultValue: 'Polynomial',
+    options: [
+      { value: 'Polynomial', label: 'Polynomial Fit' },
+      { value: 'ALS', label: 'Asymmetric Least Squares (ALS)' },
+      { value: 'Rubberband', label: 'Rubberband Baseline' }
+    ]
+  },
+  {
+    id: 'polynomial_order',
+    label: 'Polynomial Order',
+    type: 'number',
+    unit: '',
+    min: 1,
+    max: 8,
+    step: 1,
+    defaultValue: 3,
+    visibleWhen: (params) => params.method === 'Polynomial',
+    validate: (value) => {
+      if (typeof value === 'number' && (value < 1 || value > 8)) {
+        return 'Polynomial order must be between 1 and 8';
+      }
+      return null;
+    }
+  },
+  {
+    id: 'lambda',
+    label: 'Lambda',
+    type: 'number',
+    unit: 'dimensionless',
+    min: 1e2,
+    max: 1e8,
+    step: 1e4,
+    defaultValue: 1e5,
+    visibleWhen: (params) => params.method === 'ALS',
+    validate: (value) => {
+      if (typeof value === 'number' && (value < 1e2 || value > 1e8)) {
+        return 'Lambda must be between 1e2 and 1e8';
+      }
+      return null;
+    }
+  }
+];
+
+const RAMAN_SMOOTHING_DEFINITIONS: ParameterDefinition[] = [
+  {
+    id: 'method',
+    label: 'Method',
+    type: 'select',
+    defaultValue: 'Moving Average',
+    options: [
+      { value: 'Moving Average', label: 'Moving Average' },
+      { value: 'Savitzky-Golay', label: 'Savitzky-Golay Filter' }
+    ]
+  },
+  {
+    id: 'window_size',
+    label: 'Window Size',
+    type: 'number',
+    unit: '',
+    min: 3,
+    max: 25,
+    step: 2,
+    defaultValue: 9,
+    validate: (value) => {
+      if (typeof value === 'number') {
+        if (value < 3 || value > 25) return 'Window size must be between 3 and 25';
+        if (value % 2 === 0) return 'Window size must be odd';
+      }
+      return null;
+    }
+  },
+  {
+    id: 'polynomial_order',
+    label: 'Polynomial Order',
+    type: 'number',
+    unit: '',
+    min: 1,
+    max: 5,
+    step: 1,
+    defaultValue: 2,
+    visibleWhen: (params) => params.method === 'Savitzky-Golay',
+    validate: (value, allParams) => {
+      if (typeof value === 'number' && typeof allParams.window_size === 'number') {
+        if (value < 1 || value > 5) return 'Polynomial order must be between 1 and 5';
+        if (value >= allParams.window_size) return 'Polynomial order must be less than window size';
+      }
+      return null;
+    }
+  }
+];
+
+const RAMAN_PEAK_DETECTION_DEFINITIONS: ParameterDefinition[] = [
+  {
+    id: 'prominence',
+    label: 'Prominence',
+    type: 'number',
+    unit: 'dimensionless',
+    min: 0.0,
+    max: 1.0,
+    step: 0.01,
+    defaultValue: 0.08,
+    validate: (value) => {
+      if (typeof value === 'number' && (value < 0.0 || value > 1.0)) {
+        return 'Prominence must be between 0.0 and 1.0';
+      }
+      return null;
+    }
+  },
+  {
+    id: 'min_distance',
+    label: 'Min Distance',
+    type: 'number',
+    unit: 'cm⁻¹',
+    min: 1,
+    max: 50,
+    step: 1,
+    defaultValue: 10,
+    validate: (value) => {
+      if (typeof value === 'number' && (value < 1 || value > 50)) {
+        return 'Min distance must be between 1 and 50 cm⁻¹';
+      }
+      return null;
+    }
+  },
+  {
+    id: 'height_threshold',
+    label: 'Height Threshold (optional)',
+    type: 'number',
+    unit: 'dimensionless',
+    min: 0.0,
+    max: 1.0,
+    step: 0.01,
+    defaultValue: null,
+    validate: (value) => {
+      if (value !== null && typeof value === 'number' && (value < 0.0 || value > 1.0)) {
+        return 'Height threshold must be between 0.0 and 1.0';
+      }
+      return null;
+    }
+  }
+];
+
+const RAMAN_MODE_ASSIGNMENT_DEFINITIONS: ParameterDefinition[] = [
+  {
+    id: 'database',
+    label: 'Reference Database',
+    type: 'select',
+    defaultValue: 'RRUFF',
+    options: [
+      { value: 'RRUFF', label: 'RRUFF Raman Database' },
+      { value: 'SDBS', label: 'SDBS Spectral Database' },
+      { value: 'Custom', label: 'Custom Reference Library' }
+    ]
+  },
+  {
+    id: 'wavenumber_tolerance',
+    label: 'Wavenumber Tolerance',
+    type: 'number',
+    unit: 'cm⁻¹',
+    min: 1,
+    max: 30,
+    step: 1,
+    defaultValue: 8,
+    validate: (value) => {
+      if (typeof value === 'number' && (value < 1 || value > 30)) {
+        return 'Tolerance must be between 1 and 30 cm⁻¹';
+      }
+      return null;
+    }
+  },
+  {
+    id: 'use_intensity',
+    label: 'Use Intensity in Matching',
+    type: 'boolean',
+    defaultValue: false
+  }
+];
+
+const RAMAN_PHASE_INTERPRETATION_DEFINITIONS: ParameterDefinition[] = [
+  {
+    id: 'symmetry_analysis',
+    label: 'Symmetry Analysis',
+    type: 'select',
+    defaultValue: 'group_theory',
+    options: [
+      { value: 'group_theory', label: 'Group theory (factor group)' },
+      { value: 'empirical', label: 'Empirical reference matching' }
+    ]
+  },
+  {
+    id: 'include_defect_modes',
+    label: 'Include Defect / Disorder Modes',
+    type: 'boolean',
+    defaultValue: true
+  },
+  {
+    id: 'min_confidence',
+    label: 'Min Assignment Confidence',
+    type: 'number',
+    unit: 'dimensionless',
+    min: 0.0,
+    max: 1.0,
+    step: 0.05,
+    defaultValue: 0.5,
+    validate: (value) => {
+      if (typeof value === 'number' && (value < 0.0 || value > 1.0)) {
+        return 'Confidence must be between 0.0 and 1.0';
+      }
+      return null;
+    }
+  }
+];
+
+const RAMAN_SCIENTIFIC_SUMMARY_DEFINITIONS: ParameterDefinition[] = [
+  {
+    id: 'interpretation_mode',
+    label: 'Interpretation Mode',
+    type: 'select',
+    defaultValue: 'conservative',
+    options: [
+      { value: 'conservative', label: 'Conservative (validation-limited)' },
+      { value: 'exploratory', label: 'Exploratory (hypothesis-driven)' }
+    ]
+  },
+  {
+    id: 'include_caveats',
+    label: 'Include Validation Caveats',
+    type: 'boolean',
+    defaultValue: true
+  }
+];
+
+export const RAMAN_PARAMETER_DEFINITIONS: Record<string, ParameterDefinition[]> = {
+  baselineCorrection: RAMAN_BASELINE_CORRECTION_DEFINITIONS,
+  smoothing: RAMAN_SMOOTHING_DEFINITIONS,
+  peakDetection: RAMAN_PEAK_DETECTION_DEFINITIONS,
+  modeAssignment: RAMAN_MODE_ASSIGNMENT_DEFINITIONS,
+  phaseInterpretation: RAMAN_PHASE_INTERPRETATION_DEFINITIONS,
+  scientificSummary: RAMAN_SCIENTIFIC_SUMMARY_DEFINITIONS
+};
+
+// ============================================================================
 // Helper Functions
 // ============================================================================
 
@@ -666,7 +1178,12 @@ export function getStepParameterDefinitions(
   if (technique === 'xps') {
     return XPS_PARAMETER_DEFINITIONS[stepId] || [];
   }
-  // Future: Add FTIR, Raman
+  if (technique === 'ftir') {
+    return FTIR_PARAMETER_DEFINITIONS[stepId] || [];
+  }
+  if (technique === 'raman') {
+    return RAMAN_PARAMETER_DEFINITIONS[stepId] || [];
+  }
   return [];
 }
 

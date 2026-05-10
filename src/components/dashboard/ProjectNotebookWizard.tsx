@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { X, ChevronRight, CheckCircle2, FileText, Beaker, ClipboardCheck, Upload } from 'lucide-react';
+import { X, ChevronRight, CheckCircle2, FileText, Beaker, ClipboardCheck, Upload, ChevronDown } from 'lucide-react';
 import { Button } from '../ui/Button';
-import { NotebookMode, saveProjectNotebook, getLocalProjectNotebooks } from '../../data/demoProjects';
+import { NotebookMode, saveProjectNotebook, saveWizardHistoryEntry, getLocalProjectNotebooks } from '../../data/demoProjects';
 
 interface ProjectNotebookWizardProps {
   open: boolean;
@@ -40,7 +40,7 @@ const MODE_CONFIG = {
       'Evidence Workspace',
       'Agent Reasoning',
       'Validation Gap',
-      'Next Experiment',
+      'Next Experiment / Decision',
       'Decision Log',
       'Notebook Memory',
       'Report',
@@ -52,11 +52,11 @@ const MODE_CONFIG = {
     description: 'For formulation, process development, KPI comparison, risk review, and go/no-go decisions.',
     sections: [
       'R&D Objective',
-      'R&D Context',
+      'Development Context',
       'Evidence Workspace',
       'Agent Reasoning',
       'Validation Gap',
-      'Next Action',
+      'Next Action / Decision',
       'Decision Log',
       'Notebook Memory',
       'Report',
@@ -72,7 +72,7 @@ const MODE_CONFIG = {
       'Evidence Workspace',
       'Agent Reasoning',
       'Validation Gap',
-      'Next Action',
+      'Result Decision / Disposition',
       'Decision Log',
       'Notebook Memory',
       'Report',
@@ -101,29 +101,39 @@ const SUPPORTED_FILE_TYPES = [
 const DATA_FIELDS: Record<NotebookMode, SetupField[]> = {
   research: [
     { key: 'projectDescription', label: 'Project / Study Description', placeholder: 'Describe the research project or study', required: true },
-    { key: 'scientificQuestion', label: 'Scientific Question', placeholder: 'What scientific question are you investigating?', required: false, helperText: 'Optional at setup. You can start with a project description and refine the scientific question later.' },
-    { key: 'hypothesis', label: 'Hypothesis', placeholder: 'Working hypothesis or expected outcome', required: false },
+    { key: 'scientificQuestion', label: 'Scientific Question', placeholder: 'What scientific question are you investigating?', required: false },
     { key: 'sampleSystem', label: 'Sample System', placeholder: 'Material system or sample type', required: true },
     { key: 'plannedTechniques', label: 'Planned Techniques', placeholder: 'XRD, Raman, FTIR, XPS, etc.', required: false },
-    { key: 'expectedEvidence', label: 'Expected Evidence', placeholder: 'What evidence do you expect to collect?', required: false },
-    { key: 'validationBoundary', label: 'Validation Boundary', placeholder: 'Known limitations or validation requirements', required: false },
-    { key: 'publicationTarget', label: 'Publication / Thesis Target', placeholder: 'Target journal, conference, or thesis', required: false },
   ],
   rd: [
     { key: 'projectDescription', label: 'Project / Development Description', placeholder: 'Describe the R&D project or development effort', required: true },
     { key: 'productGoal', label: 'Product / Process Goal', placeholder: 'What product or process are you developing?', required: true },
     { key: 'targetKpi', label: 'Target KPI', placeholder: 'Key performance indicator or target metric', required: false },
-    { key: 'successCriteria', label: 'Success Criteria', placeholder: 'What defines success for this project?', required: false },
-    { key: 'materialSystem', label: 'Material / Formulation System', placeholder: 'Material or formulation being developed', required: false },
     { key: 'decisionNeeded', label: 'Decision Needed', placeholder: 'Go/no-go, formulation choice, etc.', required: false },
-    { key: 'riskLevel', label: 'Risk Level', placeholder: 'Technical risk or uncertainty level', required: false },
-    { key: 'nextMilestone', label: 'Next Milestone', placeholder: 'Next development milestone or decision point', required: false },
   ],
   analytical: [
     { key: 'jobDescription', label: 'Job / Request Description', placeholder: 'Describe the analytical job or request', required: true },
     { key: 'sampleSubmitted', label: 'Sample Submitted', placeholder: 'Sample ID or description', required: true },
     { key: 'analysisPurpose', label: 'Analysis Purpose', placeholder: 'Purpose of this analysis', required: false },
     { key: 'methodSop', label: 'Method / SOP', placeholder: 'Standard operating procedure or method', required: false },
+  ],
+};
+
+const ADVANCED_FIELDS: Record<NotebookMode, SetupField[]> = {
+  research: [
+    { key: 'hypothesis', label: 'Hypothesis', placeholder: 'Working hypothesis or expected outcome', required: false },
+    { key: 'expectedEvidence', label: 'Expected Evidence', placeholder: 'What evidence do you expect to collect?', required: false },
+    { key: 'validationBoundary', label: 'Validation Boundary', placeholder: 'Known limitations or validation requirements', required: false },
+    { key: 'publicationTarget', label: 'Publication / Thesis Target', placeholder: 'Target journal, conference, or thesis', required: false },
+  ],
+  rd: [
+    { key: 'materialSystem', label: 'Material / Formulation System', placeholder: 'Material or formulation being developed', required: false },
+    { key: 'riskLevel', label: 'Risk Level', placeholder: 'Technical risk or uncertainty level', required: false },
+    { key: 'expectedEvidence', label: 'Expected Evidence', placeholder: 'What evidence do you expect to collect?', required: false },
+    { key: 'validationBoundary', label: 'Validation Boundary', placeholder: 'Known limitations or validation requirements', required: false },
+    { key: 'nextMilestone', label: 'Next Milestone', placeholder: 'Next development milestone or decision point', required: false },
+  ],
+  analytical: [
     { key: 'specification', label: 'Specification / Standard', placeholder: 'Specification or standard to meet', required: false },
     { key: 'acceptanceCriteria', label: 'Acceptance Criteria', placeholder: 'Criteria for acceptance or rejection', required: false },
     { key: 'qaqcRequirement', label: 'QA/QC Requirement', placeholder: 'Quality assurance requirements', required: false },
@@ -154,12 +164,16 @@ export function ProjectNotebookWizard({ open, onClose, onCreated }: ProjectNoteb
   
   // Step 4 internal navigation
   const [step4Section, setStep4Section] = useState<'setup' | 'import'>('setup');
+  
+  // Advanced context collapsed state
+  const [advancedExpanded, setAdvancedExpanded] = useState(false);
 
   if (!open) return null;
 
   const currentStepIndex = STEPS.findIndex(s => s.id === currentStep);
   const config = selectedMode ? MODE_CONFIG[selectedMode] : null;
   const fields = selectedMode ? DATA_FIELDS[selectedMode] : [];
+  const advancedFields = selectedMode ? ADVANCED_FIELDS[selectedMode] : [];
 
   const canProceedFromProject = title.trim() && objective.trim();
   const canProceedFromMode = selectedMode !== null;
@@ -202,13 +216,14 @@ export function ProjectNotebookWizard({ open, onClose, onCreated }: ProjectNoteb
       destination: dataDestination,
     };
 
-    saveProjectNotebook({
+    const savedNotebook = saveProjectNotebook({
       title: title.trim(),
       objective: objective.trim(),
       mode: selectedMode,
       setupFields: Object.keys(setupFields).length > 0 ? setupFields : undefined,
       initialDataImport: dataSkipped || selectedFiles.length > 0 ? initialDataImport : undefined,
     });
+    saveWizardHistoryEntry(savedNotebook);
 
     onCreated();
     handleClose();
@@ -226,6 +241,7 @@ export function ProjectNotebookWizard({ open, onClose, onCreated }: ProjectNoteb
     setDataDestination('project');
     setDragActive(false);
     setStep4Section('setup');
+    setAdvancedExpanded(false);
     onClose();
   };
 
@@ -337,7 +353,7 @@ export function ProjectNotebookWizard({ open, onClose, onCreated }: ProjectNoteb
           {currentStep === 'project' && (
             <div className="space-y-4">
               <div>
-                <h3 className="text-base font-semibold text-text-main mb-3">Research Objective</h3>
+                <h3 className="text-base font-semibold text-text-main mb-3">Workflow Objective</h3>
                 <div className="space-y-3">
                   <div>
                     <label htmlFor="title" className="block text-sm font-semibold text-text-main mb-1.5">
@@ -503,11 +519,11 @@ export function ProjectNotebookWizard({ open, onClose, onCreated }: ProjectNoteb
                 <div>
                   <h3 className="text-base font-semibold text-text-main mb-2">
                     {selectedMode === 'research' ? 'Experimental Context' : 
-                     selectedMode === 'rd' ? 'R&D Context' : 
+                     selectedMode === 'rd' ? 'Development Context' : 
                      'Analytical Context'}
                   </h3>
                   <p className="text-sm text-text-muted mb-4">
-                    Provide initial setup information for your {config?.label} notebook.
+                    Provide initial context information for your {config?.label} workflow.
                   </p>
 
                   <div className="space-y-3">
@@ -532,6 +548,53 @@ export function ProjectNotebookWizard({ open, onClose, onCreated }: ProjectNoteb
                       </div>
                     ))}
                   </div>
+
+                  {/* Advanced Context Section */}
+                  <div className="mt-6">
+                    <button
+                      type="button"
+                      onClick={() => setAdvancedExpanded(!advancedExpanded)}
+                      className="w-full flex items-center justify-between rounded-md border border-border bg-surface px-4 py-3 text-left transition-colors hover:bg-surface-hover"
+                    >
+                      <div>
+                        <h4 className="text-sm font-semibold text-text-main">Advanced Context</h4>
+                        <p className="text-xs text-text-muted mt-0.5">
+                          Optional details for stronger reasoning, validation boundaries, and reporting.
+                        </p>
+                      </div>
+                      <ChevronDown 
+                        size={18} 
+                        className={`text-text-muted transition-transform flex-shrink-0 ml-2 ${
+                          advancedExpanded ? 'rotate-180' : ''
+                        }`}
+                      />
+                    </button>
+
+                    {advancedExpanded && (
+                      <div className="mt-3 space-y-3 rounded-md border border-border bg-background p-4">
+                        {advancedFields.map((field) => (
+                          <div key={field.key}>
+                            <label htmlFor={`adv-${field.key}`} className="block text-sm font-semibold text-text-main mb-1.5">
+                              {field.label} {field.required && <span className="text-red-500">*</span>}
+                            </label>
+                            <input
+                              id={`adv-${field.key}`}
+                              type="text"
+                              value={dataFields[field.key] || ''}
+                              onChange={(e) => updateDataField(field.key, e.target.value)}
+                              placeholder={field.placeholder}
+                              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-text-main placeholder:text-text-dim focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                            />
+                            {field.helperText && (
+                              <p className="mt-1 text-xs text-text-dim leading-relaxed">
+                                {field.helperText}
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -540,7 +603,7 @@ export function ProjectNotebookWizard({ open, onClose, onCreated }: ProjectNoteb
                 <div>
                   <h3 className="text-base font-semibold text-text-main mb-2">Add / Import Data</h3>
                   <p className="text-sm text-text-muted mb-3">
-                    Attach initial experimental files now or skip and add them later.
+                    Attach initial data files now or skip and add them later.
                   </p>
 
                   {/* Supported File Types */}
@@ -559,7 +622,7 @@ export function ProjectNotebookWizard({ open, onClose, onCreated }: ProjectNoteb
                       ))}
                     </div>
                     <p className="text-[11px] text-text-dim leading-relaxed">
-                      Typical technique exports: XRD (.xy, .txt, .csv, .dat), Raman (.txt, .csv, .dat), FTIR (.csv, .txt, .dat), XPS (.csv, .txt, .dat).
+                      Typical technique exports: XRD, Raman, FTIR, XPS.
                     </p>
                   </div>
 

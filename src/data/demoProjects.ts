@@ -176,6 +176,8 @@ export interface ProcessingRun {
 
 export type NotebookMode = 'research' | 'rd' | 'analytical';
 
+export type WorkflowStatus = 'setup_ready' | 'evidence_ready';
+
 export interface ProjectNotebook {
   id: string;
   title: string;
@@ -183,6 +185,7 @@ export interface ProjectNotebook {
   mode: NotebookMode;
   createdDate: string;
   lastUpdated: string;
+  workflowStatus?: WorkflowStatus;
   setupFields?: Record<string, string>;
   initialDataImport?: {
     skipped: boolean;
@@ -195,6 +198,16 @@ export interface ProjectNotebook {
   };
 }
 
+export interface WizardHistoryEntry {
+  id: string;
+  notebookId: string;
+  projectTitle: string;
+  mode: NotebookMode;
+  workflowStatus: WorkflowStatus;
+  date: string;
+  action: 'notebook';
+}
+
 export const DEFAULT_PROJECT_ID = 'cu-fe2o4-spinel';
 
 const LOCAL_EXPERIMENTS_KEY = 'difaryx-demo-experiments';
@@ -202,6 +215,7 @@ const LOCAL_DATASETS_KEY = 'difaryx-demo-datasets';
 const LOCAL_RUNS_KEY = 'difaryx-demo-processing-runs';
 const LOCAL_EVIDENCE_KEY = 'difaryx-demo-evidence';
 const LOCAL_PROJECT_NOTEBOOKS_KEY = 'difaryx-demo-project-notebooks';
+const LOCAL_WIZARD_HISTORY_KEY = 'difaryx-wizard-history';
 
 export const demoProjects: DemoProject[] = [
   {
@@ -1119,7 +1133,7 @@ export function saveEvidence(evidence: Omit<Evidence, 'id'> & { id?: string }) {
 }
 
 export function getAllHistoryEntries() {
-  return demoProjects.flatMap((project) =>
+  const demoEntries = demoProjects.flatMap((project) =>
     project.history.map((entry) => ({
       ...entry,
       projectId: project.id,
@@ -1129,6 +1143,23 @@ export function getAllHistoryEntries() {
       agentPath: getAgentPath(project),
     })),
   );
+
+  const wizardEntries = getWizardHistoryEntries().map((entry) => ({
+    id: entry.id,
+    run: entry.projectTitle,
+    technique: 'Notebook',
+    claimStatus: 'partial' as ClaimStatus,
+    status: entry.workflowStatus === 'evidence_ready' ? 'Evidence ready' : 'Setup ready',
+    date: entry.date,
+    action: entry.action,
+    projectId: entry.notebookId,
+    projectName: entry.projectTitle,
+    workspacePath: `/notebook?project=${entry.notebookId}`,
+    notebookPath: `/notebook?project=${entry.notebookId}`,
+    agentPath: `/demo/agent?project=${entry.notebookId}`,
+  }));
+
+  return [...demoEntries, ...wizardEntries];
 }
 
 // Project Notebook functions
@@ -1139,17 +1170,44 @@ export function getLocalProjectNotebooks() {
 export function saveProjectNotebook(notebook: Omit<ProjectNotebook, 'id' | 'createdDate' | 'lastUpdated'> & Partial<Pick<ProjectNotebook, 'id' | 'createdDate' | 'lastUpdated'>>) {
   const notebooks = getLocalProjectNotebooks();
   const now = new Date().toISOString();
+
+  const hasEvidence =
+    notebook.initialDataImport !== undefined &&
+    !notebook.initialDataImport.skipped &&
+    notebook.initialDataImport.files.length >= 1;
+
+  const workflowStatus: WorkflowStatus = hasEvidence ? 'evidence_ready' : 'setup_ready';
+
   const nextNotebook: ProjectNotebook = {
     ...notebook,
     id: notebook.id ?? makeId('notebook'),
     createdDate: notebook.createdDate ?? now,
     lastUpdated: notebook.lastUpdated ?? now,
+    workflowStatus,
   };
   writeLocalList(
     LOCAL_PROJECT_NOTEBOOKS_KEY,
     [...notebooks.filter((item) => item.id !== nextNotebook.id), nextNotebook],
   );
   return nextNotebook;
+}
+
+export function getWizardHistoryEntries(): WizardHistoryEntry[] {
+  return readLocalList<WizardHistoryEntry>(LOCAL_WIZARD_HISTORY_KEY);
+}
+
+export function saveWizardHistoryEntry(notebook: ProjectNotebook): void {
+  const entries = getWizardHistoryEntries();
+  const entry: WizardHistoryEntry = {
+    id: makeId('wizard-hist'),
+    notebookId: notebook.id,
+    projectTitle: notebook.title,
+    mode: notebook.mode,
+    workflowStatus: notebook.workflowStatus ?? 'setup_ready',
+    date: notebook.createdDate,
+    action: 'notebook',
+  };
+  writeLocalList(LOCAL_WIZARD_HISTORY_KEY, [...entries, entry]);
 }
 
 export function getNotebookTypeBadge(mode: NotebookMode): string {

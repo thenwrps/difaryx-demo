@@ -605,54 +605,57 @@ export default function XRDWorkspace() {
                 </div>
               </div>
 
-              {/* Manual Processing: compact variant */}
-              <div className="border-b border-border px-2.5 py-1.5">
-                <ProcessingPipeline
-                  technique="xrd"
-                  autoMode={autoMode}
-                  onAutoModeChange={handleAutoModeChange}
-                  parameters={parameters}
-                  onOpenDrawer={handleOpenDrawer}
-                  processingStatus={processingStatus}
-                  compact
-                />
-              </div>
-
-              {/* Evidence: compact summary */}
-              <div className="border-b border-border px-3 py-1.5">
-                <div className="text-[10px] font-bold text-emerald-700">Evidence Ready</div>
-                <div className="mt-0.5 text-[9px] text-text-muted leading-snug">
-                  <span>Peaks: {agentResult?.detectedPeaks.length ?? 0}</span>
-                  <span className="mx-1">/</span>
-                  <span>{decisionStatus}</span>
+              {/* Scrollable content area */}
+              <div className="flex-1 overflow-y-auto min-h-0 pb-1">
+                {/* Manual Processing: compact variant */}
+                <div className="border-b border-border px-2.5 py-1.5">
+                  <ProcessingPipeline
+                    technique="xrd"
+                    autoMode={autoMode}
+                    onAutoModeChange={handleAutoModeChange}
+                    parameters={parameters}
+                    onOpenDrawer={handleOpenDrawer}
+                    processingStatus={processingStatus}
+                    compact
+                  />
                 </div>
-                <div className="text-[9px] text-text-muted">{evidenceStatus}</div>
-                <div className="text-[9px] font-semibold text-text-main">Next: Refine</div>
-                {workflowFeedback && (
-                  <div className="mt-0.5 text-[10px] font-semibold text-primary">{workflowFeedback}</div>
-                )}
+
+                {/* Evidence: compact summary */}
+                <div className="border-b border-border px-3 py-1.5">
+                  <div className="text-[10px] font-bold text-emerald-700">Evidence Ready</div>
+                  <div className="mt-0.5 text-[9px] text-text-muted leading-snug">
+                    <span>Peaks: {agentResult?.detectedPeaks.length ?? 0}</span>
+                    <span className="mx-1">/</span>
+                    <span>{decisionStatus}</span>
+                  </div>
+                  <div className="text-[9px] text-text-muted">{evidenceStatus}</div>
+                  <div className="text-[9px] font-semibold text-text-main">Next: Refine</div>
+                  {workflowFeedback && (
+                    <div className="mt-0.5 text-[10px] font-semibold text-primary">{workflowFeedback}</div>
+                  )}
+                </div>
+
+                {/* Locked Scientific Context */}
+                {(() => {
+                  const lockedContext = getLockedContext(project.id);
+                  return lockedContext ? (
+                    <div className="border-b border-border px-3 py-1.5">
+                      <LockedScientificContext
+                        sampleIdentity={lockedContext.sampleIdentity}
+                        technique={lockedContext.technique}
+                        sourceDataset={lockedContext.sourceDataset}
+                        sourceProcessingPath={lockedContext.sourceProcessingPath}
+                        referenceScope={lockedContext.referenceScope}
+                        claimBoundary={lockedContext.claimBoundary}
+                        variant="compact"
+                      />
+                    </div>
+                  ) : null;
+                })()}
               </div>
 
-              {/* Locked Scientific Context */}
-              {(() => {
-                const lockedContext = getLockedContext(project.id);
-                return lockedContext ? (
-                  <div className="border-b border-border px-3 py-1.5">
-                    <LockedScientificContext
-                      sampleIdentity={lockedContext.sampleIdentity}
-                      technique={lockedContext.technique}
-                      sourceDataset={lockedContext.sourceDataset}
-                      sourceProcessingPath={lockedContext.sourceProcessingPath}
-                      referenceScope={lockedContext.referenceScope}
-                      claimBoundary={lockedContext.claimBoundary}
-                      variant="compact"
-                    />
-                  </div>
-                ) : null;
-              })()}
-
-              {/* Actions: compact row */}
-              <div className="px-2.5 py-1.5 space-y-1 shrink-0">
+              {/* Actions: sticky at bottom of left panel */}
+              <div className="shrink-0 border-t border-border bg-surface px-2.5 pt-2 pb-3 space-y-1">
                 <div className="grid grid-cols-2 gap-1">
                   <button
                     type="button"
@@ -671,7 +674,7 @@ export default function XRDWorkspace() {
                 <button
                   type="button"
                   onClick={handleRefineInterpretation}
-                  className="flex h-6 w-full items-center justify-center rounded bg-primary px-2 text-[10px] font-medium text-white transition-colors hover:bg-primary/90"
+                  className="flex h-7 w-full items-center justify-center rounded bg-primary px-2 text-[10px] font-medium text-white transition-colors hover:bg-primary/90"
                 >
                   Refine Interpretation <ArrowRight size={11} className="ml-1" />
                 </button>
@@ -716,8 +719,8 @@ export default function XRDWorkspace() {
 
         {/* CENTER COLUMN */}
         <main className="flex-1 flex flex-col min-w-0 overflow-hidden border-r border-border">
-          <div className="flex-1 overflow-y-auto p-3">
-            <div className="space-y-3">
+          <div className="flex-1 overflow-y-auto">
+            <div className="p-3 space-y-3">
               {canRenderXrdData ? (
                 <>
                 {/* XRD PATTERN - GRAPH FIRST (PRIMARY) */}
@@ -794,16 +797,16 @@ export default function XRDWorkspace() {
                   {/* Tab Content */}
                   {activeTab === 'pattern' && (
                     <>
-                      <div className="flex flex-wrap items-center justify-between gap-2 bg-surface/20 px-3 py-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2 bg-surface/20 px-3 py-1">
                         <div>
                           <h3 className="text-[10px] font-semibold uppercase tracking-wider text-text-main">XRD Diffraction Pattern</h3>
-                          <p className="mt-0.5 text-[9px] text-text-muted">Intensity vs. 2theta with baseline and peak markers</p>
+                          <p className="text-[9px] text-text-muted">Intensity vs. 2theta with baseline and peak markers</p>
                         </div>
                         <span className="text-[9px] font-mono text-text-muted tabular-nums">lambda = 1.5406 A (Cu K-alpha)</span>
                       </div>
 
                       {/* Graph */}
-                      <div className="h-[clamp(340px,50vh,460px)] w-full min-w-0 px-2 py-2">
+                      <div className="h-[clamp(380px,55vh,520px)] w-full min-w-0 px-2 pb-1 pt-0">
                         <Graph
                           type="xrd"
                           height="100%"
@@ -974,7 +977,8 @@ export default function XRDWorkspace() {
         </main>
 
         {/* RIGHT SIDEBAR */}
-        <aside className="w-[320px] shrink-0 overflow-y-auto border-r border-border bg-surface flex flex-col">
+        <aside className="w-[320px] shrink-0 border-r border-border bg-surface flex flex-col overflow-hidden">
+          <div className="flex-1 overflow-y-auto min-h-0">
           <div className="space-y-2 p-3">
             {canRenderXrdData ? (
               <>
@@ -1112,6 +1116,7 @@ export default function XRDWorkspace() {
                 </p>
               </div>
             )}
+          </div>
           </div>
         </aside>
       </div>

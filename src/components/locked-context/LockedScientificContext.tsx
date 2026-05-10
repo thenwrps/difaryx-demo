@@ -11,7 +11,7 @@
  * - 'compact': Displays condensed version (for XRD Workspace sidebar)
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 
 export interface LockedScientificContextProps {
   sampleIdentity: string;
@@ -33,41 +33,57 @@ export function LockedScientificContext({
   variant = 'full',
 }: LockedScientificContextProps) {
   if (variant === 'compact') {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const [expanded, setExpanded] = useState(false);
     return (
-      <div className="rounded border border-amber-500/30 bg-amber-500/5 px-2.5 py-2">
-        <div className="mb-1.5 flex items-center justify-between">
-          <h4 className="text-[10px] font-bold text-text-main">Locked Context</h4>
-          <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[8px] font-semibold text-amber-700">
-            Locked by user
-          </span>
+      <div className="rounded border border-amber-500/30 bg-amber-500/5 px-2.5 py-1.5">
+        <div className="flex items-center justify-between">
+          <h4 className="text-[9px] font-bold text-text-main">Locked Context</h4>
+          <div className="flex items-center gap-1.5">
+            <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[8px] font-semibold text-amber-700">
+              Locked
+            </span>
+            <button
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              className="text-[8px] font-semibold text-text-muted hover:text-text-main transition-colors"
+            >
+              {expanded ? 'less' : 'more'}
+            </button>
+          </div>
         </div>
-        <p className="mb-1.5 text-[8px] text-text-muted">Source context preserved</p>
-        <div className="space-y-1">
+        {/* Always-visible summary */}
+        <div className="mt-1 space-y-0.5">
           <div className="text-[9px]">
             <span className="font-semibold text-text-main">Sample:</span>{' '}
             <span className="text-text-muted">{sampleIdentity || 'Not specified'}</span>
           </div>
           <div className="text-[9px]">
-            <span className="font-semibold text-text-main">Technique:</span>{' '}
-            <span className="text-text-muted">{technique || 'Not specified'}</span>
-          </div>
-          <div className="text-[9px]">
-            <span className="font-semibold text-text-main">Dataset:</span>{' '}
-            <span className="text-text-muted">{sourceDataset || 'Not specified'}</span>
-          </div>
-          <div className="text-[9px]">
-            <span className="font-semibold text-text-main">Path:</span>{' '}
-            <span className="text-text-muted">{sourceProcessingPath || 'Not specified'}</span>
-          </div>
-          <div className="text-[9px]">
-            <span className="font-semibold text-text-main">Scope:</span>{' '}
-            <span className="text-text-muted">{referenceScope || 'Not specified'}</span>
-          </div>
-          <div className="text-[9px]">
             <span className="font-semibold text-text-main">Boundary:</span>{' '}
-            <span className="text-text-muted">{claimBoundary || 'Not specified'}</span>
+            <span className="text-text-muted line-clamp-2">{claimBoundary || 'Not specified'}</span>
           </div>
         </div>
+        {/* Expanded details */}
+        {expanded && (
+          <div className="mt-1 space-y-0.5 border-t border-amber-500/20 pt-1">
+            <div className="text-[9px]">
+              <span className="font-semibold text-text-main">Technique:</span>{' '}
+              <span className="text-text-muted">{technique || 'Not specified'}</span>
+            </div>
+            <div className="text-[9px]">
+              <span className="font-semibold text-text-main">Dataset:</span>{' '}
+              <span className="text-text-muted">{sourceDataset || 'Not specified'}</span>
+            </div>
+            <div className="text-[9px]">
+              <span className="font-semibold text-text-main">Path:</span>{' '}
+              <span className="text-text-muted">{sourceProcessingPath || 'Not specified'}</span>
+            </div>
+            <div className="text-[9px]">
+              <span className="font-semibold text-text-main">Scope:</span>{' '}
+              <span className="text-text-muted">{referenceScope || 'Not specified'}</span>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
