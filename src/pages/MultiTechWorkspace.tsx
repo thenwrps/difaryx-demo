@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { AlertTriangle, ArrowRight, BookOpen, CheckCircle2, FileText, LockKeyhole, Play, Save, Upload } from 'lucide-react';
+import { AlertTriangle, ArrowRight, BookOpen, CheckCircle2, FileText, LockKeyhole, Play, Save, Upload, X } from 'lucide-react';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
@@ -687,12 +687,21 @@ export default function MultiTechWorkspace() {
   const navigate = useNavigate();
   const project = getProject(searchParams.get('project') ?? DEFAULT_PROJECT_ID);
   
+  // Get available techniques from project
+  const availableTechniques = project.techniqueMetadata.map(t => t.key);
+  const techniqueCount = availableTechniques.length;
+
   // Cross-tech interaction state
-  const [activeTechniques, setActiveTechniques] = useState<Set<Technique>>(new Set(['XRD', 'Raman', 'XPS', 'FTIR']));
+  const [activeTechniques, setActiveTechniques] = useState<Set<Technique>>(() => new Set(availableTechniques));
+  const [primaryTechniqueKey, setPrimaryTechniqueKey] = useState<Technique>(() => {
+    // Default primary: XRD if available, otherwise first available technique
+    return availableTechniques.includes('XRD') ? 'XRD' : availableTechniques[0];
+  });
   const [selectedEvidenceId, setSelectedEvidenceId] = useState<string | null>(null);
   const [hoveredEvidenceId, setHoveredEvidenceId] = useState<string | null>(null);
   const [selectedClaimId, setSelectedClaimId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'conclusion' | 'justification' | 'evidence' | 'interpretation'>('conclusion');
+  const [activeRightTab, setActiveRightTab] = useState<'inference' | 'support' | 'limits' | 'agent'>('inference');
   const [reviewOutput, setReviewOutput] = useState<FusionResult | null>(null);
   const [isTechniqueDropdownOpen, setIsTechniqueDropdownOpen] = useState(false);
   const [workflowFeedback, setWorkflowFeedback] = useState('');
@@ -1112,14 +1121,14 @@ ${result.decision}
 
   return (
     <DashboardLayout>
-      <div className="flex-1 overflow-y-auto bg-background p-2">
+      <div className="flex flex-col h-full overflow-hidden bg-background p-1.5">
         {/* Header */}
-        <div className="mb-2 rounded-lg border border-border bg-surface px-3 py-2">
+        <div className="mb-1 rounded-lg border border-border bg-surface px-2.5 py-1.5">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="min-w-[220px]">
-              <h1 className="text-base font-bold text-text-main">Cross-Tech Evidence Review</h1>
-              <p className="mt-0.5 text-[10px] text-text-muted">
-                Compare linked evidence across XRD, Raman, XPS, and FTIR
+              <h1 className="text-sm font-bold text-text-main">Cross-Techniques Comparison</h1>
+              <p className="text-[10px] text-text-muted">
+                Compare processed evidence across available techniques.
               </p>
             </div>
             <div className="flex max-w-full flex-wrap items-center justify-start gap-1.5 sm:justify-end">
@@ -1145,7 +1154,7 @@ ${result.decision}
                   </summary>
                   <div className="absolute right-0 z-10 mt-1 rounded border border-border bg-white shadow-lg">
                     <div className="p-2 flex gap-3 whitespace-nowrap">
-                      {(['XRD', 'Raman', 'XPS', 'FTIR'] as Technique[]).map((technique) => (
+                      {availableTechniques.map((technique) => (
                         <label key={technique} className="flex items-center gap-1.5 cursor-pointer px-2 py-1 hover:bg-gray-50 rounded">
                           <input
                             type="checkbox"
@@ -1161,118 +1170,96 @@ ${result.decision}
                   </div>
                 </details>
               </div>
+              <button
+                type="button"
+                onClick={() => setUploadPanelExpanded(true)}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background text-text-muted transition-colors hover:border-primary/40 hover:bg-surface-hover hover:text-text-main"
+                title="Add Dataset"
+                aria-label="Add Dataset"
+              >
+                <Upload size={14} />
+              </button>
               <button 
                 onClick={handleRunReview}
-                className="inline-flex h-8 items-center justify-center gap-1.5 whitespace-nowrap rounded-md bg-primary px-3 text-xs font-medium text-white transition-colors hover:bg-primary/90"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-primary text-white transition-colors hover:bg-primary/90"
+                title="Run Review"
+                aria-label="Run Review"
               >
-                <Play size={14} /> Run Review
+                <Play size={14} />
               </button>
-              <Button
+              <button
                 type="button"
-                variant="outline"
-                size="sm"
-                className="gap-1.5 whitespace-nowrap"
                 onClick={handleSaveProcessingResult}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background text-text-muted transition-colors hover:border-primary/40 hover:bg-surface-hover hover:text-text-main"
+                title="Save Result"
+                aria-label="Save Result"
               >
-                <CheckCircle2 size={14} /> Save Result
-              </Button>
-              <Button
+                <CheckCircle2 size={14} />
+              </button>
+              <button
                 type="button"
-                variant="outline"
-                size="sm"
-                className="gap-1.5 whitespace-nowrap"
                 onClick={handleRefineInterpretation}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background text-text-muted transition-colors hover:border-primary/40 hover:bg-surface-hover hover:text-text-main"
+                title="Refine"
+                aria-label="Refine"
               >
-                <FileText size={14} /> Refine
-              </Button>
+                <FileText size={14} />
+              </button>
               <Link to={`/workspace/fusion?project=${project.id}`}>
-                <Button variant="outline" size="sm" className="gap-1.5 whitespace-nowrap">
-                  <BookOpen size={14} /> Report
-                </Button>
+                <button
+                  type="button"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background text-text-muted transition-colors hover:border-primary/40 hover:bg-surface-hover hover:text-text-main"
+                  title="Report"
+                  aria-label="Report"
+                >
+                  <BookOpen size={14} />
+                </button>
               </Link>
               <Link to={`/notebook?project=${project.id}&source=fusion&template=research`}>
-                <Button variant="outline" size="sm" className="gap-1.5 whitespace-nowrap">
-                  <Save size={14} /> Notebook
-                </Button>
+                <button
+                  type="button"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background text-text-muted transition-colors hover:border-primary/40 hover:bg-surface-hover hover:text-text-main"
+                  title="Notebook"
+                  aria-label="Notebook"
+                >
+                  <Save size={14} />
+                </button>
               </Link>
             </div>
           </div>
-          <div className="mt-2 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1.5">
+          <div className="mt-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1">
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-text-muted">
-              <span className="font-bold text-emerald-700">Processing Result Ready</span>
-              <span>Detected peaks: 9</span>
-              <span>Preliminary assignment: CuFe2O4 spinel ferrite</span>
-              <span className="font-semibold text-text-main">Next: Refine Interpretation</span>
+              <span className="font-bold text-emerald-700">
+                {Array.from(activeTechniques).length === 1 ? 'Processed Signal Ready' : 'Processed Evidence Ready'}
+              </span>
+              <span>
+                {Array.from(activeTechniques).length === 1
+                  ? `Technique: ${Array.from(activeTechniques)[0]}`
+                  : `Techniques: ${Array.from(activeTechniques).length}`
+                }
+              </span>
+              <span>Working assignment: {formatChemicalFormula('CuFe2O4')} spinel ferrite</span>
+              <span className="font-semibold text-text-main">
+                {Array.from(activeTechniques).length === 1 ? 'Next: Review evidence' : 'Next: Agent refinement'}
+              </span>
               {workflowFeedback && <span className="font-semibold text-primary">{workflowFeedback}</span>}
             </div>
           </div>
         </div>
 
-        <Card id="beta-upload" className="mb-2 overflow-hidden">
-          <div className={`${uploadPanelExpanded ? 'border-b' : ''} border-border bg-surface-hover/40 px-3 py-2`}>
-            <div className="grid grid-cols-1 items-center gap-2 xl:grid-cols-[230px_minmax(0,1fr)_auto]">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-sm font-bold text-text-main">Add supporting dataset</h2>
-                  <span className="rounded border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
-                    Public beta
-                  </span>
-                </div>
-                <p className="mt-0.5 text-[10px] text-text-muted">Attach another technique, replicate, or validation signal.</p>
+        {uploadPanelExpanded && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setUploadPanelExpanded(false)}>
+          <div className="relative mx-4 max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-xl border border-border bg-surface shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-surface px-4 py-3">
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-bold text-text-main">Add supporting dataset</h2>
+                <span className="rounded border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-primary">Public beta</span>
               </div>
-              {uploadPanelExpanded ? (
-                <div className="flex flex-wrap gap-1.5">
-                  {uploadWorkflowStatuses.map((item) => (
-                    <span
-                      key={item.label}
-                      className={`rounded border px-2 py-1 text-[10px] font-semibold ${
-                        item.ready
-                          ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700'
-                          : 'border-border bg-background text-text-muted'
-                      }`}
-                    >
-                      {item.ready ? item.label : item.fallback}
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <div className="truncate rounded border border-border bg-background px-2 py-1.5 text-[11px] font-semibold text-text-muted">
-                  {compactUploadStatus}
-                </div>
-              )}
-              <div className="flex flex-wrap items-center gap-2">
-                <label className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-white transition-colors hover:bg-primary/90">
-                  <Upload size={14} /> Upload action
-                  <input
-                    type="file"
-                    accept=".csv,.txt,.xy,.dat,text/csv,text/plain"
-                    className="sr-only"
-                    onChange={handleUploadFileChange}
-                  />
-                </label>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-8 gap-1.5"
-                  onClick={() => setUploadPanelExpanded((expanded) => !expanded)}
-                >
-                  {uploadPanelExpanded ? 'Hide upload details' : 'Show upload details'}
-                </Button>
-              </div>
+              <button type="button" onClick={() => setUploadPanelExpanded(false)} className="rounded-md p-1 text-text-muted hover:bg-surface-hover hover:text-text-main transition-colors">
+                <X size={18} />
+              </button>
             </div>
-            {(!uploadStorageStatus.available || uploadStorageStatus.corrupted) && (
-              <p className="mt-2 text-[10px] text-amber-700">{uploadStorageStatus.message}</p>
-            )}
-            <p className="mt-1 text-[10px] leading-relaxed text-text-muted">
-              <span className="font-semibold text-text-main">Experiment condition lock: {conditionLockStatus}.</span>{' '}
-              Supporting uploads do not inherit synthesis, measurement, processing, or validation conditions unless
-              explicitly tied to the current experiment record.
-            </p>
-          </div>
-
-          {uploadPanelExpanded && (
-          <div className="grid grid-cols-1 gap-3 p-3 xl:grid-cols-[320px_1fr]">
+            <div className="grid grid-cols-1 gap-3 p-4 xl:grid-cols-[320px_1fr]">
             <div className="space-y-3">
               <div className="rounded-lg border border-border bg-background p-3">
                 <h3 className="text-xs font-bold text-text-main">Scientific context confirmation</h3>
@@ -1762,326 +1749,593 @@ ${result.decision}
               </div>
             </div>
           </div>
-          )}
-        </Card>
+        </div>
+        </div>
+        )}
 
-        {/* Main 2-column layout: Left (2x2 graphs) | Right (vertical sections) */}
-        <div className="grid grid-cols-1 gap-2 lg:grid-cols-[minmax(0,1fr)_360px]">
-          {/* Left Panel: 2x2 synchronized evidence grid */}
-          <div className="space-y-2">
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {(['XRD', 'Raman', 'XPS', 'FTIR'] as Technique[]).map((technique) => {
+        {/* Main 2-column layout: Left (technique grid) | Right (vertical sections) */}
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-1.5 lg:grid-cols-[minmax(0,1fr)_340px]">
+          {/* Left Panel: Adaptive technique grid */}
+          <div className="min-h-0 overflow-y-auto">
+            {availableTechniques.length === 0 ? (
+              <Card className="flex h-full items-center justify-center p-8">
+                <div className="text-center">
+                  <AlertTriangle size={32} className="mx-auto mb-3 text-amber-600" />
+                  <h3 className="text-sm font-bold text-text-main">No processed technique data available.</h3>
+                  <p className="mt-2 text-xs text-text-muted">Add or process data before evidence review.</p>
+                  <Button variant="primary" size="sm" className="mt-4" onClick={() => setUploadPanelExpanded(true)}>
+                    Add Data
+                  </Button>
+                </div>
+              </Card>
+            ) : (() => {
+              const selectedTechniques = availableTechniques.filter(t => activeTechniques.has(t));
+              const techniqueCount = selectedTechniques.length;
+
+              // Ensure primaryTechniqueKey is valid for current selection
+              React.useEffect(() => {
+                if (techniqueCount === 3 && !selectedTechniques.includes(primaryTechniqueKey)) {
+                  const newPrimary = selectedTechniques.includes('XRD') ? 'XRD' : selectedTechniques[0];
+                  setPrimaryTechniqueKey(newPrimary);
+                }
+              }, [selectedTechniques.join(',')]);
+
+              if (techniqueCount === 1) {
+                // Single technique: one full-width card with large graph
+                const technique = selectedTechniques[0];
+                const metadata = project.techniqueMetadata.find(t => t.key === technique);
                 const techniqueDatasets = getDatasetsByTechnique(project.id, technique);
                 const dataset = techniqueDatasets[0];
-                const techniqueEvidence = demoEvidenceItems.filter((e) => e.technique === technique);
-                const isActive = activeTechniques.has(technique);
+
+                const compactStatus = technique === 'XRD' ? 'Reflections detected · Supported'
+                  : technique === 'Raman' ? 'A₁g mode detected · Supported'
+                  : technique === 'FTIR' ? 'M–O band detected · Supported'
+                  : 'Surface assignment pending';
 
                 return (
-                  <Card key={technique} className={`overflow-hidden transition-opacity ${!isActive ? 'opacity-40' : ''}`}>
-                    <div className="border-b border-border bg-surface-hover/40 px-2 py-1.5">
+                  <Card className="overflow-hidden">
+                    <div className="border-b border-border bg-surface-hover/40 px-3 py-1.5">
                       <div className="flex items-center justify-between">
-                        <h2 className="text-xs font-bold text-text-main">{technique}</h2>
+                        <h2 className="text-sm font-bold text-text-main">{technique} · {metadata?.role || 'Analysis'}</h2>
                         <Link to={getWorkspaceRoute(project, technique, dataset?.id)}>
-                          <Button variant="ghost" size="sm" className="h-6 gap-1 text-[10px] px-2">
-                            Open <ArrowRight size={10} />
+                          <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs px-3">
+                            Open <ArrowRight size={12} />
                           </Button>
                         </Link>
                       </div>
                     </div>
-                    {isActive && (
-                      <div className="p-1.5">
-                        <div className="h-24 rounded-md border border-border bg-background p-1">
-                          <Graph
-                            type={technique.toLowerCase() as 'xrd' | 'xps' | 'ftir' | 'raman'}
-                            height="100%"
-                            externalData={dataset?.dataPoints}
-                            showCalculated={false}
-                            showResidual={false}
-                            showLegend={false}
-                            peakMarkers={getGraphHighlights(technique).map((h) => ({
-                              position: h.position,
-                              intensity: h.intensity,
-                              label: h.role === 'selected' ? h.label : undefined,
-                            }))}
-                          />
-                        </div>
-                        
-                        {/* Evidence items for this technique */}
-                        <div className="mt-1 max-h-14 space-y-1 overflow-y-auto">
-                          {techniqueEvidence.map((evidence) => {
-                            const isHighlighted = isEvidenceHighlighted(evidence.id);
-                            const isSelected = selectedEvidenceId === evidence.id;
-                            const isLinkedToClaim = selectedClaimId && isEvidenceRelatedToClaim(evidence.id, selectedClaimId);
-                            
-                            return (
-                              <div
-                                key={evidence.id}
-                                onClick={() => handleEvidenceClick(evidence.id)}
-                                onMouseEnter={() => handleEvidenceHover(evidence.id)}
-                                onMouseLeave={() => handleEvidenceHover(null)}
-                                className={`cursor-pointer rounded-md border px-1.5 py-1 text-[9px] leading-snug transition-all ${
-                                  isSelected
-                                    ? 'border-primary bg-primary/10 text-primary font-semibold shadow-md'
-                                    : isLinkedToClaim
-                                    ? 'border-cyan/60 bg-cyan/5 text-cyan'
-                                    : isHighlighted
-                                    ? 'border-primary/30 bg-primary/5 text-text-main'
-                                    : 'border-border bg-background text-text-muted hover:border-primary/40'
-                                }`}
-                              >
-                                {evidence.description}
-                              </div>
-                            );
-                          })}
-                        </div>
+                    <div className="p-2">
+                      <div className="h-[250px] rounded-md border border-border">
+                        <Graph
+                          type={technique.toLowerCase() as 'xrd' | 'xps' | 'ftir' | 'raman'}
+                          height="100%"
+                          externalData={dataset?.dataPoints}
+                          showCalculated={false}
+                          showResidual={false}
+                          showLegend={false}
+                          peakMarkers={getGraphHighlights(technique).map((h) => ({
+                            position: h.position,
+                            intensity: h.intensity,
+                            label: h.role === 'selected' ? h.label : undefined,
+                          }))}
+                        />
                       </div>
-                    )}
+                      <div className="mt-2 text-[10px] leading-tight text-text-muted">{compactStatus}</div>
+                    </div>
                   </Card>
                 );
-              })}
-            </div>
+              } else if (techniqueCount === 2) {
+                // Two techniques: two stacked full-width rows
+                return (
+                  <div className="space-y-1">
+                    {selectedTechniques.map((technique) => {
+                      const metadata = project.techniqueMetadata.find(t => t.key === technique);
+                      const techniqueDatasets = getDatasetsByTechnique(project.id, technique);
+                      const dataset = techniqueDatasets[0];
+
+                      const compactStatus = technique === 'XRD' ? 'Reflections detected · Supported'
+                        : technique === 'Raman' ? 'A₁g mode detected · Supported'
+                        : technique === 'FTIR' ? 'M–O band detected · Supported'
+                        : 'Surface assignment pending';
+
+                      return (
+                        <Card key={technique} className="overflow-hidden">
+                          <div className="border-b border-border bg-surface-hover/40 px-3 py-1.5">
+                            <div className="flex items-center justify-between">
+                              <h2 className="text-sm font-bold text-text-main">{technique} · {metadata?.role || 'Analysis'}</h2>
+                              <Link to={getWorkspaceRoute(project, technique, dataset?.id)}>
+                                <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs px-3">
+                                  Open <ArrowRight size={12} />
+                                </Button>
+                              </Link>
+                            </div>
+                          </div>
+                          <div className="p-2">
+                            <div className="h-[155px] rounded-md border border-border">
+                              <Graph
+                                type={technique.toLowerCase() as 'xrd' | 'xps' | 'ftir' | 'raman'}
+                                height="100%"
+                                externalData={dataset?.dataPoints}
+                                showCalculated={false}
+                                showResidual={false}
+                                showLegend={false}
+                                peakMarkers={getGraphHighlights(technique).map((h) => ({
+                                  position: h.position,
+                                  intensity: h.intensity,
+                                  label: h.role === 'selected' ? h.label : undefined,
+                                }))}
+                              />
+                            </div>
+                            <div className="mt-2 text-[10px] leading-tight text-text-muted">{compactStatus}</div>
+                          </div>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                );
+              } else if (techniqueCount === 3) {
+                // Three techniques: 1+2 layout (primary full-width top, two supporting below)
+                const supportingTechniques = selectedTechniques.filter(t => t !== primaryTechniqueKey);
+
+                return (
+                  <div className="space-y-1">
+                    {/* Primary selector */}
+                    <div className="flex items-center gap-2 px-1">
+                      <span className="text-[10px] font-semibold text-text-muted">Primary:</span>
+                      <select
+                        value={primaryTechniqueKey}
+                        onChange={(e) => setPrimaryTechniqueKey(e.target.value as Technique)}
+                        className="h-7 rounded border border-border bg-background px-2 text-xs font-semibold text-text-main outline-none hover:border-primary/40 focus:border-primary"
+                      >
+                        {selectedTechniques.map((tech) => (
+                          <option key={tech} value={tech}>{tech}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Primary card */}
+                    {(() => {
+                      const technique = primaryTechniqueKey;
+                      const metadata = project.techniqueMetadata.find(t => t.key === technique);
+                      const techniqueDatasets = getDatasetsByTechnique(project.id, technique);
+                      const dataset = techniqueDatasets[0];
+
+                      const compactStatus = technique === 'XRD' ? 'Reflections detected · Supported'
+                        : technique === 'Raman' ? 'A₁g mode detected · Supported'
+                        : technique === 'FTIR' ? 'M–O band detected · Supported'
+                        : 'Surface assignment pending';
+
+                      return (
+                        <Card className="overflow-hidden">
+                          <div className="border-b border-border bg-surface-hover/40 px-3 py-1.5">
+                            <div className="flex items-center justify-between">
+                              <h2 className="text-sm font-bold text-text-main">{technique} · {metadata?.role || 'Analysis'}</h2>
+                              <Link to={getWorkspaceRoute(project, technique, dataset?.id)}>
+                                <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs px-3">
+                                  Open <ArrowRight size={12} />
+                                </Button>
+                              </Link>
+                            </div>
+                          </div>
+                          <div className="p-2">
+                            <div className="h-[155px] rounded-md border border-border">
+                              <Graph
+                                type={technique.toLowerCase() as 'xrd' | 'xps' | 'ftir' | 'raman'}
+                                height="100%"
+                                externalData={dataset?.dataPoints}
+                                showCalculated={false}
+                                showResidual={false}
+                                showLegend={false}
+                                peakMarkers={getGraphHighlights(technique).map((h) => ({
+                                  position: h.position,
+                                  intensity: h.intensity,
+                                  label: h.role === 'selected' ? h.label : undefined,
+                                }))}
+                              />
+                            </div>
+                            <div className="mt-2 text-[10px] leading-tight text-text-muted">{compactStatus}</div>
+                          </div>
+                        </Card>
+                      );
+                    })()}
+
+                    {/* Two supporting cards in columns */}
+                    <div className="grid grid-cols-2 gap-1">
+                      {supportingTechniques.map((technique) => {
+                        const metadata = project.techniqueMetadata.find(t => t.key === technique);
+                        const techniqueDatasets = getDatasetsByTechnique(project.id, technique);
+                        const dataset = techniqueDatasets[0];
+
+                        const compactStatus = technique === 'XRD' ? 'Reflections detected · Supported'
+                          : technique === 'Raman' ? 'A₁g mode detected · Supported'
+                          : technique === 'FTIR' ? 'M–O band detected · Supported'
+                          : 'Surface assignment pending';
+
+                        return (
+                          <Card key={technique} className="overflow-hidden">
+                            <div className="border-b border-border bg-surface-hover/40 px-2 py-1">
+                              <div className="flex items-center justify-between">
+                                <h2 className="text-xs font-bold text-text-main">{technique} · {metadata?.role || 'Analysis'}</h2>
+                                <Link to={getWorkspaceRoute(project, technique, dataset?.id)}>
+                                  <Button variant="ghost" size="sm" className="h-6 gap-1 text-[10px] px-2">
+                                    Open <ArrowRight size={10} />
+                                  </Button>
+                                </Link>
+                              </div>
+                            </div>
+                            <div className="p-1.5">
+                              <div className="h-[120px] rounded-md border border-border">
+                                <Graph
+                                  type={technique.toLowerCase() as 'xrd' | 'xps' | 'ftir' | 'raman'}
+                                  height="100%"
+                                  externalData={dataset?.dataPoints}
+                                  showCalculated={false}
+                                  showResidual={false}
+                                  showLegend={false}
+                                  peakMarkers={getGraphHighlights(technique).map((h) => ({
+                                    position: h.position,
+                                    intensity: h.intensity,
+                                    label: h.role === 'selected' ? h.label : undefined,
+                                  }))}
+                                />
+                              </div>
+                              <div className="mt-1.5 text-[9px] leading-tight text-text-muted">{compactStatus}</div>
+                            </div>
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              } else {
+                // Four techniques: 2x2 grid
+                return (
+                  <div className="grid h-full grid-cols-2 grid-rows-2 gap-0.5">
+                    {selectedTechniques.map((technique) => {
+                      const metadata = project.techniqueMetadata.find(t => t.key === technique);
+                      const techniqueDatasets = getDatasetsByTechnique(project.id, technique);
+                      const dataset = techniqueDatasets[0];
+
+                      const compactStatus = technique === 'XRD' ? 'Reflections detected · Supported'
+                        : technique === 'Raman' ? 'A₁g mode detected · Supported'
+                        : technique === 'FTIR' ? 'M–O band detected · Supported'
+                        : 'Surface assignment pending';
+
+                      return (
+                        <Card key={technique} className="overflow-hidden">
+                          <div className="border-b border-border bg-surface-hover/40 px-2 py-1">
+                            <div className="flex items-center justify-between">
+                              <h2 className="text-xs font-bold text-text-main">{technique} · {metadata?.role || 'Analysis'}</h2>
+                              <Link to={getWorkspaceRoute(project, technique, dataset?.id)}>
+                                <Button variant="ghost" size="sm" className="h-6 gap-1 text-[10px] px-2">
+                                  Open <ArrowRight size={10} />
+                                </Button>
+                              </Link>
+                            </div>
+                          </div>
+                          <div className="p-1.5">
+                            <div className="h-[125px] rounded-md border border-border">
+                              <Graph
+                                type={technique.toLowerCase() as 'xrd' | 'xps' | 'ftir' | 'raman'}
+                                height="100%"
+                                externalData={dataset?.dataPoints}
+                                showCalculated={false}
+                                showResidual={false}
+                                showLegend={false}
+                                peakMarkers={getGraphHighlights(technique).map((h) => ({
+                                  position: h.position,
+                                  intensity: h.intensity,
+                                  label: h.role === 'selected' ? h.label : undefined,
+                                }))}
+                              />
+                            </div>
+                            <div className="mt-1.5 text-[9px] leading-tight text-text-muted">{compactStatus}</div>
+                          </div>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                );
+              }
+            })()}
           </div>
 
-          {/* Right Panel: Vertical sections */}
-          <div className="space-y-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 180px)' }}>
-            {/* Scientific Interpretation */}
-            <Card className="p-3">
-              <h2 className="mb-2 text-xs font-bold text-text-main">Characterization Interpretation</h2>
-              <div className="space-y-2">
-                <div>
-                  <div className="text-[9px] font-semibold uppercase tracking-wider text-primary">Interpretation</div>
-                  <p className="mt-1 text-[10px] leading-relaxed text-text-main">
-                    {reviewOutput?.conclusion || 'Linked XRD, Raman, and FTIR evidence supports a spinel-ferrite working interpretation, while XPS surface-state validation remains under review.'}
-                  </p>
-                </div>
-                <div>
-                  <div className="text-[9px] font-semibold uppercase tracking-wider text-primary">Supporting Data</div>
-                  <ul className="mt-1 space-y-0.5 text-[9px] text-text-muted">
-                    {reviewOutput ? (
-                      reviewOutput.basis.slice(0, 3).map((item, idx) => (
-                        <li key={idx} className="flex gap-1">
-                          <span className="text-primary">•</span>
-                          <span>{item}</span>
-                        </li>
-                      ))
-                    ) : (
-                      <>
-                        <li className="flex gap-1">
-                          <span className="text-primary">•</span>
-                          <span>Raman: A₁g at 690 cm⁻¹</span>
-                        </li>
-                        <li className="flex gap-1">
-                          <span className="text-primary">•</span>
-                          <span>XRD: Spinel at 30.1° 2θ</span>
-                        </li>
-                        <li className="flex gap-1">
-                          <span className="text-primary">•</span>
-                          <span>FTIR: M-O at 580 cm⁻¹</span>
-                        </li>
-                      </>
-                    )}
-                  </ul>
-                </div>
-                <div>
-                  <div className="text-[9px] font-semibold uppercase tracking-wider text-primary">Limitation</div>
-                  <ul className="mt-1 space-y-0.5 text-[9px] text-text-muted">
-                    {reviewOutput ? (
-                      reviewOutput.limitations.slice(0, 2).map((item, idx) => (
-                        <li key={idx} className="flex gap-1">
-                          <span className="text-primary">•</span>
-                          <span>{item}</span>
-                        </li>
-                      ))
-                    ) : (
-                      <>
-                        <li className="flex gap-1">
-                          <span className="text-primary">•</span>
-                          <span>XRD bulk-averaged; surface may differ</span>
-                        </li>
-                        <li className="flex gap-1">
-                          <span className="text-primary">•</span>
-                          <span>Cation distribution not resolved</span>
-                        </li>
-                      </>
-                    )}
-                  </ul>
-                </div>
-                <div>
-                  <div className="text-[9px] font-semibold uppercase tracking-wider text-primary">Claim Boundary</div>
-                  <p className="mt-1 text-[10px] font-semibold text-text-main">
-                    {reviewOutput?.decision || 'Use spinel ferrite assignment as a working interpretation; phase purity and surface-state claims remain validation-limited.'}
-                  </p>
+          {/* Right Panel: Tabbed Scientific Interface */}
+          <div className="min-h-0 overflow-y-auto">
+            <Card className="h-full">
+              {/* Tab Navigation */}
+              <div className="border-b border-border px-2 py-1.5">
+                <div className="flex gap-1">
+                  {(['inference', 'support', 'limits', 'agent'] as const).map((tab) => (
+                    <button
+                      key={tab}
+                      onClick={() => setActiveRightTab(tab)}
+                      className={`rounded px-3 py-1.5 text-[11px] font-semibold transition-colors ${
+                        activeRightTab === tab
+                          ? 'bg-primary/10 text-primary'
+                          : 'text-text-muted hover:bg-surface-hover hover:text-text-main'
+                      }`}
+                    >
+                      {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                    </button>
+                  ))}
                 </div>
               </div>
-            </Card>
 
-            {/* Interpretation Basis */}
-            <Card className="p-3">
-              <h2 className="mb-2 text-xs font-bold text-text-main">Interpretation Basis</h2>
-              <div className="space-y-2">
-                <div>
-                  <div className="text-[9px] font-semibold uppercase tracking-wider text-primary">Assignment</div>
-                  <div className="mt-1 rounded-md border border-border bg-background p-1.5 text-[10px] text-text-main">
-                    {selectedClaim?.title || selectedEvidence?.claimId === 'spinel-ferrite' 
-                      ? 'Spinel ferrite structure supported by convergent evidence'
-                      : 'The selected evidence set is consistent with ferrite spinel interpretation'}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-[9px] font-semibold uppercase tracking-wider text-primary">Observations</div>
-                  <div className="mt-1 space-y-1">
-                    {selectedEvidence ? (
-                      <div className="rounded-md border border-border bg-background p-1.5 text-[9px]">
-                        <div className="font-semibold text-primary">{selectedEvidence.technique}</div>
-                        <div className="mt-0.5 text-text-muted">{selectedEvidence.description}</div>
+              {/* Tab Content */}
+              <div className="p-3">
+                {activeRightTab === 'inference' && (
+                  <div className="space-y-3">
+                    <div>
+                      <h3 className="text-xs font-bold text-text-main">Working Inference</h3>
+                      <p className="mt-0.5 text-[10px] text-text-muted">
+                        {Array.from(activeTechniques).length === 1
+                          ? `Single-technique analysis from ${Array.from(activeTechniques)[0]}.`
+                          : `Cross-tech synthesis from ${Array.from(activeTechniques).join(', ')}.`
+                        }
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="rounded-lg border border-border bg-surface p-2">
+                        <div className="text-[9px] font-semibold uppercase tracking-wider text-text-muted">Current assignment</div>
+                        <div className="mt-1 text-sm font-bold text-text-main">{formatChemicalFormula('CuFe2O4')} spinel ferrite</div>
                       </div>
-                    ) : (
-                      <>
-                        <div className="rounded-md border border-border bg-background p-1.5 text-[9px] text-text-muted">
-                          <span className="font-semibold text-text-main">XRD:</span> Phase-reflection context
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="rounded border border-border bg-background p-2">
+                          <div className="text-[9px] font-semibold uppercase tracking-wider text-text-muted">Inference state</div>
+                          <div className="mt-1 text-[10px] font-semibold text-text-main">Working interpretation</div>
                         </div>
-                        <div className="rounded-md border border-border bg-background p-1.5 text-[9px] text-text-muted">
-                          <span className="font-semibold text-text-main">Raman:</span> Lattice-vibration context
+                        <div className="rounded border border-border bg-background p-2">
+                          <div className="text-[9px] font-semibold uppercase tracking-wider text-text-muted">Confidence</div>
+                          <div className="mt-1 text-[10px] font-semibold text-text-main">Moderate</div>
                         </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-                {linkedEvidence.length > 0 && (
-                  <div>
-                    <div className="text-[9px] font-semibold uppercase tracking-wider text-primary">Linked</div>
-                    <div className="mt-1 space-y-1">
-                      {linkedEvidence.slice(0, 2).map((evidence) => (
-                        <div key={evidence.id} className="rounded-md border border-cyan/40 bg-cyan/5 p-1.5 text-[9px]">
-                          <div className="font-semibold text-cyan">{evidence.technique}</div>
-                          <div className="mt-0.5 text-text-muted">{evidence.description}</div>
+                      </div>
+
+                      <div className="rounded-lg border border-border bg-surface p-2">
+                        <div className="text-[9px] font-semibold uppercase tracking-wider text-text-muted">Basis</div>
+                        <p className="mt-1 text-[10px] leading-relaxed text-text-main">
+                          {Array.from(activeTechniques).length === 1
+                            ? `${Array.from(activeTechniques)[0]} evidence supports the working interpretation. Additional techniques recommended for stronger assignment.`
+                            : Array.from(activeTechniques).includes('XRD')
+                              ? `XRD phase reflections align with a spinel ferrite pattern. ${Array.from(activeTechniques).filter(t => t !== 'XRD').join(' and ')} provide${Array.from(activeTechniques).length === 2 ? 's' : ''} supporting evidence.`
+                              : `${Array.from(activeTechniques).join(', ')} evidence supports the working interpretation.`
+                          }
+                        </p>
+                      </div>
+
+                      <div className="space-y-1">
+                        {project.techniqueMetadata.filter(m => activeTechniques.has(m.key)).map((metadata) => {
+                          const statusMap: Record<string, { label: string; color: string }> = {
+                            'XRD': { label: 'Bulk phase', color: 'text-emerald-600' },
+                            'Raman': { label: 'Lattice mode', color: 'text-emerald-600' },
+                            'XPS': { label: 'Surface state', color: 'text-amber-600' },
+                            'FTIR': { label: 'Bonding context', color: 'text-emerald-600' },
+                          };
+                          const status = statusMap[metadata.key];
+                          if (!status) return null;
+
+                          return (
+                            <div key={metadata.key} className="flex items-center justify-between rounded border border-border bg-background px-2 py-1">
+                              <span className="text-[10px] text-text-muted">{status.label}:</span>
+                              <span className={`text-[10px] font-semibold ${status.color}`}>
+                                {metadata.key === 'XPS' ? 'Pending' : 'Supported'}
+                              </span>
+                            </div>
+                          );
+                        })}
+                        <div className="flex items-center justify-between rounded border border-border bg-background px-2 py-1">
+                          <span className="text-[10px] text-text-muted">Claim status:</span>
+                          <span className="text-[10px] font-semibold text-text-main">Validation-limited</span>
                         </div>
-                      ))}
+                      </div>
+
+                      <Button
+                        type="button"
+                        variant="primary"
+                        size="sm"
+                        className="w-full gap-1.5"
+                        onClick={handleRefineInterpretation}
+                      >
+                        <FileText size={14} /> Refine Inference
+                      </Button>
                     </div>
                   </div>
                 )}
-                <div>
-                  <div className="text-[9px] font-semibold uppercase tracking-wider text-primary">Cross-check</div>
-                  <div className="mt-1 rounded-md border border-border bg-background p-1.5 text-[9px] text-text-muted">
-                    {linkedEvidence.length > 0
-                      ? `${linkedEvidence.length} technique${linkedEvidence.length === 1 ? '' : 's'} provide corroborating evidence`
-                      : 'Complementary structural and vibrational information'}
-                  </div>
-                </div>
-              </div>
-            </Card>
 
-            {/* Cross-Technique Insights */}
-            <Card className="p-3">
-              <h2 className="mb-2 text-xs font-bold text-text-main">Cross-Technique Insights</h2>
-              <div className="overflow-x-auto">
-                <table className="w-full text-[9px]">
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th className="p-1.5 text-left font-semibold text-text-main">Assignment</th>
-                      {(['XRD', 'Raman', 'XPS', 'FTIR'] as Technique[]).map((technique) => (
-                        <th key={technique} className="p-1.5 text-center font-semibold text-text-main">
-                          {technique}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {demoClaims.slice(0, 3).map((claim) => {
-                      const isClaimSelected = selectedClaimId === claim.id;
-                      
-                      return (
-                        <tr
-                          key={claim.id}
-                          className={`transition-colors ${
-                            isClaimSelected ? 'bg-primary/10' : 'hover:bg-surface-hover/40'
-                          }`}
-                        >
-                          <td 
-                            className="p-1.5 cursor-pointer"
-                            onClick={() => handleClaimRowClick(claim.id)}
-                          >
-                            <div className="text-[9px] font-semibold text-text-main">{claim.title}</div>
-                          </td>
-                          {(['XRD', 'Raman', 'XPS', 'FTIR'] as Technique[]).map((technique) => {
-                            const cell = getMatrixCell(claim.id, technique);
-                            const isActiveTechnique = selectedClaimId === claim.id && cell?.evidenceId === selectedEvidenceId;
+                {activeRightTab === 'support' && (
+                  <div className="space-y-3">
+                    <div>
+                      <h3 className="text-xs font-bold text-text-main">Analysis Support</h3>
+                      <p className="mt-0.5 text-[10px] text-text-muted">Processed observations linked to scientific claims.</p>
+                    </div>
 
-                            return (
-                              <td key={technique} className="p-1.5 text-center">
-                                {cell ? (
-                                  <div
-                                    onClick={() => handleMatrixCellClick(claim.id, technique, cell.evidenceId)}
-                                    className={`cursor-pointer rounded border p-1 text-[8px] transition-all ${
-                                      isActiveTechnique
-                                        ? 'border-primary bg-primary/20 text-primary font-semibold'
-                                        : isClaimSelected && cell.evidenceId
-                                        ? 'border-cyan bg-cyan/10 text-cyan'
-                                        : 'border-border bg-background text-text-muted hover:border-primary/40'
-                                    }`}
-                                  >
-                                    {cell.status}
-                                  </div>
-                                ) : (
-                                  <span className="text-text-muted/50">—</span>
+                    <div className="space-y-2">
+                      {(() => {
+                        const selectedTechniques = Array.from(activeTechniques);
+                        // Show primary first if in 3-tech mode
+                        const orderedTechniques = selectedTechniques.length === 3 && selectedTechniques.includes(primaryTechniqueKey)
+                          ? [primaryTechniqueKey, ...selectedTechniques.filter(t => t !== primaryTechniqueKey)]
+                          : selectedTechniques;
+
+                        const supportData: Record<string, { role: string; observation: string; support: string; status: string; statusColor: string }> = {
+                          'XRD': {
+                            role: 'Bulk phase assignment',
+                            observation: 'Processed reflections at 2θ = 30.1°, 35.5°, 43.2°, 57.1°',
+                            support: 'Supports spinel ferrite bulk-phase assignment.',
+                            status: 'Supported',
+                            statusColor: 'bg-emerald-500/10 text-emerald-600',
+                          },
+                          'Raman': {
+                            role: 'Lattice vibration consistency',
+                            observation: 'A₁g mode near ~690 cm⁻¹',
+                            support: 'Supports spinel-like lattice vibration.',
+                            status: 'Supported',
+                            statusColor: 'bg-emerald-500/10 text-emerald-600',
+                          },
+                          'FTIR': {
+                            role: 'Metal–oxygen bonding context',
+                            observation: 'M–O band near ~580 cm⁻¹',
+                            support: 'Supports ferrite framework bonding.',
+                            status: 'Supported',
+                            statusColor: 'bg-emerald-500/10 text-emerald-600',
+                          },
+                          'XPS': {
+                            role: 'Surface-state validation',
+                            observation: 'Cu 2p / Fe 2p regions detected',
+                            support: 'Surface-state assignment remains pending.',
+                            status: 'Pending',
+                            statusColor: 'bg-amber-500/10 text-amber-600',
+                          },
+                        };
+
+                        return orderedTechniques.map((technique, index) => {
+                          const data = supportData[technique];
+                          if (!data) return null;
+
+                          const metadata = project.techniqueMetadata.find(t => t.key === technique);
+                          const isPrimary = selectedTechniques.length === 3 && technique === primaryTechniqueKey;
+
+                          return (
+                            <div key={technique} className="rounded-lg border border-border bg-surface p-2">
+                              <div className="flex items-center justify-between mb-1">
+                                <h4 className="text-[10px] font-bold text-text-main">{technique} · {metadata?.role || 'Analysis'}</h4>
+                                {isPrimary && (
+                                  <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[8px] font-semibold text-primary">Primary</span>
                                 )}
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
-
-            {/* Interpretation */}
-            <Card className="p-3">
-              <h2 className="mb-2 text-xs font-bold text-text-main">Interpretation</h2>
-              <div className="space-y-2">
-                {demoClaims.slice(0, 2).map((claim) => (
-                  <div key={claim.id} className="rounded-lg border border-border p-2">
-                    <h3 className="text-[10px] font-bold text-text-main">{claim.title}</h3>
-                    {claim.interpretation && (
-                      <p className="mt-1 text-[9px] leading-relaxed text-text-muted">{claim.interpretation.slice(0, 120)}...</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </Card>
-
-            {/* Report */}
-            <Card className="p-3">
-              <h2 className="mb-2 text-xs font-bold text-text-main">Report</h2>
-              <div className="space-y-2">
-                <div>
-                  <h3 className="text-[10px] font-semibold text-primary">Summary</h3>
-                  <p className="mt-1 text-[9px] leading-relaxed text-text-muted">
-                    Multi-technique characterization of {formatChemicalFormula(project.name)} provides convergent evidence
-                    for cubic spinel ferrite structure with mixed Cu/Fe oxidation states.
-                  </p>
-                </div>
-                <div>
-                  <h3 className="text-[10px] font-semibold text-primary">Evidence by Technique</h3>
-                  <div className="mt-1 space-y-1.5">
-                    <div>
-                      <h4 className="text-[9px] font-semibold text-text-main">XRD</h4>
-                      <p className="mt-0.5 text-[8px] text-text-muted">Spinel phase reflections at 2θ = 30.1°, 35.5°, 43.2°, 57.1°</p>
-                    </div>
-                    <div>
-                      <h4 className="text-[9px] font-semibold text-text-main">Raman</h4>
-                      <p className="mt-0.5 text-[8px] text-text-muted">A₁g mode at ~690 cm⁻¹ diagnostic of spinel lattice</p>
+                              </div>
+                              <div className="space-y-1">
+                                <div>
+                                  <div className="text-[9px] font-semibold text-text-muted">Role</div>
+                                  <div className="text-[9px] text-text-main">{data.role}</div>
+                                </div>
+                                <div>
+                                  <div className="text-[9px] font-semibold text-text-muted">Observation</div>
+                                  <div className="text-[9px] text-text-main">{data.observation}</div>
+                                </div>
+                                <div>
+                                  <div className="text-[9px] font-semibold text-text-muted">Support</div>
+                                  <div className="text-[9px] text-text-main">{data.support}</div>
+                                </div>
+                                <div className="flex items-center justify-between pt-0.5">
+                                  <span className="text-[9px] font-semibold text-text-muted">Status</span>
+                                  <span className={`rounded px-1.5 py-0.5 text-[8px] font-semibold ${data.statusColor}`}>
+                                    {data.status}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        });
+                      })()}
                     </div>
                   </div>
-                </div>
-                <div className="flex justify-end border-t border-border pt-2">
-                  <Link to={getNotebookPath(project)}>
-                    <Button variant="primary" size="sm" className="gap-1 text-[10px] h-7 px-2">
-                      <Save size={10} /> Add to Notebook
-                    </Button>
-                  </Link>
-                </div>
+                )}
+
+                {activeRightTab === 'limits' && (
+                  <div className="space-y-3">
+                    <div>
+                      <h3 className="text-xs font-bold text-text-main">Claim Limits</h3>
+                      <p className="mt-0.5 text-[10px] text-text-muted">Validation gaps, uncertainty, and evidence boundaries.</p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="rounded-lg border border-border bg-surface p-2">
+                        <h4 className="text-[10px] font-bold text-text-main">Phase purity</h4>
+                        <p className="mt-1 text-[9px] text-text-muted">Not fully resolved from current evidence.</p>
+                      </div>
+
+                      <div className="rounded-lg border border-border bg-surface p-2">
+                        <h4 className="text-[10px] font-bold text-text-main">Surface chemistry</h4>
+                        <p className="mt-1 text-[9px] text-text-muted">XRD is bulk-averaged; surface state may differ.</p>
+                      </div>
+
+                      <div className="rounded-lg border border-border bg-surface p-2">
+                        <h4 className="text-[10px] font-bold text-text-main">Cation distribution</h4>
+                        <p className="mt-1 text-[9px] text-text-muted">Not assigned from current signal set.</p>
+                      </div>
+
+                      <div className="rounded-lg border border-border bg-surface p-2">
+                        <h4 className="text-[10px] font-bold text-text-main">XPS validation</h4>
+                        <p className="mt-1 text-[9px] text-text-muted">Required before final oxidation-state or surface-chemistry claims.</p>
+                      </div>
+
+                      <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-2.5">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-[10px] font-bold text-amber-700">Claim boundary</h4>
+                          <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[8px] font-semibold text-amber-700">Overclaim risk: Moderate</span>
+                        </div>
+                        <p className="mt-1.5 text-[9px] leading-relaxed text-text-muted">
+                          Use {formatChemicalFormula('CuFe2O4')} spinel ferrite as a working inference. Phase purity, cation distribution, and surface-state claims remain validation-limited.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {activeRightTab === 'agent' && (
+                  <div className="space-y-3">
+                    <div>
+                      <h3 className="text-xs font-bold text-text-main">Agent Refinement</h3>
+                      <p className="mt-0.5 text-[10px] text-text-muted">Send selected processed evidence to Agent Mode.</p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="rounded-lg border border-border bg-surface p-2">
+                        <div className="text-[9px] font-semibold uppercase tracking-wider text-text-muted">Agent task</div>
+                        <p className="mt-1 text-[9px] text-text-main">Refine the working inference using selected processed evidence.</p>
+                      </div>
+
+                      <div className="rounded-lg border border-border bg-surface p-2">
+                        <div className="text-[9px] font-semibold uppercase tracking-wider text-text-muted">Context included</div>
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {Array.from(activeTechniques).map((tech) => (
+                            <span key={tech} className="rounded bg-primary/10 px-1.5 py-0.5 text-[8px] font-semibold text-primary">
+                              {tech}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="rounded-lg border border-border bg-surface p-2">
+                        <div className="text-[9px] font-semibold uppercase tracking-wider text-text-muted">Expected output</div>
+                        <ul className="mt-1 space-y-0.5 text-[9px] text-text-muted">
+                          <li className="flex gap-1">
+                            <span className="text-primary">•</span>
+                            <span>Evidence-linked interpretation</span>
+                          </li>
+                          <li className="flex gap-1">
+                            <span className="text-primary">•</span>
+                            <span>Support mapping</span>
+                          </li>
+                          <li className="flex gap-1">
+                            <span className="text-primary">•</span>
+                            <span>Claim boundary</span>
+                          </li>
+                          <li className="flex gap-1">
+                            <span className="text-primary">•</span>
+                            <span>Validation gaps</span>
+                          </li>
+                          <li className="flex gap-1">
+                            <span className="text-primary">•</span>
+                            <span>Notebook-ready discussion</span>
+                          </li>
+                        </ul>
+                      </div>
+
+                      <Button
+                        type="button"
+                        variant="primary"
+                        size="sm"
+                        className="w-full gap-1.5"
+                        onClick={handleRefineInterpretation}
+                      >
+                        <Play size={14} /> Open Agent Mode
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             </Card>
           </div>

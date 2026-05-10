@@ -256,7 +256,7 @@ export default function RamanWorkspace() {
       {/* Show empty state when no dataset is loaded */}
       {!hasDatasetLoaded && entryMode && (
         <EmptyWorkspaceState
-          technique="RAMAN"
+          technique="Raman"
           onLoadSample={handleLoadSample}
           onUploadDataset={handleUploadDataset}
         />
@@ -268,7 +268,7 @@ export default function RamanWorkspace() {
         {/* Dataset Info Bar */}
         {datasetSource && (
           <DatasetInfoBar
-            technique="RAMAN"
+            technique="Raman"
             source={datasetSource}
             datasetName={datasetName}
             projectName={datasetSource === 'project' ? project.name : undefined}

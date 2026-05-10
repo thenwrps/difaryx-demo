@@ -30,11 +30,20 @@ export interface DemoHistoryEntry {
   action: 'workspace' | 'notebook' | 'agent';
 }
 
+export interface TechniqueMetadata {
+  key: Technique;
+  label: string;
+  role: string;
+  status: 'ready' | 'pending' | 'processing';
+  dataAvailable: boolean;
+}
+
 export interface DemoProject {
   id: string;
   name: string;
   material: string;
   techniques: Technique[];
+  techniqueMetadata: TechniqueMetadata[];
   status: string;
   claimStatus: ClaimStatus;
   validationState: ValidationState;
@@ -165,12 +174,34 @@ export interface ProcessingRun {
   log: string[];
 }
 
+export type NotebookMode = 'research' | 'rd' | 'analytical';
+
+export interface ProjectNotebook {
+  id: string;
+  title: string;
+  objective: string;
+  mode: NotebookMode;
+  createdDate: string;
+  lastUpdated: string;
+  setupFields?: Record<string, string>;
+  initialDataImport?: {
+    skipped: boolean;
+    files: Array<{
+      name: string;
+      type: string;
+      status: 'attached' | 'pending-parse';
+    }>;
+    destination: 'project' | 'first-row';
+  };
+}
+
 export const DEFAULT_PROJECT_ID = 'cu-fe2o4-spinel';
 
 const LOCAL_EXPERIMENTS_KEY = 'difaryx-demo-experiments';
 const LOCAL_DATASETS_KEY = 'difaryx-demo-datasets';
 const LOCAL_RUNS_KEY = 'difaryx-demo-processing-runs';
 const LOCAL_EVIDENCE_KEY = 'difaryx-demo-evidence';
+const LOCAL_PROJECT_NOTEBOOKS_KEY = 'difaryx-demo-project-notebooks';
 
 export const demoProjects: DemoProject[] = [
   {
@@ -178,6 +209,10 @@ export const demoProjects: DemoProject[] = [
     name: 'CuFe₂O₄ Spinel',
     material: 'Copper ferrite spinel',
     techniques: ['XRD', 'Raman'],
+    techniqueMetadata: [
+      { key: 'XRD', label: 'XRD', role: 'Bulk phase', status: 'ready', dataAvailable: true },
+      { key: 'Raman', label: 'Raman', role: 'Lattice mode', status: 'ready', dataAvailable: true },
+    ],
     status: 'Report Ready',
     claimStatus: 'strongly_supported',
     validationState: 'complete',
@@ -255,6 +290,12 @@ export const demoProjects: DemoProject[] = [
     name: 'CuFe₂O₄/SBA-15',
     material: 'Copper ferrite on mesoporous silica',
     techniques: ['XRD', 'XPS', 'FTIR', 'Raman'],
+    techniqueMetadata: [
+      { key: 'XRD', label: 'XRD', role: 'Bulk phase', status: 'ready', dataAvailable: true },
+      { key: 'XPS', label: 'XPS', role: 'Surface state', status: 'ready', dataAvailable: true },
+      { key: 'FTIR', label: 'FTIR', role: 'Bonding context', status: 'ready', dataAvailable: true },
+      { key: 'Raman', label: 'Raman', role: 'Lattice mode', status: 'ready', dataAvailable: true },
+    ],
     status: 'In Progress',
     claimStatus: 'supported',
     validationState: 'partial',
@@ -310,6 +351,9 @@ export const demoProjects: DemoProject[] = [
     name: 'NiFe₂O₄',
     material: 'Nickel ferrite spinel',
     techniques: ['XRD'],
+    techniqueMetadata: [
+      { key: 'XRD', label: 'XRD', role: 'Bulk phase', status: 'ready', dataAvailable: true },
+    ],
     status: 'Report Ready',
     claimStatus: 'supported',
     validationState: 'complete',
@@ -358,6 +402,10 @@ export const demoProjects: DemoProject[] = [
     name: 'CoFe₂O₄',
     material: 'Cobalt ferrite spinel',
     techniques: ['XRD', 'XPS'],
+    techniqueMetadata: [
+      { key: 'XRD', label: 'XRD', role: 'Bulk phase', status: 'ready', dataAvailable: true },
+      { key: 'XPS', label: 'XPS', role: 'Surface state', status: 'ready', dataAvailable: true },
+    ],
     status: 'Report Ready',
     claimStatus: 'strongly_supported',
     validationState: 'complete',
@@ -406,6 +454,10 @@ export const demoProjects: DemoProject[] = [
     name: 'Fe₃O₄ Nanoparticles',
     material: 'Iron oxide nanoparticles',
     techniques: ['FTIR', 'Raman'],
+    techniqueMetadata: [
+      { key: 'FTIR', label: 'FTIR', role: 'Bonding context', status: 'ready', dataAvailable: true },
+      { key: 'Raman', label: 'Raman', role: 'Lattice mode', status: 'ready', dataAvailable: true },
+    ],
     status: 'In Progress',
     claimStatus: 'partial',
     validationState: 'requires_validation',
@@ -463,11 +515,21 @@ export function getProject(projectId?: string | null) {
       ? localExperiment.techniqueScope
       : [localExperiment.technique];
 
+    // Generate techniqueMetadata from techniqueScope
+    const techniqueMetadata: TechniqueMetadata[] = techniqueScope.map((tech) => ({
+      key: tech,
+      label: tech,
+      role: tech === 'XRD' ? 'Bulk phase' : tech === 'Raman' ? 'Lattice mode' : tech === 'XPS' ? 'Surface state' : 'Bonding context',
+      status: 'ready' as const,
+      dataAvailable: true,
+    }));
+
     return {
       id: localExperiment.projectId,
       name: localExperiment.projectName ?? localExperiment.sampleName,
       material: localExperiment.materialSystem,
       techniques: techniqueScope,
+      techniqueMetadata,
       status: 'Demo dataset ready',
       claimStatus: 'partial',
       validationState: 'requires_validation',
@@ -1067,4 +1129,44 @@ export function getAllHistoryEntries() {
       agentPath: getAgentPath(project),
     })),
   );
+}
+
+// Project Notebook functions
+export function getLocalProjectNotebooks() {
+  return readLocalList<ProjectNotebook>(LOCAL_PROJECT_NOTEBOOKS_KEY);
+}
+
+export function saveProjectNotebook(notebook: Omit<ProjectNotebook, 'id' | 'createdDate' | 'lastUpdated'> & Partial<Pick<ProjectNotebook, 'id' | 'createdDate' | 'lastUpdated'>>) {
+  const notebooks = getLocalProjectNotebooks();
+  const now = new Date().toISOString();
+  const nextNotebook: ProjectNotebook = {
+    ...notebook,
+    id: notebook.id ?? makeId('notebook'),
+    createdDate: notebook.createdDate ?? now,
+    lastUpdated: notebook.lastUpdated ?? now,
+  };
+  writeLocalList(
+    LOCAL_PROJECT_NOTEBOOKS_KEY,
+    [...notebooks.filter((item) => item.id !== nextNotebook.id), nextNotebook],
+  );
+  return nextNotebook;
+}
+
+export function getNotebookTypeBadge(mode: NotebookMode): string {
+  if (mode === 'research') return 'PROJECT · RESEARCH';
+  if (mode === 'rd') return 'PROJECT · R&D';
+  return 'ANALYTICAL JOB';
+}
+
+export function getNotebookActionLabel(mode: NotebookMode): string {
+  if (mode === 'research') return 'Add Exp';
+  if (mode === 'rd') return 'Add Trial';
+  return 'Add Run';
+}
+
+export function isNotebookSetupComplete(notebook: ProjectNotebook): boolean {
+  if (!notebook.setupFields) return false;
+  
+  const fields = Object.values(notebook.setupFields);
+  return fields.length > 0 && fields.some(value => value && value.trim());
 }

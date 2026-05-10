@@ -19,32 +19,32 @@ const techniques: TechniqueConfig[] = [
   {
     id: 'xrd',
     name: 'XRD',
-    purpose: 'Phase identification and peak analysis',
+    purpose: 'Phase and peak analysis',
   },
   {
     id: 'xps',
     name: 'XPS',
-    purpose: 'Surface-state and oxidation-state analysis',
+    purpose: 'Surface-state analysis',
   },
   {
     id: 'ftir',
     name: 'FTIR',
-    purpose: 'Bonding and functional group analysis',
+    purpose: 'Bonding and functional groups',
   },
   {
     id: 'raman',
     name: 'Raman',
-    purpose: 'Vibrational mode and lattice analysis',
+    purpose: 'Vibrational and lattice modes',
   },
 ];
 
 const workspaceWorkflowSteps = [
-  'Analysis Workspace',
-  'Technique Processing',
-  'Cross-Tech Evidence Review',
-  'Agentic Interpretation Refinement',
-  'Notebook Template Entry',
-  'Report Export',
+  'Signal',
+  'Process',
+  'Cross-Techniques Comparison',
+  'Agent',
+  'Notebook',
+  'Report',
 ];
 
 interface WorkspaceHistoryItem {
@@ -64,7 +64,7 @@ const workspaceHistory: WorkspaceHistoryItem[] = [
     dataset: 'cufe2o4_clean_demo.xy',
     technique: 'XRD',
     project: 'CuFe₂O₄ Spinel',
-    projectId: 'cufe2o4-spinel',
+    projectId: 'cu-fe2o4-spinel',
     lastUpdated: '2 hours ago',
     status: 'Ready',
   },
@@ -73,7 +73,7 @@ const workspaceHistory: WorkspaceHistoryItem[] = [
     dataset: 'cufe2o4_raman_demo.txt',
     technique: 'Raman',
     project: 'CuFe₂O₄ Spinel',
-    projectId: 'cufe2o4-spinel',
+    projectId: 'cu-fe2o4-spinel',
     lastUpdated: '5 hours ago',
     status: 'Ready',
   },
@@ -93,6 +93,51 @@ const workspaceHistory: WorkspaceHistoryItem[] = [
     project: 'CuFe₂O₄/SBA-15',
     projectId: 'cufe2o4-sba15',
     lastUpdated: '1 day ago',
+    status: 'Ready',
+  },
+  {
+    id: '5',
+    dataset: 'nife2o4_xrd_demo.xy',
+    technique: 'XRD',
+    project: 'NiFe₂O₄',
+    projectId: 'ni-fe2o4',
+    lastUpdated: '2 days ago',
+    status: 'Ready',
+  },
+  {
+    id: '6',
+    dataset: 'cofe2o4_xrd_demo.xy',
+    technique: 'XRD',
+    project: 'CoFe₂O₄',
+    projectId: 'co-fe2o4',
+    lastUpdated: '3 days ago',
+    status: 'Ready',
+  },
+  {
+    id: '7',
+    dataset: 'cofe2o4_xps_demo.csv',
+    technique: 'XPS',
+    project: 'CoFe₂O₄',
+    projectId: 'co-fe2o4',
+    lastUpdated: '3 days ago',
+    status: 'Ready',
+  },
+  {
+    id: '8',
+    dataset: 'fe3o4_ftir_demo.csv',
+    technique: 'FTIR',
+    project: 'Fe₃O₄ Nanoparticles',
+    projectId: 'fe3o4-nanoparticles',
+    lastUpdated: '1 week ago',
+    status: 'Ready',
+  },
+  {
+    id: '9',
+    dataset: 'fe3o4_raman_demo.txt',
+    technique: 'Raman',
+    project: 'Fe₃O₄ Nanoparticles',
+    projectId: 'fe3o4-nanoparticles',
+    lastUpdated: '1 week ago',
     status: 'Ready',
   },
 ];
@@ -128,26 +173,27 @@ export default function WorkspaceLauncher() {
   return (
     <DashboardLayout>
       <div className="flex-1 overflow-y-auto bg-background">
-        <div className="max-w-7xl mx-auto p-6 space-y-8">
+        <div className="max-w-7xl mx-auto p-4 space-y-3">
           {/* Header */}
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-text-main">
+            <h1 className="text-xl font-bold tracking-tight text-text-main">
               Analysis Workspace
             </h1>
-            <p className="mt-1 text-sm text-text-muted max-w-3xl">
-              Choose a technique, load a sample or project dataset, then process, analyze, and export results.
+            <p className="mt-0.5 text-xs text-text-muted">
+              Process, compare, refine, report.
             </p>
           </div>
 
-          <div className="rounded-lg border border-border bg-surface p-3">
-            <div className="flex flex-wrap items-center gap-2">
+          {/* Compact workflow strip */}
+          <div className="rounded-lg border border-border bg-surface px-3 py-2">
+            <div className="flex flex-wrap items-center gap-1.5">
               {workspaceWorkflowSteps.map((step, index) => (
                 <React.Fragment key={step}>
-                  <span className="rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-semibold text-text-muted">
+                  <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[10px] font-semibold text-text-muted">
                     {step}
                   </span>
                   {index < workspaceWorkflowSteps.length - 1 && (
-                    <span className="text-[11px] font-semibold text-primary">/</span>
+                    <span className="text-[10px] font-semibold text-primary">→</span>
                   )}
                 </React.Fragment>
               ))}
@@ -155,57 +201,57 @@ export default function WorkspaceLauncher() {
           </div>
 
           {/* Technique Cards - Compact 4x1 Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
             {techniques.map((technique) => {
               const hasProjectData = project && project.techniques.includes(technique.name as any);
               
               return (
                 <Card key={technique.id} className="group transition-all hover:border-primary/50">
-                  <div className="p-4">
+                  <div className="p-3">
                     {/* Technique name and purpose */}
-                    <div className="mb-3">
-                      <h3 className="text-lg font-bold text-text-main">{technique.name}</h3>
-                      <p className="text-xs text-text-muted mt-0.5">{technique.purpose}</p>
+                    <div className="mb-2">
+                      <h3 className="text-base font-bold text-text-main">{technique.name}</h3>
+                      <p className="text-[10px] text-text-muted mt-0.5">{technique.purpose}</p>
                     </div>
 
-                    {/* Action buttons */}
-                    <div className="space-y-2">
+                    {/* Action buttons - side by side */}
+                    <div className="flex gap-1.5">
                       {hasProjectData ? (
                         <>
                           <Button
                             variant="primary"
-                            className="w-full gap-1.5 h-8 text-xs"
+                            className="flex-1 gap-1 h-7 text-[10px] px-2"
                             onClick={() => handleUseProjectData(technique.id)}
                           >
-                            <Database size={14} />
-                            Use Project Data
+                            <Database size={12} />
+                            Load
                           </Button>
                           <Button
                             variant="outline"
-                            className="w-full gap-1.5 h-8 text-xs"
+                            className="flex-1 gap-1 h-7 text-[10px] px-2"
                             onClick={() => handleUploadData(technique.id)}
                           >
-                            <Upload size={14} />
-                            Upload New Data
+                            <Upload size={12} />
+                            Upload
                           </Button>
                         </>
                       ) : (
                         <>
                           <Button
                             variant="primary"
-                            className="w-full gap-1.5 h-8 text-xs"
+                            className="flex-1 gap-1 h-7 text-[10px] px-2"
                             onClick={() => handleLoadSample(technique.id)}
                           >
-                            <Database size={14} />
-                            Load Sample
+                            <Database size={12} />
+                            Load
                           </Button>
                           <Button
                             variant="outline"
-                            className="w-full gap-1.5 h-8 text-xs"
+                            className="flex-1 gap-1 h-7 text-[10px] px-2"
                             onClick={() => handleUploadData(technique.id)}
                           >
-                            <Upload size={14} />
-                            Upload Data
+                            <Upload size={12} />
+                            Upload
                           </Button>
                         </>
                       )}
@@ -216,66 +262,71 @@ export default function WorkspaceLauncher() {
             })}
           </div>
 
-          {/* Recent Workspace History */}
+          {/* Recent Workspace History - Preview */}
           <div>
-            <h2 className="text-lg font-bold text-text-main mb-3">Recent Workspace History</h2>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-base font-bold text-text-main">Recent Workspace History</h2>
+              <button className="text-xs font-semibold text-primary hover:text-primary/80 transition-colors">
+                View all
+              </button>
+            </div>
             <Card>
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="border-b border-border">
                     <tr className="text-left">
-                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-text-muted">
+                      <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-text-muted">
                         Sample / Dataset
                       </th>
-                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-text-muted">
+                      <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-text-muted">
                         Technique
                       </th>
-                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-text-muted">
+                      <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-text-muted">
                         Project
                       </th>
-                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-text-muted">
+                      <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-text-muted">
                         Last Updated
                       </th>
-                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-text-muted">
+                      <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-text-muted">
                         Status
                       </th>
-                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-text-muted">
+                      <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-text-muted">
                         Action
                       </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {workspaceHistory.map((item) => (
+                    {workspaceHistory.slice(0, 5).map((item) => (
                       <tr key={item.id} className="hover:bg-surface-hover transition-colors">
-                        <td className="px-4 py-3 text-sm font-medium text-text-main">
+                        <td className="px-3 py-2 text-xs font-medium text-text-main">
                           {item.dataset}
                         </td>
-                        <td className="px-4 py-3">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-primary/10 text-primary">
+                        <td className="px-3 py-2">
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-primary/10 text-primary">
                             {item.technique}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-sm text-text-main">
+                        <td className="px-3 py-2 text-xs text-text-main">
                           {item.project}
                         </td>
-                        <td className="px-4 py-3 text-sm text-text-muted">
-                          <div className="flex items-center gap-1.5">
-                            <Clock size={12} />
+                        <td className="px-3 py-2 text-xs text-text-muted">
+                          <div className="flex items-center gap-1">
+                            <Clock size={10} />
                             {item.lastUpdated}
                           </div>
                         </td>
-                        <td className="px-4 py-3">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-emerald-500/10 text-emerald-600">
+                        <td className="px-3 py-2">
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-600">
                             {item.status}
                           </span>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-3 py-2">
                           <button
                             onClick={() => handleHistoryItemClick(item)}
-                            className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary/80 transition-colors"
+                            className="inline-flex items-center gap-1 text-[10px] font-semibold text-primary hover:text-primary/80 transition-colors"
                           >
-                            Open {item.technique} Analysis
-                            <ArrowRight size={12} />
+                            Open {item.technique}
+                            <ArrowRight size={10} />
                           </button>
                         </td>
                       </tr>
