@@ -38,12 +38,37 @@ export interface TechniqueMetadata {
   dataAvailable: boolean;
 }
 
+export interface ValidationGap {
+  id: string;
+  description: string;
+  severity: 'critical' | 'moderate' | 'low';
+  suggestedResolution: string;
+}
+
+export interface NextDecision {
+  id: string;
+  label: string;
+  description: string;
+  urgency: 'high' | 'medium' | 'low';
+  linkedTechnique?: Technique;
+}
+
+export interface EvidenceSource {
+  technique: Technique;
+  datasetId: string;
+  datasetLabel: string;
+  description: string;
+  available: boolean;
+}
+
 export interface DemoProject {
   id: string;
   name: string;
   material: string;
+  objective: string;
   techniques: Technique[];
   techniqueMetadata: TechniqueMetadata[];
+  evidenceSources: EvidenceSource[];
   status: string;
   claimStatus: ClaimStatus;
   validationState: ValidationState;
@@ -53,7 +78,15 @@ export interface DemoProject {
   summary: string;
   xrdPeaks: DemoPeak[];
   evidence: string[];
+  validationGaps: ValidationGap[];
+  nextDecisions: NextDecision[];
   recommendations: string[];
+  reportReadiness: {
+    notebookReady: boolean;
+    exportReady: boolean;
+    readinessPercent: number;
+    label: string;
+  };
   notebook: {
     title: string;
     pipeline: string[];
@@ -222,10 +255,15 @@ export const demoProjects: DemoProject[] = [
     id: 'cu-fe2o4-spinel',
     name: 'CuFe₂O₄ Spinel',
     material: 'Copper ferrite spinel',
+    objective: 'Confirm CuFe₂O₄ spinel phase identity and assess phase purity for publication readiness.',
     techniques: ['XRD', 'Raman'],
     techniqueMetadata: [
       { key: 'XRD', label: 'XRD', role: 'Bulk phase', status: 'ready', dataAvailable: true },
       { key: 'Raman', label: 'Raman', role: 'Lattice mode', status: 'ready', dataAvailable: true },
+    ],
+    evidenceSources: [
+      { technique: 'XRD', datasetId: 'xrd-cufe2o4-clean', datasetLabel: 'CuFe₂O₄ clean XRD', description: 'Nine diffraction peaks at 17.1–61.6° 2θ match CuFe₂O₄ spinel reference positions; strongest reflection at 35.6° (400).', available: true },
+      { technique: 'Raman', datasetId: 'raman-cufe2o4-demo', datasetLabel: 'CuFe₂O₄ Raman spectrum', description: 'A1g mode near 690 cm⁻¹ and T2g features support local spinel symmetry assignment.', available: true },
     ],
     status: 'Report Ready',
     claimStatus: 'strongly_supported',
@@ -251,10 +289,45 @@ export const demoProjects: DemoProject[] = [
       'Raman A1g/T2g vibrational features support local spinel symmetry.',
       'Peak width and unresolved weak reflections indicate validation is still required before phase-purity claims.',
     ],
+    validationGaps: [
+      {
+        id: 'gap-cu-surface',
+        description: 'Surface oxidation state not confirmed by surface-sensitive technique (XPS).',
+        severity: 'moderate',
+        suggestedResolution: 'Run XPS survey to confirm Cu²⁺/Fe³⁺ oxidation envelope.',
+      },
+      {
+        id: 'gap-cu-phase-purity',
+        description: 'Phase purity claims limited by unresolved weak reflections.',
+        severity: 'low',
+        suggestedResolution: 'High-resolution XRD scan or Rietveld refinement to resolve minor phases.',
+      },
+    ],
+    nextDecisions: [
+      {
+        id: 'dec-cu-xps',
+        label: 'Run XPS surface analysis',
+        description: 'Confirm surface oxidation state for publication-level claims.',
+        urgency: 'medium',
+        linkedTechnique: 'XPS',
+      },
+      {
+        id: 'dec-cu-export',
+        label: 'Export notebook report',
+        description: 'Phase assignment is supported; export with validation boundaries noted.',
+        urgency: 'low',
+      },
+    ],
     recommendations: [
       'Review notebook synthesis conditions before export.',
       'Run multi-tech correlation if surface oxidation state needs confirmation.',
     ],
+    reportReadiness: {
+      notebookReady: true,
+      exportReady: true,
+      readinessPercent: 85,
+      label: 'Report-ready with validation boundaries',
+    },
     notebook: {
       title: 'Exp-042: CuFe₂O₄ Spinel Phase Confirmation',
       pipeline: [
@@ -303,12 +376,19 @@ export const demoProjects: DemoProject[] = [
     id: 'cufe2o4-sba15',
     name: 'CuFe₂O₄/SBA-15',
     material: 'Copper ferrite on mesoporous silica',
+    objective: 'Correlate multi-technique evidence to confirm CuFe₂O₄ dispersion on mesoporous SBA-15 support.',
     techniques: ['XRD', 'XPS', 'FTIR', 'Raman'],
     techniqueMetadata: [
       { key: 'XRD', label: 'XRD', role: 'Bulk phase', status: 'ready', dataAvailable: true },
       { key: 'XPS', label: 'XPS', role: 'Surface state', status: 'ready', dataAvailable: true },
       { key: 'FTIR', label: 'FTIR', role: 'Bonding context', status: 'ready', dataAvailable: true },
       { key: 'Raman', label: 'Raman', role: 'Lattice mode', status: 'ready', dataAvailable: true },
+    ],
+    evidenceSources: [
+      { technique: 'XRD', datasetId: 'xrd-cufe2o4-sba15-demo', datasetLabel: 'CuFe₂O₄/SBA-15 XRD', description: 'CuFe₂O₄-assigned reflections at 30.1°, 35.5°, and 43.2° 2θ remain visible in the SBA-15 supported sample; broad silica shoulder near 20.9°.', available: true },
+      { technique: 'XPS', datasetId: 'xps-cufe2o4-sba15-demo', datasetLabel: 'CuFe₂O₄/SBA-15 XPS', description: 'Cu 2p and Fe 2p binding energies indicate mixed-oxide surface state on silica support; oxidation-state assignment requires peak fitting.', available: true },
+      { technique: 'FTIR', datasetId: 'ftir-cufe2o4-sba15-demo', datasetLabel: 'CuFe₂O₄/SBA-15 FTIR', description: 'Si–O–Si stretching bands at ~1080 cm⁻¹ confirm SBA-15 matrix; metal–oxygen bands provide contextual ferrite evidence.', available: true },
+      { technique: 'Raman', datasetId: 'raman-cufe2o4-sba15-demo', datasetLabel: 'CuFe₂O₄/SBA-15 Raman', description: 'Ferrite-like A1g/T2g modes support local spinel symmetry in the supported sample; intensity reduced relative to unsupported CuFe₂O₄.', available: true },
     ],
     status: 'In Progress',
     claimStatus: 'supported',
@@ -330,10 +410,52 @@ export const demoProjects: DemoProject[] = [
       'Raman vibrational modes provide supporting evidence for ferrite-like local structure.',
       'FTIR silica/support features contextualize the SBA-15 matrix but do not independently establish ferrite phase purity.',
     ],
+    validationGaps: [
+      {
+        id: 'gap-sba-loading',
+        description: 'Ferrite loading uniformity on SBA-15 not quantified.',
+        severity: 'critical',
+        suggestedResolution: 'Quantify Cu/Fe ratio from XPS survey scan and compare with nominal loading.',
+      },
+      {
+        id: 'gap-sba-dispersion',
+        description: 'Phase distribution across mesoporous support not mapped.',
+        severity: 'moderate',
+        suggestedResolution: 'Run TEM-EDX or synchrotron XRD for spatial phase mapping.',
+      },
+      {
+        id: 'gap-sba-surface',
+        description: 'Surface oxidation state of supported ferrite unresolved.',
+        severity: 'moderate',
+        suggestedResolution: 'XPS high-resolution scan of Cu 2p and Fe 2p regions.',
+      },
+    ],
+    nextDecisions: [
+      {
+        id: 'dec-sba-xps',
+        label: 'Complete XPS Cu/Fe ratio quantification',
+        description: 'Loading uniformity is the primary validation gap for this project.',
+        urgency: 'high',
+        linkedTechnique: 'XPS',
+      },
+      {
+        id: 'dec-sba-ftir',
+        label: 'Compare FTIR silica bands',
+        description: 'Verify support matrix features before final report.',
+        urgency: 'medium',
+        linkedTechnique: 'FTIR',
+      },
+    ],
     recommendations: [
       'Quantify Cu/Fe ratio from XPS survey scan.',
       'Compare FTIR silica bands before report export.',
     ],
+    reportReadiness: {
+      notebookReady: true,
+      exportReady: false,
+      readinessPercent: 55,
+      label: 'In progress — validation gaps remain',
+    },
     notebook: {
       title: 'Exp-044: CuFe₂O₄/SBA-15 Multi-Tech Correlation',
       pipeline: [
@@ -364,9 +486,13 @@ export const demoProjects: DemoProject[] = [
     id: 'nife2o4',
     name: 'NiFe₂O₄',
     material: 'Nickel ferrite spinel',
+    objective: 'Establish NiFe₂O₄ spinel phase identity as a control sample for the ferrite research program.',
     techniques: ['XRD'],
     techniqueMetadata: [
       { key: 'XRD', label: 'XRD', role: 'Bulk phase', status: 'ready', dataAvailable: true },
+    ],
+    evidenceSources: [
+      { technique: 'XRD', datasetId: 'xrd-nife2o4-control', datasetLabel: 'NiFe₂O₄ control XRD', description: 'Six reflections at 18.4°, 30.3°, 35.7°, 43.4°, 57.4°, and 63.0° 2θ match nickel ferrite spinel reference; no dominant secondary phase detected.', available: true },
     ],
     status: 'Report Ready',
     claimStatus: 'supported',
@@ -387,7 +513,36 @@ export const demoProjects: DemoProject[] = [
       'Major XRD reflections align with nickel ferrite spinel.',
       'No dominant secondary oxide peak detected in the working window.',
     ],
+    validationGaps: [
+      {
+        id: 'gap-ni-raman',
+        description: 'No Raman confirmation of vibrational fingerprint.',
+        severity: 'low',
+        suggestedResolution: 'Run Raman measurement to confirm lattice mode assignment.',
+      },
+    ],
+    nextDecisions: [
+      {
+        id: 'dec-ni-export',
+        label: 'Export control report',
+        description: 'Phase assignment is supported; export as reference control.',
+        urgency: 'low',
+      },
+      {
+        id: 'dec-ni-raman',
+        label: 'Run Raman confirmation',
+        description: 'Optional: confirm with vibrational spectroscopy.',
+        urgency: 'low',
+        linkedTechnique: 'Raman',
+      },
+    ],
     recommendations: ['Export report or run Raman confirmation.'],
+    reportReadiness: {
+      notebookReady: true,
+      exportReady: true,
+      readinessPercent: 90,
+      label: 'Report-ready as control sample',
+    },
     notebook: {
       title: 'Exp-041: NiFe₂O₄ Control Sample',
       pipeline: [
@@ -415,10 +570,15 @@ export const demoProjects: DemoProject[] = [
     id: 'cofe2o4',
     name: 'CoFe₂O₄',
     material: 'Cobalt ferrite spinel',
+    objective: 'Verify cobalt ferrite spinel phase and surface chemistry for catalyst precursor characterization.',
     techniques: ['XRD', 'XPS'],
     techniqueMetadata: [
       { key: 'XRD', label: 'XRD', role: 'Bulk phase', status: 'ready', dataAvailable: true },
       { key: 'XPS', label: 'XPS', role: 'Surface state', status: 'ready', dataAvailable: true },
+    ],
+    evidenceSources: [
+      { technique: 'XRD', datasetId: 'xrd-cofe2o4-control', datasetLabel: 'CoFe₂O₄ control XRD', description: 'Six cobalt ferrite spinel reflections at 18.2°, 30.0°, 35.4°, 43.1°, 57.0°, and 62.6° 2θ; strongest peak at 35.4° (311).', available: true },
+      { technique: 'XPS', datasetId: 'xps-cofe2o4-demo', datasetLabel: 'CoFe₂O₄ XPS survey', description: 'Co 2p and Fe 2p binding energies consistent with Co²⁺/Co³⁺ and Fe³⁺ in cobalt ferrite; peak fitting required before archival claims.', available: true },
     ],
     status: 'Report Ready',
     claimStatus: 'strongly_supported',
@@ -439,7 +599,36 @@ export const demoProjects: DemoProject[] = [
       'XRD confirms cobalt ferrite spinel reflections.',
       'XPS supports expected cobalt and iron oxidation-state envelope.',
     ],
+    validationGaps: [
+      {
+        id: 'gap-co-xps-fit',
+        description: 'XPS oxidation-state envelope fit not fully resolved.',
+        severity: 'moderate',
+        suggestedResolution: 'Review and refine XPS peak fitting for Co 2p and Fe 2p regions.',
+      },
+    ],
+    nextDecisions: [
+      {
+        id: 'dec-co-review',
+        label: 'Review XPS oxidation-state fit',
+        description: 'Refine surface chemistry evidence before archival.',
+        urgency: 'medium',
+        linkedTechnique: 'XPS',
+      },
+      {
+        id: 'dec-co-export',
+        label: 'Export notebook report',
+        description: 'Phase and surface evidence are strong; export with notes.',
+        urgency: 'low',
+      },
+    ],
     recommendations: ['Review XPS oxidation-state fit before archiving.'],
+    reportReadiness: {
+      notebookReady: true,
+      exportReady: true,
+      readinessPercent: 80,
+      label: 'Report-ready with fit review pending',
+    },
     notebook: {
       title: 'Exp-039: CoFe₂O₄ Spinel Verification',
       pipeline: [
@@ -467,10 +656,15 @@ export const demoProjects: DemoProject[] = [
     id: 'fe3o4-nanoparticles',
     name: 'Fe₃O₄ Nanoparticles',
     material: 'Iron oxide nanoparticles',
+    objective: 'Identify iron oxide nanoparticle phase and distinguish Fe₃O₄ from gamma-Fe₂O₃.',
     techniques: ['FTIR', 'Raman'],
     techniqueMetadata: [
       { key: 'FTIR', label: 'FTIR', role: 'Bonding context', status: 'ready', dataAvailable: true },
       { key: 'Raman', label: 'Raman', role: 'Lattice mode', status: 'ready', dataAvailable: true },
+    ],
+    evidenceSources: [
+      { technique: 'FTIR', datasetId: 'ftir-fe3o4-nanoparticles-demo', datasetLabel: 'Fe₃O₄ nanoparticle FTIR', description: 'Fe–O stretching band near 580 cm⁻¹ indicates iron oxide lattice vibration; surface hydroxyl contribution visible near 3400 cm⁻¹.', available: true },
+      { technique: 'Raman', datasetId: 'raman-fe3o4-nanoparticles-demo', datasetLabel: 'Fe₃O₄ nanoparticle Raman', description: 'A1g mode near 670 cm⁻¹ suggests magnetite-like local symmetry; XRD confirmation needed to distinguish Fe₃O₄ from γ-Fe₂O₃.', available: true },
     ],
     status: 'In Progress',
     claimStatus: 'partial',
@@ -492,7 +686,42 @@ export const demoProjects: DemoProject[] = [
       'Raman band pattern suggests magnetite-like nanoparticle signatures.',
       'Surface hydroxyl contribution remains visible in FTIR.',
     ],
+    validationGaps: [
+      {
+        id: 'gap-fe-xrd',
+        description: 'No XRD data to distinguish Fe₃O₄ from gamma-Fe₂O₃.',
+        severity: 'critical',
+        suggestedResolution: 'Run XRD measurement on nanoparticle sample.',
+      },
+      {
+        id: 'gap-fe-size',
+        description: 'Particle size distribution not characterized.',
+        severity: 'moderate',
+        suggestedResolution: 'TEM or DLS measurement for size distribution.',
+      },
+    ],
+    nextDecisions: [
+      {
+        id: 'dec-fe-xrd',
+        label: 'Run XRD phase confirmation',
+        description: 'Critical: XRD needed to resolve phase ambiguity between magnetite and maghemite.',
+        urgency: 'high',
+        linkedTechnique: 'XRD',
+      },
+      {
+        id: 'dec-fe-tem',
+        label: 'Characterize particle size',
+        description: 'Size distribution needed for publication-ready nanoparticle characterization.',
+        urgency: 'medium',
+      },
+    ],
     recommendations: ['Run XRD confirmation to distinguish Fe₃O₄ from gamma-Fe₂O₃.'],
+    reportReadiness: {
+      notebookReady: false,
+      exportReady: false,
+      readinessPercent: 30,
+      label: 'Requires processing — evidence gaps remain',
+    },
     notebook: {
       title: 'Exp-040: Fe₃O₄ Nanoparticle Surface Signature',
       pipeline: [
@@ -519,7 +748,7 @@ export const demoProjects: DemoProject[] = [
   },
 ];
 
-export function getProject(projectId?: string | null) {
+export function getProject(projectId?: string | null): DemoProject | null {
   const demoProject = demoProjects.find((project) => project.id === projectId);
   if (demoProject) return demoProject;
 
@@ -544,6 +773,7 @@ export function getProject(projectId?: string | null) {
       material: localExperiment.materialSystem,
       techniques: techniqueScope,
       techniqueMetadata,
+      objective: localExperiment.projectObjective ?? 'Process and interpret the imported dataset.',
       status: 'Demo dataset ready',
       claimStatus: 'partial',
       validationState: 'requires_validation',
@@ -558,8 +788,39 @@ export function getProject(projectId?: string | null) {
         { position: 43.3, intensity: 55, label: '(400)' },
         { position: 57.2, intensity: 42, label: '(511)' },
       ],
+      evidenceSources: [
+        ...techniqueScope.map((tech) => ({
+          technique: tech,
+          datasetId: `local-${tech.toLowerCase()}-demo`,
+          datasetLabel: `${localExperiment.projectName ?? localExperiment.sampleName} ${tech}`,
+          description: `Local ${tech} dataset is ready for processing.`,
+          available: true,
+        })),
+      ],
       evidence: ['Local project dataset is ready for processing; interpretation requires validation.'],
+      validationGaps: [
+        {
+          id: 'gap-local-processing',
+          description: 'No processed evidence available yet.',
+          severity: 'critical',
+          suggestedResolution: 'Process the imported dataset in the workspace.',
+        },
+      ],
+      nextDecisions: [
+        {
+          id: 'dec-local-process',
+          label: 'Process dataset',
+          description: 'Run workspace processing to generate evidence.',
+          urgency: 'high',
+        },
+      ],
       recommendations: ['Process the selected signal before review or export.'],
+      reportReadiness: {
+        notebookReady: false,
+        exportReady: false,
+        readinessPercent: 10,
+        label: 'Requires processing',
+      },
       notebook: {
         title: localExperiment.title,
         pipeline: ['Project created locally.', 'Dataset source selected.', 'Experiment conditions locked by user.'],
@@ -571,7 +832,10 @@ export function getProject(projectId?: string | null) {
     } satisfies DemoProject;
   }
 
-  return demoProjects[0];
+  /* Fallback: find any local experiment for this project, or return the first demo project
+     ONLY when no projectId is provided (e.g. default project landing). */
+  if (!projectId) return demoProjects[0];
+  return null;
 }
 
 function readLocalList<T>(key: string): T[] {
@@ -1033,6 +1297,7 @@ export function getLocalDatasets(projectId?: string) {
 
 export function getProjectDatasets(projectId: string) {
   const project = getProject(projectId);
+  if (!project) return getLocalDatasets(projectId);
   return [...getBuiltInDatasets(project), ...getLocalDatasets(projectId)];
 }
 
@@ -1208,6 +1473,14 @@ export function saveWizardHistoryEntry(notebook: ProjectNotebook): void {
     action: 'notebook',
   };
   writeLocalList(LOCAL_WIZARD_HISTORY_KEY, [...entries, entry]);
+}
+
+export function deleteProjectNotebook(notebookId: string): void {
+  const notebooks = getLocalProjectNotebooks();
+  writeLocalList(LOCAL_PROJECT_NOTEBOOKS_KEY, notebooks.filter((nb) => nb.id !== notebookId));
+  // Also remove associated wizard history entries
+  const historyEntries = getWizardHistoryEntries();
+  writeLocalList(LOCAL_WIZARD_HISTORY_KEY, historyEntries.filter((e) => e.notebookId !== notebookId));
 }
 
 export function getNotebookTypeBadge(mode: NotebookMode): string {

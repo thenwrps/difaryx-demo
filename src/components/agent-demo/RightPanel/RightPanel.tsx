@@ -215,6 +215,180 @@ function getScientificSummary(technique: string) {
   }
 }
 
+type TechniqueReasoning = {
+  evidenceReview: Array<{ label: string; body: string }>;
+  supportingBullets: Array<{ label: string; body: string }>;
+  supportingInterpretation: string;
+  interpretationParagraphs: Array<{ label: string; body: string }>;
+  interpretationFooter: string;
+  reportTitle: string;
+  reportBullets: Array<{ label: string; body: string; key: string }>;
+  reportValidation: string;
+  timeline: Array<{ timestamp: string; level: 'info' | 'success' | 'warning'; message: string; details: string }>;
+};
+
+function getTechniqueReasoning(technique: string): TechniqueReasoning {
+  switch (technique) {
+    case 'Raman':
+      return {
+        evidenceReview: [
+          { label: 'Mode position matching:', body: 'Compare observed Raman shift to reference mode positions. Structural relation requires Δν ≤ 4 cm⁻¹ (instrumental resolution limit). Current: A₁g, Eg, and three T₂g modes support local spinel symmetry.' },
+          { label: 'Linewidth / FWHM review:', body: 'Sharp linewidths (FWHM < 25 cm⁻¹) indicate long-range vibrational order. Broadened modes flag structural disorder. Current: all modes within expected FWHM range.' },
+          { label: 'Mode completeness check:', body: 'Verify presence of all expected vibrational bands for the candidate phase. Missing modes require validation. Current: 5/5 expected active modes observed.' },
+        ],
+        supportingBullets: [
+          { label: 'Band position matching:', body: 'Major vibrational bands align within ±2 cm⁻¹ of reference, supports local spinel symmetry.' },
+          { label: 'Symmetry coverage:', body: 'A₁g, Eg, and T₂g modes all observed, consistent with Fd-3m local symmetry.' },
+          { label: 'Unassigned features:', body: 'No dominant carbon D-band (1350 cm⁻¹); weak shoulders remain below assignment threshold.' },
+        ],
+        supportingInterpretation: 'Vibrational fingerprint supports the structural assignment. Cross-technique context (XRD + XPS) reinforces the interpretation.',
+        interpretationParagraphs: [
+          { label: 'Vibrational consistency:', body: 'Observed mode positions (A₁g ~ 690 cm⁻¹; T₂g split Δν ≈ 145 cm⁻¹) align with reference spinel ferrite within instrumental resolution. T₂g splitting supports octahedral site distortion.' },
+          { label: 'Structural fingerprint:', body: 'Mode linewidths remain below 25 cm⁻¹ FWHM, indicating long-range vibrational order. No D-band at 1350 cm⁻¹ rules out carbonaceous contamination.' },
+          { label: 'Alternative hypotheses:', body: 'Fe₃O₄ magnetite rejected — A₁g at ~670 cm⁻¹ would shift the breathing mode. α-Fe₂O₃ hematite rejected — absent 225/245 cm⁻¹ A₁g doublet. CuO tenorite rejected — missing 295/340/620 cm⁻¹ signature.' },
+        ],
+        interpretationFooter: 'Compared mode positions against bundled reference context. Cross-technique convergence supports the assignment with validation requirements.',
+        reportTitle: 'Local spinel symmetry supported by Raman fingerprint',
+        reportBullets: [
+          { key: 'mode-alignment', label: 'Vibrational match:', body: 'A₁g, Eg, and T₂g modes present with expected positions' },
+          { key: 'symmetry', label: 'Symmetry coverage:', body: 'Fd-3m mode count satisfied (5/5 active modes observed)' },
+          { key: 'cross-tech', label: 'Cross-technique convergence:', body: 'XRD reflections and XPS oxidation envelope provide supporting context' },
+          { key: 'literature', label: 'Supporting literature:', body: 'Reference Raman studies (2021-2023) match observed mode positions within ±2 cm⁻¹' },
+        ],
+        reportValidation: 'Priority 1: Polarization-dependent Raman to confirm mode symmetry. Priority 2: Temperature-dependent Raman to probe cation ordering.',
+        timeline: [
+          { timestamp: '00:00.123', level: 'info', message: 'Initialized structural fingerprint workflow', details: 'Loaded Raman spectrum (1024 points) and cross-technique context.' },
+          { timestamp: '00:00.456', level: 'info', message: 'Raman preprocessing prepared', details: 'Baseline correction (asymmetric least squares), Savitzky-Golay smoothing (window=9), cosmic-ray removal.' },
+          { timestamp: '00:01.234', level: 'success', message: 'Detected 5 active vibrational bands', details: 'Band positions (cm⁻¹): 210, 340, 475, 620, 690. Average FWHM = 18 cm⁻¹.' },
+          { timestamp: '00:01.567', level: 'info', message: 'Mode-assignment review initiated', details: 'Checking deterministic spinel-mode reference for A₁g, Eg, and T₂g assignments.' },
+          { timestamp: '00:02.891', level: 'success', message: 'Retrieved candidate mode sets', details: 'Filtered by composition and expected active-mode count for Fd-3m symmetry.' },
+          { timestamp: '00:03.234', level: 'info', message: 'Mode matching in progress', details: 'Evaluating CuFe₂O₄ (spinel), Fe₃O₄ (magnetite), α-Fe₂O₃ (hematite), CuO (tenorite).' },
+          { timestamp: '00:04.567', level: 'success', message: 'Top candidate identified: CuFe₂O₄', details: 'Mode-position relation and symmetry completeness criterion met.' },
+          { timestamp: '00:04.789', level: 'warning', message: 'Weak shoulder flagged', details: 'Low-intensity shoulder near 1050 cm⁻¹ remains below assignment threshold; flagged for validation.' },
+          { timestamp: '00:05.123', level: 'info', message: 'Claim boundary prepared', details: 'Local symmetry supported; quantitative cation distribution remains validation-limited.' },
+        ],
+      };
+    case 'FTIR':
+      return {
+        evidenceReview: [
+          { label: 'Band position matching:', body: 'Compare observed wavenumber to reference absorption bands. Bonding relation requires Δν ≤ 10 cm⁻¹ (instrumental resolution limit). Current: tetrahedral ν₁(M-O) and octahedral ν₂(M-O) bands support spinel-type bonding.' },
+          { label: 'Intensity ratio review:', body: 'ν₁/ν₂ ratio compared to reference inverse spinel context. Current: ν₁/ν₂ = 1.39 remains consistent with the working model.' },
+          { label: 'Baseline integrity check:', body: 'Verify baseline correction preserves low-intensity features without introducing artifacts. Current: baseline residual ≤ 2% transmittance.' },
+        ],
+        supportingBullets: [
+          { label: 'Band position matching:', body: 'ν₁ and ν₂ M-O absorption bands align within ±5 cm⁻¹ of reference, supports metal-oxygen bonding.' },
+          { label: 'Functional-group context:', body: 'Surface hydroxyl band at ~3400 cm⁻¹ and Si-O-Si at ~1050 cm⁻¹ provide support/surface context.' },
+          { label: 'Unassigned features:', body: 'No dominant CuO signature at 530 cm⁻¹; minor shoulders remain below assignment threshold.' },
+        ],
+        supportingInterpretation: 'Bonding environment supports the structural assignment. Cross-technique context (XRD + Raman) reinforces the interpretation.',
+        interpretationParagraphs: [
+          { label: 'Bonding consistency:', body: 'Tetrahedral ν₁(M-O) at ~585 cm⁻¹ and octahedral ν₂(M-O) at ~420 cm⁻¹ align with reference spinel ferrite within instrumental resolution (±4 cm⁻¹).' },
+          { label: 'Functional-group screening:', body: 'Surface hydroxyl (3400 cm⁻¹) and Si-O-Si (1050 cm⁻¹) features contextualize support interaction; phase purity remains validation-limited.' },
+          { label: 'Alternative hypotheses:', body: 'CuO tenorite rejected — absent dominant 530 cm⁻¹ signature. Fe₃O₄ magnetite rejected — expected 570/390 cm⁻¹ band positions do not match observed maxima. Cu₂O cuprite rejected — missing 620 cm⁻¹ mode.' },
+        ],
+        interpretationFooter: 'Compared band positions against bundled reference context. Cross-technique convergence supports the assignment with validation requirements.',
+        reportTitle: 'Metal-oxygen bonding environment supported by FTIR',
+        reportBullets: [
+          { key: 'mode-alignment', label: 'Bonding match:', body: 'ν₁/ν₂ M-O absorption bands present at spinel-ferrite positions' },
+          { key: 'symmetry', label: 'Functional-group context:', body: 'Surface hydroxyl and Si-O-Si support/surface bands observed' },
+          { key: 'cross-tech', label: 'Cross-technique convergence:', body: 'XRD reflections and Raman A₁g mode provide supporting structural context' },
+          { key: 'literature', label: 'Supporting literature:', body: 'Reference FTIR studies (2021-2023) match observed M-O band positions within ±5 cm⁻¹' },
+        ],
+        reportValidation: 'Priority 1: DRIFTS to separate surface vs. bulk bonding context. Priority 2: Temperature-programmed FTIR to probe surface hydroxyl thermodynamics.',
+        timeline: [
+          { timestamp: '00:00.123', level: 'info', message: 'Initialized bonding analysis workflow', details: 'Loaded FTIR spectrum (ATR mode, 400–4000 cm⁻¹) and cross-technique context.' },
+          { timestamp: '00:00.456', level: 'info', message: 'FTIR preprocessing prepared', details: 'Rubber-band baseline correction (64 points), Savitzky-Golay smoothing (window=11), atmospheric compensation.' },
+          { timestamp: '00:01.234', level: 'success', message: 'Detected 5 absorption bands above threshold', details: 'Band positions (cm⁻¹): 420, 585, 610, 1050, 3400. Average FWHM = 32 cm⁻¹.' },
+          { timestamp: '00:01.567', level: 'info', message: 'Band-assignment review initiated', details: 'Checking deterministic metal-oxygen reference for ν₁/ν₂ and support-matrix assignments.' },
+          { timestamp: '00:02.891', level: 'success', message: 'Retrieved candidate bonding contexts', details: 'Filtered by composition and expected M-O band window for tetrahedral/octahedral sites.' },
+          { timestamp: '00:03.234', level: 'info', message: 'Bonding matching in progress', details: 'Evaluating CuFe₂O₄ (spinel), Fe₃O₄ (magnetite), CuO (tenorite), Cu₂O (cuprite).' },
+          { timestamp: '00:04.567', level: 'success', message: 'Top candidate identified: CuFe₂O₄', details: 'Band-position relation and intensity-ratio criterion met.' },
+          { timestamp: '00:04.789', level: 'warning', message: 'Weak shoulder flagged', details: 'Low-intensity shoulder near 530 cm⁻¹ remains below CuO assignment threshold; flagged for validation.' },
+          { timestamp: '00:05.123', level: 'info', message: 'Claim boundary prepared', details: 'Bonding environment supported; quantitative phase purity remains validation-limited.' },
+        ],
+      };
+    case 'XPS':
+      return {
+        evidenceReview: [
+          { label: 'Binding-energy matching:', body: 'Compare observed core-level BE to reference values. Chemical-state relation requires ΔBE ≤ 0.2 eV (instrumental resolution limit). Current: Cu 2p₃/₂, Fe 2p₃/₂, and O 1s support the surface-chemistry context.' },
+          { label: 'Spin-orbit / satellite review:', body: 'Verify Cu 2p₃/₂ shake-up satellite (~942 eV) for Cu²⁺; check Fe 2p spin-orbit splitting. Current: satellite present and Δ(2p₃/₂-2p₁/₂) ≈ 13.6 eV supports Fe³⁺/Fe²⁺ mixture.' },
+          { label: 'Fit completeness check:', body: 'Verify residual of component fit across the sampled core levels. Current: fit residual within 3% of intensity; Cu 2p, Fe 2p, and O 1s components resolved.' },
+        ],
+        supportingBullets: [
+          { label: 'Core-level matching:', body: 'Cu 2p₃/₂ at 933.8 eV and Fe 2p₃/₂ components match reference oxidation-state library within ±0.2 eV.' },
+          { label: 'Surface chemistry context:', body: 'O 1s deconvolution separates lattice oxygen (530.1 eV) and surface hydroxyl (531.8 eV) components.' },
+          { label: 'Fit quality:', body: 'Component fitting residual remains below 3% across Cu 2p, Fe 2p, and O 1s windows.' },
+        ],
+        supportingInterpretation: 'Surface oxidation-state envelope supports the phase assignment. Cross-technique context (XRD + Raman) reinforces the interpretation; surface vs. bulk disparity remains validation-limited.',
+        interpretationParagraphs: [
+          { label: 'Oxidation-state consistency:', body: 'Cu 2p₃/₂ at 933.8 eV with satellite at ~942 eV supports Cu²⁺. Fe 2p₃/₂ deconvolution shows Fe³⁺ (711.2 eV) and Fe²⁺ (709.4 eV) with ~3:1 ratio consistent with inverse spinel stoichiometry.' },
+          { label: 'Surface vs. bulk boundary:', body: 'XPS samples ~5 nm depth; Cu/Fe surface ratio = 0.76 (vs. nominal bulk 0.50) indicates preferential surface segregation. Bulk composition remains validation-limited.' },
+          { label: 'Alternative hypotheses:', body: 'Cu⁺ rejected — satellite feature at 942 eV incompatible with Cu⁺ (no shake-up). Pure Fe₃O₄ rejected — expected Fe²⁺/Fe³⁺ = 1:2 not matched. CuO-dominated surface rejected — Cu LMM Auger parameter inconsistent.' },
+        ],
+        interpretationFooter: 'Compared binding energies against bundled reference context. Cross-technique convergence supports the assignment with surface-sensitive validation requirements.',
+        reportTitle: 'Surface chemistry supported by XPS oxidation envelope',
+        reportBullets: [
+          { key: 'mode-alignment', label: 'Oxidation-state match:', body: 'Cu 2p₃/₂ with shake-up satellite supports Cu²⁺; Fe 2p envelope supports Fe³⁺/Fe²⁺ mixture' },
+          { key: 'symmetry', label: 'Surface chemistry context:', body: 'O 1s lattice vs. hydroxyl components resolved in fit' },
+          { key: 'cross-tech', label: 'Cross-technique convergence:', body: 'XRD reflections and Raman A₁g mode provide supporting structural context' },
+          { key: 'literature', label: 'Supporting literature:', body: 'Reference XPS studies (2021-2023) match observed Cu 2p / Fe 2p positions within ±0.2 eV' },
+        ],
+        reportValidation: 'Priority 1: Depth-profiling (Ar⁺ sputter + XPS) to resolve surface vs. bulk disparity. Priority 2: Auger parameter analysis to tighten Cu oxidation-state assignment.',
+        timeline: [
+          { timestamp: '00:00.123', level: 'info', message: 'Initialized surface chemistry workflow', details: 'Loaded XPS regions (survey + Cu 2p + Fe 2p + O 1s) and cross-technique context.' },
+          { timestamp: '00:00.456', level: 'info', message: 'XPS preprocessing prepared', details: 'Shirley background subtraction, charge correction to adventitious C 1s (284.8 eV), Savitzky-Golay smoothing (window=5).' },
+          { timestamp: '00:01.234', level: 'success', message: 'Fit 6 core-level components above threshold', details: 'Core-level positions (eV): Cu 2p₃/₂ 933.8, Cu satellite 942.0, Fe 2p₃/₂ 711.2 / 709.4, O 1s 530.1 / 531.8.' },
+          { timestamp: '00:01.567', level: 'info', message: 'Oxidation-state review initiated', details: 'Checking deterministic Cu / Fe / O reference library for binding-energy assignments.' },
+          { timestamp: '00:02.891', level: 'success', message: 'Retrieved candidate chemical states', details: 'Filtered by composition window and expected satellite features for Cu²⁺ and mixed-valence Fe.' },
+          { timestamp: '00:03.234', level: 'info', message: 'Component matching in progress', details: 'Evaluating Cu²⁺/Fe³⁺ inverse spinel, Cu⁺ context, Fe₃O₄ surface, CuO-dominated surface.' },
+          { timestamp: '00:04.567', level: 'success', message: 'Top candidate identified: CuFe₂O₄ surface', details: 'Core-level BE relation and satellite-feature criterion met.' },
+          { timestamp: '00:04.789', level: 'warning', message: 'Surface vs. bulk disparity flagged', details: 'Cu/Fe surface ratio 0.76 vs. nominal bulk 0.50; flagged for depth-profile validation.' },
+          { timestamp: '00:05.123', level: 'info', message: 'Claim boundary prepared', details: 'Surface chemistry supported; bulk composition remains validation-limited.' },
+        ],
+      };
+    case 'XRD':
+    default:
+      return {
+        evidenceReview: [
+          { label: 'Position matching:', body: 'Calculate Δ2θ = |θ_obs - θ_ref| for each peak. Structural relation requires Δ2θ ≤ 0.2° (instrumental resolution limit). Current: 7/7 peaks support assignment.' },
+          { label: 'Intensity correlation:', body: 'Compute Pearson r between I_obs and I_ref after Lorentz-polarization correction. Strong correlation (r ≥ 0.80) supports structural match. Current: r = 0.87 supports assignment.' },
+          { label: 'Completeness check:', body: 'Verify presence of all expected reflections with I/I₀ ≥ 5% from reference. Missing peaks require validation. Current: 18/21 expected peaks observed (85.7% completeness).' },
+        ],
+        supportingBullets: [
+          { label: 'Peak position matching:', body: 'All major reflections align within ±0.15° (2θ) of reference pattern, primary evidence supports structural assignment.' },
+          { label: 'Intensity correlation:', body: 'Observed intensity ratios match expected values, supporting evidence reinforces phase identification.' },
+          { label: 'Unindexed features:', body: '2 weak peaks (I/I₀ < 2%) at 62.3° and 64.1° require validation but do not contradict primary phase assignment.' },
+        ],
+        supportingInterpretation: 'Multiple independent evidence streams support the same structural assignment. Cross-technique evidence (XRD + Raman + XPS) provides contextual support for the phase identification.',
+        interpretationParagraphs: [
+          { label: 'Crystallographic consistency:', body: 'The observed d-spacings (d₃₁₁ = 2.53 Å, d₄₄₀ = 1.48 Å) align with cubic spinel lattice within instrumental resolution (±0.02 Å). Peak intensity ratios deviate <8% from powder diffraction file, suggesting minimal preferred orientation.' },
+          { label: 'Phase-purity screening note:', body: 'Integrated intensity analysis across 2θ = 10-80° accounts for 97.3% of total scattering. Residual 2.7% is distributed as background noise rather than dominant secondary phase reflections; phase purity remains validation-limited.' },
+          { label: 'Competing hypotheses:', body: 'Fe₃O₄ magnetite rejected due to absence of characteristic (111) reflection at 18.3° and incompatible lattice parameter (a_magnetite = 8.39 Å vs. a_observed = 8.38 Å). CuO tenorite ruled out by missing monoclinic signature at 38.7°.' },
+        ],
+        interpretationFooter: 'Compared peak positions against bundled reference context. Multi-technique convergence (XRD + Raman + XPS) supports the spinel assignment with validation requirements.',
+        reportTitle: 'CuFe₂O₄ inverse spinel phase assignment',
+        reportBullets: [
+          { key: 'peak-alignment', label: 'Crystallographic match:', body: '7/7 major reflections support Fd-3m assignment, a = 8.38 Å' },
+          { key: 'intensity-corr', label: 'Intensity correlation:', body: 'Pearson r = 0.87 vs. reference powder pattern' },
+          { key: 'raman-validation', label: 'Spectroscopic convergence:', body: 'Raman A₁g at 690 cm⁻¹ and XPS Cu²⁺ satellite provide cation-ordering context' },
+          { key: 'literature-consensus', label: 'Supporting literature:', body: 'Literature context (5 studies, 2021-2023) supports structural parameters' },
+        ],
+        reportValidation: 'Priority 1: High-resolution TEM to resolve 62.3° anomaly (superlattice vs. impurity). Priority 2: Temperature-dependent XPS to quantify surface reconstruction thermodynamics.',
+        timeline: [
+          { timestamp: '00:00.123', level: 'info', message: 'Initialized phase identification workflow', details: 'Loaded 3 technique datasets: XRD (3501 points), Raman (1024 points), XPS (2 regions).' },
+          { timestamp: '00:00.456', level: 'info', message: 'XRD preprocessing prepared', details: 'Background subtraction (5th order polynomial, R² = 0.998), Kα₂ stripping, Savitzky-Golay smoothing (window=7).' },
+          { timestamp: '00:01.234', level: 'success', message: 'Detected 9 peaks above threshold', details: 'Peak positions (2θ): 18.3°, 30.1°, 35.5°, 43.2°, 53.5°, 57.1°, 62.3°, 62.7°, 64.1°. Average FWHM = 0.32°.' },
+          { timestamp: '00:01.567', level: 'info', message: 'Bundled reference context review initiated', details: 'Checking deterministic Cu-Fe-O reference context for peak-position relations and validation boundaries.' },
+          { timestamp: '00:02.891', level: 'success', message: 'Retrieved 47 candidate phases', details: 'Filtered by composition (Cu:Fe ratio 0.3-0.7) and peak count (≥5 expected reflections in scan range).' },
+          { timestamp: '00:03.234', level: 'info', message: 'Phase matching in progress', details: 'Evaluating CuFe₂O₄ (spinel), Fe₃O₄ (magnetite), CuO (tenorite), Cu₂O (cuprite), α-Fe₂O₃ (hematite).' },
+          { timestamp: '00:04.567', level: 'success', message: 'Top candidate identified: CuFe₂O₄', details: 'Structural relation: position match, intensity correlation, completeness criterion met.' },
+          { timestamp: '00:04.789', level: 'warning', message: 'Unindexed peaks detected', details: '2 weak reflections at 62.3° and 64.1° (I/I₀ < 2%) cannot be assigned to CuFe₂O₄ Fd-3m. Flagged for review.' },
+          { timestamp: '00:05.123', level: 'info', message: 'Claim boundary prepared', details: 'Phase assignment supported; quantitative phase purity remains validation-limited.' },
+        ],
+      };
+  }
+}
+
 type LiteratureProvider = 'google_scholar_proxy' | 'semantic_scholar' | 'crossref' | 'mock';
 
 interface LiteraturePaper {
@@ -1027,38 +1201,55 @@ export function RightPanel({
                 Step {currentStep >= 0 ? currentStep + 1 : 1} of {totalSteps} - Evidence Review
               </div>
               <div className="space-y-3">
-                <div>
-                  <div className="text-xs font-semibold text-slate-300 mb-2">
-                    Observed Peaks (2θ):
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {['18.3°', '30.1°', '35.5°', '43.2°', '53.5°', '57.1°', '62.7°'].map((peak) => (
-                      <span
-                        key={peak}
-                        className="px-2 py-1 rounded bg-slate-800/50 border border-slate-700 text-[10px] font-mono text-slate-300"
-                      >
-                        {peak}
-                      </span>
-                    ))}
-                  </div>
-                </div>
+                {(() => {
+                  const observedConfig: Record<string, { label: string; values: string[] }> = {
+                    XRD: {
+                      label: 'Observed peaks (2θ):',
+                      values: ['18.3°', '30.1°', '35.5°', '43.2°', '53.5°', '57.1°', '62.7°'],
+                    },
+                    Raman: {
+                      label: 'Observed bands (cm⁻¹):',
+                      values: ['210 cm⁻¹', '340 cm⁻¹', '475 cm⁻¹', '620 cm⁻¹', '690 cm⁻¹'],
+                    },
+                    FTIR: {
+                      label: 'Observed absorption bands (cm⁻¹):',
+                      values: ['420 cm⁻¹', '585 cm⁻¹', '610 cm⁻¹', '1050 cm⁻¹', '3400 cm⁻¹'],
+                    },
+                    XPS: {
+                      label: 'Observed core levels (eV):',
+                      values: ['530.1 eV', '531.8 eV', '709.4 eV', '711.2 eV', '933.8 eV', '942.0 eV'],
+                    },
+                  };
+                  const observed = observedConfig[technique] ?? observedConfig.XRD;
+                  return (
+                    <div>
+                      <div className="text-xs font-semibold text-slate-300 mb-2">
+                        {observed.label}
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {observed.values.map((peak) => (
+                          <span
+                            key={peak}
+                            className="px-2 py-1 rounded bg-slate-800/50 border border-slate-700 text-[10px] font-mono text-slate-300"
+                          >
+                            {peak}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
                 <div>
                   <div className="text-xs font-semibold text-slate-300 mb-2">
                     Evidence Review:
                   </div>
                   <ul className="space-y-1.5 text-xs text-slate-400">
-                    <li className="flex items-start gap-2">
-                      <CheckCircle2 size={12} className="text-emerald-400 mt-0.5 shrink-0" />
-                      <span><span className="text-slate-300">Position matching:</span> Calculate Δ2θ = |θ_obs - θ_ref| for each peak. Structural relation requires Δ2θ ≤ 0.2° (instrumental resolution limit). Current: 7/7 peaks support assignment.</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <CheckCircle2 size={12} className="text-emerald-400 mt-0.5 shrink-0" />
-                      <span><span className="text-slate-300">Intensity correlation:</span> Compute Pearson r between I_obs and I_ref after Lorentz-polarization correction. Strong correlation (r ≥ 0.80) supports structural match. Current: r = 0.87 supports assignment.</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <CheckCircle2 size={12} className="text-emerald-400 mt-0.5 shrink-0" />
-                      <span><span className="text-slate-300">Completeness check:</span> Verify presence of all expected reflections with I/I₀ ≥ 5% from reference. Missing peaks require validation. Current: 18/21 expected peaks observed (85.7% completeness).</span>
-                    </li>
+                    {getTechniqueReasoning(technique).evidenceReview.map((item) => (
+                      <li key={item.label} className="flex items-start gap-2">
+                        <CheckCircle2 size={12} className="text-emerald-400 mt-0.5 shrink-0" />
+                        <span><span className="text-slate-300">{item.label}</span> {item.body}</span>
+                      </li>
+                    ))}
                   </ul>
                 </div>
               </div>
@@ -1152,24 +1343,18 @@ export function RightPanel({
                 <div>
                   <div className="text-xs font-semibold text-slate-400 mb-1.5">Supporting Data:</div>
                   <ul className="space-y-1 text-xs text-slate-500">
-                    <li className="flex items-start gap-2">
-                      <span className="text-slate-600">•</span>
-                      <span><span className="text-slate-400">Peak position matching:</span> All major reflections align within ±0.15° (2θ) of reference pattern, primary evidence supports structural assignment</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-slate-600">•</span>
-                      <span><span className="text-slate-400">Intensity correlation:</span> Observed intensity ratios match expected values, supporting evidence reinforces phase identification</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-slate-600">•</span>
-                      <span><span className="text-slate-400">Unindexed features:</span> 2 weak peaks (I/I₀ &lt; 2%) at 62.3° and 64.1° require validation but do not contradict primary phase assignment</span>
-                    </li>
+                    {getTechniqueReasoning(technique).supportingBullets.map((bullet) => (
+                      <li key={bullet.label} className="flex items-start gap-2">
+                        <span className="text-slate-600">•</span>
+                        <span><span className="text-slate-400">{bullet.label}</span> {bullet.body}</span>
+                      </li>
+                    ))}
                   </ul>
                 </div>
                 <div>
                   <div className="text-xs font-semibold text-slate-400 mb-1.5">Interpretation:</div>
                   <div className="text-xs text-emerald-400">
-                  Multiple independent evidence streams support the same structural assignment. Cross-technique evidence (XRD + Raman + XPS) provides contextual support for the phase identification.
+                  {getTechniqueReasoning(technique).supportingInterpretation}
                   </div>
                 </div>
               </div>
@@ -1178,17 +1363,13 @@ export function RightPanel({
             {/* Section 4: Interpretation */}
             <Section title="Interpretation" badge="Source: Interpretation Run" badgeColor="violet">
               <div className="text-xs text-slate-400 space-y-2">
-                <p>
-                  <span className="text-slate-300 font-medium">Crystallographic consistency:</span> The observed d-spacings (d₃₁₁ = 2.53 Å, d₄₄₀ = 1.48 Å) align with cubic spinel lattice within instrumental resolution (±0.02 Å). Peak intensity ratios deviate &lt;8% from powder diffraction file, suggesting minimal preferred orientation.
-                </p>
-                <p>
-                  <span className="text-slate-300 font-medium">Phase-purity screening note:</span> Integrated intensity analysis across 2θ = 10-80° accounts for 97.3% of total scattering. Residual 2.7% is distributed as background noise rather than dominant secondary phase reflections; phase purity remains validation-limited.
-                </p>
-                <p>
-                  <span className="text-slate-300 font-medium">Competing hypotheses:</span> Fe₃O₄ magnetite rejected due to absence of characteristic (111) reflection at 18.3° and incompatible lattice parameter (a_magnetite = 8.39 Å vs. a_observed = 8.38 Å). CuO tenorite ruled out by missing monoclinic signature at 38.7°.
-                </p>
+                {getTechniqueReasoning(technique).interpretationParagraphs.map((para) => (
+                  <p key={para.label}>
+                    <span className="text-slate-300 font-medium">{para.label}</span> {para.body}
+                  </p>
+                ))}
                 <p className="text-slate-500 text-[10px] pt-2 border-t border-slate-800">
-                  <span className="text-violet-400">Interpretation:</span> Compared peak positions against bundled reference context. Multi-technique convergence (XRD + Raman + XPS) supports the spinel assignment with validation requirements.
+                  <span className="text-violet-400">Interpretation:</span> {getTechniqueReasoning(technique).interpretationFooter}
                 </p>
               </div>
             </Section>
@@ -1197,7 +1378,7 @@ export function RightPanel({
             <Section title="Report-ready Discussion" badge="Source: Workflow" badgeColor="cyan">
               <div className="space-y-3">
                 <div className="text-xs">
-                  <span className="text-slate-200 font-semibold">CuFe₂O₄ inverse spinel phase assignment</span>
+                  <span className="text-slate-200 font-semibold">{getTechniqueReasoning(technique).reportTitle}</span>
                 </div>
 
                 <div className="rounded-lg bg-emerald-400/5 border border-emerald-400/20 p-3">
@@ -1220,37 +1401,31 @@ export function RightPanel({
                 <div>
                   <div className="text-xs font-semibold text-slate-400 mb-1.5">Supporting Data:</div>
                   <ul className="space-y-1 text-xs text-slate-400">
-                    <li className={`flex items-start gap-2 p-2 rounded transition-all ${
-                      activeEvidenceId === 'peak-alignment' ? 'bg-blue-400/10 border border-blue-400/30' : ''
-                    }`}>
-                      <CheckCircle2 size={12} className="text-emerald-400 mt-0.5 shrink-0" />
-                      <span><span className="text-slate-300">Crystallographic match:</span> 7/7 major reflections support Fd-3m assignment, a = 8.38 Å</span>
-                    </li>
-                    <li className={`flex items-start gap-2 p-2 rounded transition-all ${
-                      activeEvidenceId === 'intensity-corr' ? 'bg-blue-400/10 border border-blue-400/30' : ''
-                    }`}>
-                      <CheckCircle2 size={12} className="text-emerald-400 mt-0.5 shrink-0" />
-                      <span><span className="text-slate-300">Intensity correlation:</span> Pearson r = 0.87 vs. reference powder pattern</span>
-                    </li>
-                    <li className={`flex items-start gap-2 p-2 rounded transition-all ${
-                      activeEvidenceId === 'raman-validation' || activeEvidenceId === 'xps-validation' ? 'bg-blue-400/10 border border-blue-400/30' : ''
-                    }`}>
-                      <CheckCircle2 size={12} className="text-emerald-400 mt-0.5 shrink-0" />
-                      <span><span className="text-slate-300">Spectroscopic convergence:</span> Raman A₁g at 690 cm⁻¹ and XPS Cu²⁺ satellite provide cation-ordering context</span>
-                    </li>
-                    <li className={`flex items-start gap-2 p-2 rounded transition-all ${
-                      activeEvidenceId === 'literature-consensus' ? 'bg-blue-400/10 border border-blue-400/30' : ''
-                    }`}>
-                      <span className="text-violet-400 shrink-0">◆</span>
-                      <span><span className="text-slate-300">Supporting literature:</span> Literature context (5 studies, 2021-2023) supports structural parameters</span>
-                    </li>
+                    {getTechniqueReasoning(technique).reportBullets.map((bullet, idx) => {
+                      const isLiterature = bullet.key === 'literature' || bullet.key === 'literature-consensus';
+                      return (
+                        <li
+                          key={bullet.key}
+                          className={`flex items-start gap-2 p-2 rounded transition-all ${
+                            activeEvidenceId === bullet.key ? 'bg-blue-400/10 border border-blue-400/30' : ''
+                          }`}
+                        >
+                          {isLiterature ? (
+                            <span className="text-violet-400 shrink-0">◆</span>
+                          ) : (
+                            <CheckCircle2 size={12} className="text-emerald-400 mt-0.5 shrink-0" />
+                          )}
+                          <span><span className="text-slate-300">{bullet.label}</span> {bullet.body}</span>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
 
                 <div className="pt-2 border-t border-slate-700">
                   <div className="text-xs font-semibold text-slate-400 mb-1.5">Recommended validation:</div>
                   <div className="text-xs text-cyan-400">
-                    <span className="text-slate-300">Priority 1:</span> High-resolution TEM to resolve 62.3° anomaly (superlattice vs. impurity). <span className="text-slate-300">Priority 2:</span> Temperature-dependent XPS to quantify surface reconstruction thermodynamics.
+                    {getTechniqueReasoning(technique).reportValidation}
                   </div>
                 </div>
               </div>
@@ -1934,54 +2109,15 @@ export function RightPanel({
             {/* Reasoning Timeline */}
             <Section title="Reasoning Timeline">
               <div className="space-y-2">
-                <LogEntry
-                  timestamp="00:00.123"
-                  level="info"
-                  message="Initialized phase identification workflow"
-                  details="Loaded 3 technique datasets: XRD (3501 points), Raman (1024 points), XPS (2 regions)"
-                />
-                <LogEntry
-                  timestamp="00:00.456"
-                  level="info"
-                  message="XRD preprocessing prepared"
-                  details="Background subtraction (5th order polynomial, R² = 0.998), Kα₂ stripping, Savitzky-Golay smoothing (window=7)"
-                />
-                <LogEntry
-                  timestamp="00:01.234"
-                  level="success"
-                  message="Detected 9 peaks above threshold"
-                  details="Peak positions (2θ): 18.3°, 30.1°, 35.5°, 43.2°, 53.5°, 57.1°, 62.3°, 62.7°, 64.1°. Average FWHM = 0.32°"
-                />
-                <LogEntry
-                  timestamp="00:01.567"
-                  level="info"
-                  message="Bundled reference context review initiated"
-                  details="Checking deterministic Cu-Fe-O reference context for peak-position relations and validation boundaries"
-                />
-                <LogEntry
-                  timestamp="00:02.891"
-                  level="success"
-                  message="Retrieved 47 candidate phases"
-                  details="Filtered by composition (Cu:Fe ratio 0.3-0.7) and peak count (≥5 expected reflections in scan range)"
-                />
-                <LogEntry
-                  timestamp="00:03.234"
-                  level="info"
-                  message="Phase matching in progress"
-                  details="Evaluating CuFe₂O₄ (spinel), Fe₃O₄ (magnetite), CuO (tenorite), Cu₂O (cuprite), α-Fe₂O₃ (hematite)..."
-                />
-                <LogEntry
-                  timestamp="00:04.567"
-                  level="success"
-                  message="Top candidate identified: CuFe₂O₄"
-                  details="Structural relation: position match, intensity correlation, completeness criterion met. Next candidate: Fe3O4 (In Progress)"
-                />
-                <LogEntry
-                  timestamp="00:04.789"
-                  level="warning"
-                  message="Unindexed peaks detected"
-                  details="2 weak reflections at 62.3° and 64.1° (I/I₀ < 2%) cannot be assigned to CuFe₂O₄ Fd-3m. Flagged for review."
-                />
+                {getTechniqueReasoning(technique).timeline.map((entry) => (
+                  <LogEntry
+                    key={`${entry.timestamp}-${entry.message}`}
+                    timestamp={entry.timestamp}
+                    level={entry.level}
+                    message={entry.message}
+                    details={entry.details}
+                  />
+                ))}
                 <LogEntry
                   timestamp="00:05.123"
                   level="info"

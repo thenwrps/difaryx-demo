@@ -50,13 +50,34 @@ export function CenterColumn({
 }: CenterColumnProps) {
   const graphType: GraphType = context.toLowerCase() as GraphType;
 
-  // Default metrics if none provided
-  const displayMetrics = metrics.length > 0 ? metrics : [
-    { label: 'Detected Peaks', value: '24 significant' },
-    { label: '2θ Range', value: '10° - 80°' },
-    { label: 'Dominant Peaks (2θ)', value: '35.5°, 43.2°', sublabel: 'highest intensity' },
-    { label: 'Signal Quality', value: 'High, SNR 28.7 dB' },
-  ];
+  // Default metrics if none provided — technique-specific placeholders
+  const TECHNIQUE_METRIC_DEFAULTS: Record<AgentContext, MetricData[]> = {
+    XRD: [
+      { label: 'Detected peaks', value: 'Pending' },
+      { label: '2θ range', value: '10° – 80°' },
+      { label: 'Dominant reflections', value: 'Pending', sublabel: 'highest intensity' },
+      { label: 'Signal quality', value: 'Pending' },
+    ],
+    Raman: [
+      { label: 'Detected bands', value: 'Pending' },
+      { label: 'Raman shift range', value: '100 – 4000 cm⁻¹' },
+      { label: 'Dominant bands', value: 'Pending', sublabel: 'strongest modes' },
+      { label: 'Spectral quality', value: 'Pending' },
+    ],
+    FTIR: [
+      { label: 'Detected bands', value: 'Pending' },
+      { label: 'Wavenumber range', value: '400 – 4000 cm⁻¹' },
+      { label: 'Dominant absorption bands', value: 'Pending', sublabel: 'strongest absorption' },
+      { label: 'Baseline quality', value: 'Pending' },
+    ],
+    XPS: [
+      { label: 'Detected components', value: 'Pending' },
+      { label: 'Binding energy window', value: '0 – 1200 eV' },
+      { label: 'Dominant core levels', value: 'Pending', sublabel: 'strongest core levels' },
+      { label: 'Fit quality', value: 'Pending' },
+    ],
+  };
+  const displayMetrics = metrics.length > 0 ? metrics : TECHNIQUE_METRIC_DEFAULTS[context];
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4">

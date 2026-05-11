@@ -314,6 +314,19 @@ export const XRD_DEMO_DATASETS: XrdDemoDataset[] = [
       noiseAmplitude: 0.56,
     }),
   },
+  {
+    id: 'xrd-cufe2o4-sba15-demo',
+    label: 'CuFe2O4/SBA-15',
+    fileName: 'cufe2o4_sba15_demo.xy',
+    sampleName: 'CuFe2O4 on SBA-15 mesoporous silica',
+    description: 'CuFe₂O₄ spinel reflections on SBA-15 support with broad silica shoulder near 20–25° 2θ.',
+    expectedSignal: 'CuFe2O4 reflections visible but reduced intensity; broad SBA-15 amorphous contribution expected.',
+    dataPoints: synthesizeXrdPattern({
+      components: [{ phaseId: 'cufe2o4', scale: 0.58, width: 0.22 }],
+      amorphousHalo: { center: 22.5, width: 6.0, amplitude: 24 },
+      noiseAmplitude: 0.62,
+    }),
+  },
 ];
 
 export function getXrdDemoDataset(datasetId?: string | null) {
@@ -339,7 +352,7 @@ export const XRD_PROJECT_COMPATIBILITY: Record<string, {
     materialLabel: 'copper ferrite spinel',
   },
   'cufe2o4-sba15': {
-    datasetIds: ['xrd-cufe2o4-clean'],
+    datasetIds: ['xrd-cufe2o4-sba15-demo'],
     assignment: 'CuFe2O4/SBA-15',
     materialLabel: 'copper ferrite on mesoporous silica',
   },

@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 
 import Landing from "./pages/Landing";
 import Dashboard from "./pages/Dashboard";
+import ProjectDetail from "./pages/ProjectDetail";
 import MultiTechWorkspace from "./pages/MultiTechWorkspace";
 import TechniqueWorkspace from "./pages/TechniqueWorkspace";
 import WorkspaceLauncher from "./pages/WorkspaceLauncher";
@@ -36,6 +37,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/project/:projectId"
+            element={
+              <ProtectedRoute>
+                <ProjectDetail />
               </ProtectedRoute>
             }
           />

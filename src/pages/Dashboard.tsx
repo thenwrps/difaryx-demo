@@ -2,7 +2,21 @@ import React, { useEffect, useState } from 'react';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
 import { Card } from '../components/ui/Card';
 import { Graph } from '../components/ui/Graph';
-import { AlertTriangle, Plus, Clock, FileText } from 'lucide-react';
+import {
+  AlertTriangle,
+  ArrowRight,
+  BookOpen,
+  Bot,
+  CheckCircle2,
+  Clock,
+  FileText,
+  FlaskConical,
+  Layers,
+  Lightbulb,
+  Plus,
+  Target,
+  Workflow,
+} from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Link, useNavigate } from 'react-router-dom';
 import { ExperimentModal } from '../components/workspace/ExperimentModal';
@@ -14,6 +28,7 @@ import {
   DEFAULT_PROJECT_ID,
   DemoExperiment,
   Technique,
+  DemoProject,
   demoProjects,
   getAgentPath,
   getDefaultTechnique,
@@ -23,24 +38,20 @@ import {
   getProject,
   makeTechniquePattern,
   getLocalProjectNotebooks,
-  saveProjectNotebook,
   getNotebookTypeBadge,
   getNotebookActionLabel,
   isNotebookSetupComplete,
+  deleteProjectNotebook,
   type ProjectNotebook,
 } from '../data/demoProjects';
-import {
-  XRD_DEMO_DATASETS,
-  getXrdProjectCompatibility,
-  isDatasetCompatibleWithProject,
-} from '../data/xrdDemoDatasets';
 import {
   getConditionBoundaryNotes,
   getConditionLockStatusLabel,
 } from '../data/experimentConditionLock';
 import { formatChemicalFormula } from '../utils';
 
-const PRODUCT_WORKFLOW_STEPS = [
+/* ─── workflow chain (top of dashboard) ─── */
+const WORKFLOW_STEPS = [
   'Objective',
   'Context',
   'Evidence',
@@ -50,42 +61,230 @@ const PRODUCT_WORKFLOW_STEPS = [
   'Memory',
 ];
 
-function formatDashboardClaimStatus(status: string): string {
-  if (status === 'strongly_supported') return 'Supported assignment';
-  if (status === 'supported') return 'Requires validation';
-  if (status === 'partial') return 'Validation-limited';
-  if (status === 'inconclusive') return 'Publication-limited';
-  return 'Claim boundary';
+/* ─── severity / urgency helpers ─── */
+function gapSeverityColor(severity: string) {
+  if (severity === 'critical') return 'text-red-600 bg-red-50 border-red-200';
+  if (severity === 'moderate') return 'text-amber-600 bg-amber-50 border-amber-200';
+  return 'text-text-muted bg-surface border-border';
 }
 
-function hasMatchedXrdDemoData(projectId: string): boolean {
-  const compatibility = getXrdProjectCompatibility(projectId);
-  if (!compatibility) return false;
-
-  return compatibility.datasetIds.some((datasetId) => (
-    isDatasetCompatibleWithProject(datasetId, projectId) &&
-    XRD_DEMO_DATASETS.some((dataset) => dataset.id === datasetId)
-  ));
+function urgencyColor(urgency: string) {
+  if (urgency === 'high') return 'text-red-600';
+  if (urgency === 'medium') return 'text-amber-600';
+  return 'text-text-muted';
 }
 
-const DASHBOARD_SPECTRA_PREVIEWS: Partial<Record<string, Technique[]>> = {
-  nife2o4: ['XRD'],
-  cofe2o4: ['XRD', 'XPS'],
-  'fe3o4-nanoparticles': ['FTIR', 'Raman'],
-};
+function claimStatusColor(status: string) {
+  if (status === 'strongly_supported') return 'text-emerald-600';
+  if (status === 'supported') return 'text-cyan';
+  if (status === 'partial') return 'text-amber-500';
+  return 'text-text-muted';
+}
 
-function getDashboardSpectraPreviews(projectId: string): Technique[] {
-  return DASHBOARD_SPECTRA_PREVIEWS[projectId] ?? [];
+function readinessBarColor(percent: number) {
+  if (percent >= 80) return 'bg-emerald-500';
+  if (percent >= 50) return 'bg-amber-500';
+  return 'bg-red-400';
+}
+
+function readinessLabelColor(percent: number) {
+  if (percent >= 80) return 'text-emerald-600';
+  if (percent >= 50) return 'text-amber-600';
+  return 'text-red-500';
 }
 
 function getProjectTypeBadge(projectId: string): string {
-  if (projectId === 'cu-fe2o4-spinel') return 'PROJECT · RESEARCH';
-  if (projectId === 'cufe2o4-sba15') return 'PROJECT · R&D';
+  if (projectId === 'cu-fe2o4-spinel') return 'RESEARCH PROJECT';
+  if (projectId === 'cufe2o4-sba15') return 'R&D PROJECT';
   if (projectId === 'nife2o4') return 'ANALYTICAL JOB';
-  if (projectId === 'cofe2o4') return 'PROJECT · RESEARCH';
-  if (projectId === 'fe3o4-nanoparticles') return 'PROJECT · R&D';
-  return 'PROJECT · RESEARCH';
+  if (projectId === 'cofe2o4') return 'RESEARCH PROJECT';
+  if (projectId === 'fe3o4-nanoparticles') return 'R&D PROJECT';
+  return 'RESEARCH PROJECT';
 }
+
+function getProjectTypeBadgeColor(projectId: string) {
+  if (projectId === 'cufe2o4-sba15' || projectId === 'fe3o4-nanoparticles') return 'border-cyan/40 bg-cyan/10 text-cyan';
+  return 'border-primary/40 bg-primary/10 text-primary';
+}
+
+/* ─── evidence coverage bar ─── */
+function EvidenceCoverageBar({ project }: { project: DemoProject }) {
+  const total = project.techniqueMetadata.length;
+  const ready = project.techniqueMetadata.filter((t) => t.dataAvailable).length;
+  const percent = total > 0 ? Math.round((ready / total) * 100) : 0;
+
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between text-[10px]">
+        <span className="text-text-muted font-medium">Evidence Coverage</span>
+        <span className="text-text-main font-semibold">{ready}/{total} sources</span>
+      </div>
+      <div className="h-1.5 rounded-full bg-surface overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all ${percent >= 80 ? 'bg-emerald-500' : percent >= 50 ? 'bg-amber-500' : 'bg-red-400'}`}
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+/* ─── project card — graph-first layout ─── */
+function ProjectCard({ project }: { project: DemoProject }) {
+  const navigate = useNavigate();
+  const graphData = makeTechniquePattern(project, getDefaultTechnique(project));
+  const graphLabels = getTechniqueLabels(getDefaultTechnique(project));
+
+  const hasXrdDemoData = project.techniques.includes('XRD');
+  const statusLabel = project.claimStatus === 'strongly_supported'
+    ? 'Supported assignment'
+    : project.claimStatus === 'supported'
+    ? 'Requires validation'
+    : project.claimStatus === 'partial'
+    ? 'Validation-limited'
+    : 'In progress';
+  const statusColor = project.claimStatus === 'strongly_supported'
+    ? 'text-emerald-600'
+    : project.claimStatus === 'supported'
+    ? 'text-cyan'
+    : 'text-amber-500';
+
+  const readinessLabel = project.reportReadiness.readinessPercent >= 80
+    ? 'Report-ready'
+    : project.reportReadiness.readinessPercent >= 50
+    ? 'Discussion-ready'
+    : 'Requires processing';
+  const readinessColor = project.reportReadiness.readinessPercent >= 80
+    ? 'text-primary'
+    : project.reportReadiness.readinessPercent >= 50
+    ? 'text-cyan'
+    : 'text-amber-600';
+
+  return (
+    <Card
+      className="cursor-pointer hover:border-primary/50 transition-colors group flex flex-col h-full"
+      onClick={() => navigate(`/project/${project.id}`)}
+    >
+      {/* header */}
+      <div className="p-4 border-b border-border bg-surface-hover/30 flex justify-between items-start">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${getProjectTypeBadgeColor(project.id)}`}>
+              {getProjectTypeBadge(project.id)}
+            </span>
+          </div>
+          <h3 className="font-bold text-sm text-text-main group-hover:text-primary transition-colors">
+            {formatChemicalFormula(project.name)}
+          </h3>
+          <div className="flex items-center gap-1.5 text-[11px] text-text-muted mt-1">
+            <Clock size={11} /> {project.lastUpdated}
+          </div>
+        </div>
+        <div className="text-right">
+          <div className={`text-xs font-bold ${statusColor}`}>{statusLabel}</div>
+          <div className="text-[9px] text-text-muted uppercase tracking-wider">Status</div>
+        </div>
+      </div>
+
+      {/* graph */}
+      <div className="h-[180px] px-2 py-2 border-b border-border/50">
+        {graphData ? (
+          <Graph
+            type={getDefaultTechnique(project).toLowerCase() as any}
+            height="100%"
+            showBackground={false}
+            showCalculated={false}
+            showResidual={false}
+            showLegend={false}
+            externalData={graphData}
+            xAxisLabel={graphLabels.xLabel}
+            yAxisLabel={graphLabels.yLabel}
+          />
+        ) : (
+          <div className="flex h-full items-center justify-center rounded border border-dashed border-amber-500/30 bg-amber-500/5">
+            <p className="text-xs text-text-muted">No dataset</p>
+          </div>
+        )}
+      </div>
+
+      {/* body */}
+      <div className="flex-1 p-4 flex flex-col gap-2">
+        <p className="text-[11px] text-text-muted leading-relaxed line-clamp-2">{project.summary}</p>
+
+        {/* technique pills + readiness */}
+        <div className="flex items-center justify-between">
+          <div className="flex flex-wrap gap-1">
+            {project.techniques.map((tech) => (
+              <span key={tech} className="rounded-full border border-primary/30 bg-primary/5 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary">
+                {tech}
+              </span>
+            ))}
+          </div>
+          <div className="flex items-center gap-1">
+            <FileText size={11} className={readinessColor} />
+            <span className={`text-[10px] font-semibold ${readinessColor}`}>{readinessLabel}</span>
+          </div>
+        </div>
+
+        {/* mode / status / validation chips */}
+        <div className="flex flex-wrap gap-1">
+          <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[9px] font-medium text-text-muted">
+            {getProjectTypeBadge(project.id).split(' · ')[1] ?? 'Research'} Mode
+          </span>
+          <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[9px] font-medium text-text-muted">
+            {statusLabel}
+          </span>
+          <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[9px] font-medium text-text-muted">
+            Validation required
+          </span>
+        </div>
+
+        {/* pipeline */}
+        <div className="text-[10px] font-medium text-text-dim tracking-wide">
+          Processing <span className="text-primary/60">→</span> Refinement <span className="text-primary/60">→</span> Notebook
+        </div>
+      </div>
+
+      {/* footer actions */}
+      <div className="mt-auto p-3 pt-0 border-t border-border">
+        <div className="grid grid-cols-4 gap-1.5 pt-3">
+          <Link
+            to={`/workspace/${getDefaultTechnique(project).toLowerCase()}?project=${project.id}`}
+            onClick={(e) => e.stopPropagation()}
+            className="inline-flex h-8 items-center justify-center rounded-md border border-primary bg-primary/10 px-2 text-[10px] font-semibold text-primary hover:bg-primary/20 transition-colors whitespace-nowrap"
+          >
+            Analyze
+          </Link>
+          <Link
+            to={getAgentPath(project)}
+            onClick={(e) => e.stopPropagation()}
+            className="inline-flex h-8 items-center justify-center rounded-md border border-border px-2 text-[10px] font-medium text-text-muted hover:bg-surface-hover hover:text-text-main transition-colors whitespace-nowrap"
+          >
+            Review
+          </Link>
+          <Link
+            to={getNotebookPath(project)}
+            onClick={(e) => e.stopPropagation()}
+            className="inline-flex h-8 items-center justify-center rounded-md border border-border px-2 text-[10px] font-medium text-text-muted hover:bg-surface-hover hover:text-text-main transition-colors whitespace-nowrap"
+          >
+            Notebook
+          </Link>
+          <button
+            type="button"
+            disabled
+            onClick={(e) => e.stopPropagation()}
+            title="Report route is not enabled in this demo."
+            className="inline-flex h-8 items-center justify-center rounded-md border border-border px-2 text-[10px] font-medium text-text-muted opacity-50 whitespace-nowrap"
+          >
+            Export
+          </button>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+/* ─── main dashboard ─── */
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -94,7 +293,6 @@ export default function Dashboard() {
   const [localNotebooks, setLocalNotebooks] = useState<ProjectNotebook[]>([]);
   const [experimentModalOpen, setExperimentModalOpen] = useState(false);
   const [experimentProjectId, setExperimentProjectId] = useState(DEFAULT_PROJECT_ID);
-  const [selectedTechniques, setSelectedTechniques] = useState<Record<string, Technique>>({});
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [projectNotebookWizardOpen, setProjectNotebookWizardOpen] = useState(false);
   const [quickExperimentSetupOpen, setQuickExperimentSetupOpen] = useState(false);
@@ -109,14 +307,22 @@ export default function Dashboard() {
     setLocalNotebooks(getLocalProjectNotebooks());
   }, []);
 
+  /* aggregate stats */
+  const totalGaps = demoProjects.reduce((sum, p) => sum + p.validationGaps.length, 0);
+  const criticalGaps = demoProjects.reduce((sum, p) => sum + p.validationGaps.filter((g) => g.severity === 'critical').length, 0);
+  const avgReadiness = Math.round(demoProjects.reduce((sum, p) => sum + p.reportReadiness.readinessPercent, 0) / demoProjects.length);
+
   return (
     <>
     <DashboardLayout>
       <div className="p-4 h-full overflow-y-auto">
+        {/* header */}
         <div className="flex justify-between items-center mb-4">
           <div>
             <h1 className="text-xl font-bold tracking-tight">Workflow Intelligence Dashboard</h1>
-            <p className="text-text-muted mt-0.5 text-xs">Manage research objectives, experimental context, evidence reasoning, validation gaps, and notebook memory.</p>
+            <p className="text-text-muted mt-0.5 text-xs">
+              Research projects, evidence coverage, validation gaps, and scientific decisions.
+            </p>
           </div>
           <div className="flex gap-3">
             {feedback && (
@@ -124,527 +330,213 @@ export default function Dashboard() {
                 {feedback}
               </span>
             )}
-            <Button
-              variant="primary"
-              className="gap-2"
-              onClick={() => setCreateMenuOpen(true)}
-            >
+            <Button variant="primary" className="gap-2" onClick={() => setCreateMenuOpen(true)}>
               <Plus size={16} /> New
             </Button>
           </div>
         </div>
 
+        {/* workflow chain */}
         <div className="mb-4 rounded-md border border-border bg-surface px-3 py-2">
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="mr-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">
-              Demo flow
+              Workflow
             </span>
-            {PRODUCT_WORKFLOW_STEPS.map((step, index) => (
+            {WORKFLOW_STEPS.map((step, index) => (
               <React.Fragment key={step}>
                 <span className="rounded-md border border-border bg-background px-2 py-0.5 text-[10px] font-semibold text-text-main">
                   {step}
                 </span>
-                {index < PRODUCT_WORKFLOW_STEPS.length - 1 && (
-                  <span className="text-[10px] font-semibold text-primary/70">-&gt;</span>
+                {index < WORKFLOW_STEPS.length - 1 && (
+                  <ArrowRight size={10} className="text-primary/50" />
                 )}
               </React.Fragment>
             ))}
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {demoProjects.map((project) => {
-            const currentTechnique = selectedTechniques[project.id] || project.techniques[0];
-            const hasXrdDemoData = hasMatchedXrdDemoData(project.id);
-            const spectraPreviews = getDashboardSpectraPreviews(project.id);
-            const hasSpectraPreview = !hasXrdDemoData && spectraPreviews.length > 0;
-            const hasDashboardEvidence = hasXrdDemoData || hasSpectraPreview;
-            const bundledDatasetSummary = project.id === 'fe3o4-nanoparticles'
-              ? 'FTIR/Raman demo signals are available for bonding-context and vibrational-evidence review.'
-              : `${spectraPreviews.join('/')} demo signals are available. Processing evidence is still required before review or export.`;
-            const cardRoute = hasXrdDemoData
-              ? `/workspace?project=${project.id}`
-              : hasSpectraPreview
-                ? `/workspace/${currentTechnique.toLowerCase()}?project=${project.id}`
-                : `/workspace/xrd?project=${project.id}`;
-            const graphData = hasSpectraPreview
-              ? makeTechniquePattern(project, currentTechnique)
-              : undefined;
-            const graphLabels = getTechniqueLabels(currentTechnique);
-            const dashboardStatus = hasXrdDemoData
-              ? formatDashboardClaimStatus(project.claimStatus)
-              : hasSpectraPreview
-                ? 'Demo dataset ready'
-                : 'Dataset required';
-            const dashboardSummary = hasXrdDemoData
-              ? project.summary
-              : hasSpectraPreview
-                ? bundledDatasetSummary
-                : 'Processing evidence is not linked to this project yet.';
-            const dashboardBadges = hasXrdDemoData
-              ? ['Research Mode', 'Publication-limited', 'Validation required']
-              : hasSpectraPreview
-                ? ['Research Mode', 'Ready for processing', 'Validation pending']
-                : ['Research Mode', 'Requires dataset', 'Validation pending'];
-            
-            return (
-            <Card 
-              key={project.id} 
-              className="cursor-pointer hover:border-primary/50 transition-colors group flex flex-col h-full"
-              onClick={() => navigate(cardRoute)}
-            >
-              <div className="p-4 border-b border-border bg-surface-hover/30 flex justify-between items-start">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-[9px] font-bold uppercase tracking-wider text-text-dim px-1.5 py-0.5 rounded border border-border bg-background">
-                      {getProjectTypeBadge(project.id)}
-                    </span>
-                  </div>
-                  <h3 className="font-semibold text-text-main group-hover:text-primary transition-colors">{formatChemicalFormula(project.name)}</h3>
-                  <div className="flex items-center gap-1.5 text-xs text-text-muted mt-1.5">
-                    <Clock size={12} /> {project.lastUpdated}
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className={`text-sm font-bold ${
-                    hasSpectraPreview || !hasDashboardEvidence ? 'text-amber-600' :
-                    project.claimStatus === 'strongly_supported' ? 'text-emerald-600' :
-                    project.claimStatus === 'supported' ? 'text-cyan' :
-                    project.claimStatus === 'partial' ? 'text-amber-500' :
-                    'text-text-muted'
-                  }`}>
-                    {dashboardStatus}
-                  </div>
-                  <div className="text-[10px] text-text-muted uppercase tracking-wider">Status</div>
-                </div>
-              </div>
-              <div className="flex-1 p-4 flex flex-col">
-                <div className="h-[180px] mb-3">
-                  {hasXrdDemoData ? (
-                    <Graph type={currentTechnique.toLowerCase() as any} height="100%" showBackground={false} showCalculated={false} showResidual={false} showLegend={false} />
-                  ) : hasSpectraPreview ? (
-                    <Graph
-                      type={currentTechnique.toLowerCase() as any}
-                      height="100%"
-                      showBackground={false}
-                      showCalculated={false}
-                      showResidual={false}
-                      showLegend={false}
-                      externalData={graphData}
-                      xAxisLabel={graphLabels.xLabel}
-                      yAxisLabel={graphLabels.yLabel}
-                    />
-                  ) : (
-                    <div className="flex h-full flex-col items-center justify-center rounded-md border border-dashed border-amber-500/30 bg-amber-500/5 px-4 text-center">
-                      <AlertTriangle size={18} className="mb-2 text-amber-600" />
-                      <p className="text-xs font-semibold text-text-main">Dataset required</p>
-                      <p className="mt-1 max-w-[180px] text-[11px] leading-relaxed text-text-muted">
-                        Load compatible data to generate evidence.
-                      </p>
+        {/* aggregate stats bar */}
+        <div className="mb-4 grid grid-cols-4 gap-3">
+          <div className="rounded-md border border-border bg-surface px-3 py-2">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-text-muted">Projects</div>
+            <div className="text-lg font-bold text-text-main">{demoProjects.length}</div>
+            <div className="text-[10px] text-text-dim">Active research</div>
+          </div>
+          <div className="rounded-md border border-border bg-surface px-3 py-2">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-text-muted">Validation Gaps</div>
+            <div className={`text-lg font-bold ${criticalGaps > 0 ? 'text-red-600' : 'text-amber-600'}`}>{totalGaps}</div>
+            <div className="text-[10px] text-text-dim">{criticalGaps} critical</div>
+          </div>
+          <div className="rounded-md border border-border bg-surface px-3 py-2">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-text-muted">Decisions Pending</div>
+            <div className="text-lg font-bold text-cyan">
+              {demoProjects.reduce((sum, p) => sum + p.nextDecisions.length, 0)}
+            </div>
+            <div className="text-[10px] text-text-dim">Next experiments</div>
+          </div>
+          <div className="rounded-md border border-border bg-surface px-3 py-2">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-text-muted">Report Readiness</div>
+            <div className={`text-lg font-bold ${readinessLabelColor(avgReadiness)}`}>{avgReadiness}%</div>
+            <div className="text-[10px] text-text-dim">Average across projects</div>
+          </div>
+        </div>
+
+        {/* section: Active Research Projects */}
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-3">
+            <FlaskConical size={14} className="text-primary" />
+            <h2 className="text-xs font-bold uppercase tracking-wider text-text-muted">Active Research Projects</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {demoProjects.map((project) => (
+              <ProjectCard key={project.id} project={project} />
+            ))}
+            {/* local experiments */}
+            {localExperiments.map((experiment) => {
+              const project = getProject(experiment.projectId);
+              const workspaceTechnique = project.techniques.includes(experiment.technique)
+                ? experiment.technique
+                : getDefaultTechnique(project);
+              const conditionStatus = getConditionLockStatusLabel(experiment.conditionLock);
+
+              return (
+                <Card
+                  key={experiment.id}
+                  className="cursor-pointer hover:border-primary/50 transition-colors group flex flex-col h-full"
+                  onClick={() => navigate(`/workspace/${workspaceTechnique.toLowerCase()}?project=${project.id}`)}
+                >
+                  <div className="p-4 border-b border-border bg-primary/5 flex justify-between items-start">
+                    <div>
+                      <span className="text-[9px] font-bold uppercase tracking-wider text-text-dim px-1.5 py-0.5 rounded border border-border bg-background">
+                        QUICK EXPERIMENT
+                      </span>
+                      <h3 className="font-semibold text-sm text-text-main group-hover:text-primary transition-colors mt-1">
+                        {experiment.title}
+                      </h3>
+                      <div className="flex items-center gap-1.5 text-[11px] text-text-muted mt-1">
+                        <Clock size={11} /> {experiment.date}
+                      </div>
                     </div>
-                  )}
-                </div>
-                <div className="flex-1 flex flex-col">
-                  <p className="mt-3 line-clamp-2 text-xs text-text-muted leading-relaxed">{dashboardSummary}</p>
-                  <div className="mt-4 flex items-center justify-between">
-                    <div className="flex gap-1.5">
-                      {project.techniques.map(tag => (
-                        <button
-                          key={tag}
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setSelectedTechniques(prev => ({ ...prev, [project.id]: tag }));
-                          }}
-                          className={`px-2 py-0.5 border rounded text-[10px] font-medium uppercase tracking-wider transition-colors ${
-                            currentTechnique === tag
-                              ? 'bg-primary/10 border-primary/40 text-primary'
-                              : 'bg-surface border-border text-text-dim hover:border-primary/40 hover:text-primary'
-                          }`}
-                          title={`Preview ${tag}`}
-                        >
-                          {tag}
-                        </button>
-                      ))}
+                    <div className="text-right">
+                      <div className="text-sm font-bold text-cyan">Demo</div>
+                      <div className="text-[9px] text-text-muted uppercase tracking-wider">local</div>
                     </div>
-                    {hasSpectraPreview ? (
-                      <span className="text-xs text-amber-600 flex items-center gap-1">
-                        <AlertTriangle size={12} /> Requires processing
-                      </span>
-                    ) : !hasDashboardEvidence ? (
-                      <span className="text-xs text-amber-600 flex items-center gap-1">
-                        <AlertTriangle size={12} /> Requires dataset
-                      </span>
-                    ) : project.status === 'In Progress' ? (
-                      <span className="text-xs text-cyan flex items-center gap-1">
-                        <div className="w-1.5 h-1.5 rounded-full bg-cyan animate-pulse" />
-                        In Progress
-                      </span>
-                    ) : (
-                      <span className="text-xs text-primary flex items-center gap-1">
-                        <FileText size={12} /> {project.id === 'nife2o4' ? 'Discussion-ready' : 'Report-ready'}
-                      </span>
-                    )}
                   </div>
-                  <div className="mt-3 space-y-1.5">
-                    <div className="flex flex-wrap gap-1.5 text-[10px]">
-                      {dashboardBadges.map((badge) => (
+                  <div className="flex-1 p-4 flex flex-col gap-2">
+                    <p className="text-[11px] text-text-main leading-relaxed line-clamp-2">{experiment.notes}</p>
+                    <div className="flex items-center gap-1">
+                      <span className="px-2 py-0.5 bg-surface border border-border rounded text-[10px] font-medium text-text-dim uppercase tracking-wider">
+                        {experiment.technique}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1 text-[9px]">
+                      {['Research Mode', conditionStatus, 'Validation required'].map((badge) => (
                         <span key={badge} className="rounded-full border border-border bg-background px-2 py-0.5 font-medium text-text-muted">{badge}</span>
                       ))}
                     </div>
-                    <div className="text-[10px] font-medium text-text-dim tracking-wide">
-                      {hasXrdDemoData ? (
-                        <>
-                          Processing <span className="text-primary/60">-&gt;</span> Refinement <span className="text-primary/60">-&gt;</span> Notebook
-                        </>
-                      ) : hasSpectraPreview ? (
-                        <>
-                          Demo dataset ready <span className="text-primary/60">/</span> Processing evidence required
-                        </>
-                      ) : (
-                        <>
-                          Evidence not generated <span className="text-primary/60">/</span> Load compatible dataset
-                        </>
-                      )}
-                    </div>
                   </div>
-                </div>
-                <div className="mt-auto pt-4 grid grid-cols-4 gap-1.5 border-t border-border min-h-[52px]">
-                  {hasXrdDemoData ? (
-                    <>
+                  <div className="mt-auto p-4 pt-3 border-t border-border">
+                    <div className="grid grid-cols-3 gap-1.5">
                       <Link
-                        to={`/workspace/${currentTechnique.toLowerCase()}?project=${project.id}`}
-                        onClick={(event) => event.stopPropagation()}
-                        className="inline-flex h-8 items-center justify-center rounded-md border border-primary bg-primary/10 px-2 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors whitespace-nowrap"
+                        to={`/workspace/${workspaceTechnique.toLowerCase()}?project=${project.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex h-8 items-center justify-center rounded-md border border-primary bg-primary/10 px-2 text-[10px] font-semibold text-primary hover:bg-primary/20 transition-colors whitespace-nowrap"
                       >
                         Analyze
-                      </Link>
-                      <Link
-                        to={getAgentPath(project)}
-                        onClick={(event) => event.stopPropagation()}
-                        className="inline-flex h-8 items-center justify-center rounded-md border border-border px-2 text-xs font-medium text-text-muted hover:bg-surface-hover hover:text-text-main transition-colors whitespace-nowrap"
-                      >
-                        Review
                       </Link>
                       <Link
                         to={getNotebookPath(project)}
-                        onClick={(event) => event.stopPropagation()}
-                        className="inline-flex h-8 items-center justify-center rounded-md border border-border px-2 text-xs font-medium text-text-muted hover:bg-surface-hover hover:text-text-main transition-colors whitespace-nowrap"
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex h-8 items-center justify-center rounded-md border border-border px-2 text-[10px] font-medium text-text-muted hover:bg-surface-hover hover:text-text-main transition-colors whitespace-nowrap"
                       >
                         Notebook
                       </Link>
-                      <button
-                        type="button"
-                        disabled
-                        onClick={(event) => event.stopPropagation()}
-                        title="Report route is not enabled in this demo. Export-ready sections are generated from notebook entries."
-                        className="inline-flex h-8 items-center justify-center rounded-md border border-border px-2 text-xs font-medium text-text-muted opacity-50 whitespace-nowrap"
-                      >
-                        Export
-                      </button>
-                    </>
-                  ) : hasSpectraPreview ? (
-                    <>
                       <Link
-                        to={`/workspace/${currentTechnique.toLowerCase()}?project=${project.id}`}
-                        onClick={(event) => event.stopPropagation()}
-                        className="inline-flex h-8 items-center justify-center rounded-md border border-primary bg-primary/10 px-2 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors whitespace-nowrap"
+                        to={`/project/${project.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex h-8 items-center justify-center rounded-md border border-border px-2 text-[10px] font-medium text-text-muted hover:bg-surface-hover hover:text-text-main transition-colors whitespace-nowrap"
                       >
-                        Analyze
+                        Details
                       </Link>
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setExperimentProjectId(project.id);
-                          setExperimentModalOpen(true);
-                        }}
-                        className="inline-flex h-8 items-center justify-center rounded-md border border-border px-2 text-xs font-medium text-text-muted hover:bg-surface-hover hover:text-text-main transition-colors whitespace-nowrap"
-                      >
-                        Add Data
-                      </button>
-                      <button
-                        type="button"
-                        disabled
-                        onClick={(event) => event.stopPropagation()}
-                        title="Requires processed evidence before review."
-                        className="inline-flex h-8 items-center justify-center rounded-md border border-border px-2 text-xs font-medium text-text-muted opacity-50 whitespace-nowrap"
-                      >
-                        Review
-                      </button>
-                      <button
-                        type="button"
-                        disabled
-                        onClick={(event) => event.stopPropagation()}
-                        title="Requires processed evidence before export."
-                        className="inline-flex h-8 items-center justify-center rounded-md border border-border px-2 text-xs font-medium text-text-muted opacity-50 whitespace-nowrap"
-                      >
-                        Export
-                      </button>
-                    </>
-                  ) : (
-                    <>
+                    </div>
+                  </div>
+                </Card>
+              );
+            })}
+            {/* local notebooks */}
+            {localNotebooks.map((notebook) => {
+              const typeBadge = getNotebookTypeBadge(notebook.mode);
+              const modeLabel = notebook.mode === 'research' ? 'Research' : notebook.mode === 'rd' ? 'R&D' : 'Analytical';
+              const setupComplete = isNotebookSetupComplete(notebook);
+              const statusLabel = notebook.workflowStatus === 'evidence_ready' ? 'Evidence ready' : notebook.workflowStatus === 'setup_ready' ? 'Setup ready' : (setupComplete ? 'Ready' : 'Setup required');
+              const statusColor = notebook.workflowStatus === 'evidence_ready' ? 'text-primary' : notebook.workflowStatus === 'setup_ready' ? 'text-amber-600' : (setupComplete ? 'text-primary' : 'text-amber-600');
+
+              return (
+                <Card
+                  key={notebook.id}
+                  className="cursor-pointer hover:border-primary/50 transition-colors group flex flex-col h-full"
+                  onClick={() => navigate(`/notebook?project=${notebook.id}`)}
+                >
+                  <div className="p-4 border-b border-border bg-surface-hover/30">
+                    <div className="flex items-start justify-between">
+                      <span className="text-[9px] font-bold uppercase tracking-wider text-text-dim px-2 py-0.5 rounded border border-border bg-background">
+                        {typeBadge}
+                      </span>
+                      <span className={`text-xs font-bold ${statusColor}`}>{statusLabel}</span>
+                    </div>
+                    <h3 className="font-semibold text-sm text-text-main group-hover:text-primary transition-colors mt-1">
+                      {notebook.title}
+                    </h3>
+                    <div className="flex items-center gap-1.5 text-[11px] text-text-muted mt-1">
+                      <Clock size={11} /> {new Date(notebook.lastUpdated).toLocaleDateString()}
+                    </div>
+                  </div>
+                  <div className="flex-1 p-4 flex flex-col gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <Target size={11} className="text-primary" />
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">Objective</span>
+                    </div>
+                    <p className="text-[11px] text-text-main leading-relaxed line-clamp-2">{notebook.objective}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="px-2 py-0.5 bg-surface border border-border rounded text-[10px] font-medium text-text-dim uppercase tracking-wider">{modeLabel}</span>
+                      <span className="text-[10px] text-text-dim">{notebook.initialDataImport && !notebook.initialDataImport.skipped && notebook.initialDataImport.files.length > 0 ? 'Data attached' : 'Data pending'}</span>
+                    </div>
+                  </div>
+                  <div className="mt-auto p-4 pt-3 border-t border-border">
+                    <div className="grid grid-cols-3 gap-1.5">
                       <Link
-                        to={`/workspace/xrd?project=${project.id}`}
-                        onClick={(event) => event.stopPropagation()}
-                        className="inline-flex h-8 items-center justify-center rounded-md border border-primary bg-primary/10 px-2 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors whitespace-nowrap"
+                        to={`/notebook?project=${notebook.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex h-8 items-center justify-center rounded-md border border-primary bg-primary/10 px-2 text-[10px] font-semibold text-primary hover:bg-primary/20 transition-colors whitespace-nowrap"
                       >
                         Open
                       </Link>
                       <button
                         type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setExperimentProjectId(project.id);
-                          setExperimentModalOpen(true);
+                        disabled
+                        className="inline-flex h-8 items-center justify-center rounded-md border border-border px-2 text-[10px] font-medium text-text-muted opacity-50 whitespace-nowrap"
+                      >
+                        Analyze
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (window.confirm(`Delete "${notebook.title}"?`)) {
+                            deleteProjectNotebook(notebook.id);
+                            setLocalNotebooks(getLocalProjectNotebooks());
+                          }
                         }}
-                        className="inline-flex h-8 items-center justify-center rounded-md border border-border px-2 text-xs font-medium text-text-muted hover:bg-surface-hover hover:text-text-main transition-colors whitespace-nowrap"
+                        className="inline-flex h-8 items-center justify-center rounded-md border border-red-300 px-2 text-[10px] font-medium text-red-600 hover:bg-red-50 transition-colors whitespace-nowrap"
                       >
-                        Add Data
+                        Delete
                       </button>
-                      <button
-                        type="button"
-                        disabled
-                        onClick={(event) => event.stopPropagation()}
-                        title="Requires processed evidence before review."
-                        className="inline-flex h-8 items-center justify-center rounded-md border border-border px-2 text-xs font-medium text-text-muted opacity-50 whitespace-nowrap"
-                      >
-                        Review
-                      </button>
-                      <button
-                        type="button"
-                        disabled
-                        onClick={(event) => event.stopPropagation()}
-                        title="Requires processed evidence before export."
-                        className="inline-flex h-8 items-center justify-center rounded-md border border-border px-2 text-xs font-medium text-text-muted opacity-50 whitespace-nowrap"
-                      >
-                        Export
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            </Card>
-            );
-          })}
-          {localExperiments.map((experiment) => {
-            const project = getProject(experiment.projectId);
-            const workspaceTechnique = project.techniques.includes(experiment.technique)
-              ? experiment.technique
-              : getDefaultTechnique(project);
-            const conditionStatus = getConditionLockStatusLabel(experiment.conditionLock);
-            const conditionBoundary = getConditionBoundaryNotes(experiment.conditionLock, project.techniques)[0];
-
-            return (
-              <Card
-                key={experiment.id}
-                className="cursor-pointer hover:border-primary/50 transition-colors group flex flex-col h-full"
-                onClick={() => navigate(`/workspace/${workspaceTechnique.toLowerCase()}?project=${project.id}`)}
-              >
-                <div className="p-4 border-b border-border bg-primary/5 flex justify-between items-start">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-[9px] font-bold uppercase tracking-wider text-text-dim px-1.5 py-0.5 rounded border border-border bg-background">
-                        QUICK EXPERIMENT
-                      </span>
-                    </div>
-                    <h3 className="font-semibold text-text-main group-hover:text-primary transition-colors">{experiment.title}</h3>
-                    <div className="flex items-center gap-1.5 text-xs text-text-muted mt-1.5">
-                      <Clock size={12} /> {experiment.date}
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-lg font-bold text-cyan">Demo</div>
-                    <div className="text-[10px] text-text-muted uppercase tracking-wider">local</div>
-                  </div>
-                </div>
-                <div className="flex-1 p-4 flex flex-col">
-                  <div className="h-[180px] mb-3">
-                    <Graph type={workspaceTechnique.toLowerCase() as any} height="100%" showBackground={false} showCalculated={false} showResidual={false} showLegend={false} />
-                  </div>
-                  <div className="flex-1 flex flex-col">
-                    <p className="mt-3 line-clamp-2 text-xs text-text-muted leading-relaxed">{experiment.notes}</p>
-                    <div className="mt-4 flex items-center justify-between">
-                      <span className="px-2 py-0.5 bg-surface border border-border rounded text-[10px] font-medium text-text-dim uppercase tracking-wider">
-                        {experiment.technique}
-                      </span>
-                    <span className="text-xs text-primary flex items-center gap-1">
-                      <FileText size={12} /> Added dataset
-                    </span>
-                  </div>
-                  <div className="mt-3 space-y-1.5">
-                    <div className="flex flex-wrap gap-1.5 text-[10px]">
-                      {['Research Mode', conditionStatus, 'Validation required'].map((badge) => (
-                        <span key={badge} className="rounded-full border border-border bg-background px-2 py-0.5 font-medium text-text-muted">{badge}</span>
-                      ))}
-                    </div>
-                    <div className="line-clamp-2 text-[10px] text-text-dim">
-                      {conditionBoundary}
-                    </div>
-                    <div className="text-[10px] font-medium text-text-dim tracking-wide">
-                      Processing <span className="text-primary/60">-&gt;</span> Refinement <span className="text-primary/60">-&gt;</span> Notebook
-                    </div>
-                  </div>
-                </div>
-                  <div className="mt-auto pt-4 grid grid-cols-4 gap-1.5 border-t border-border min-h-[52px]">
-                    <Link
-                      to={`/workspace/${workspaceTechnique.toLowerCase()}?project=${project.id}`}
-                      onClick={(event) => event.stopPropagation()}
-                      className="inline-flex h-8 items-center justify-center rounded-md border border-primary bg-primary/10 px-2 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors whitespace-nowrap"
-                    >
-                      Analyze
-                    </Link>
-                    <Link
-                      to={getAgentPath(project)}
-                      onClick={(event) => event.stopPropagation()}
-                      className="inline-flex h-8 items-center justify-center rounded-md border border-border px-2 text-xs font-medium text-text-muted hover:bg-surface-hover hover:text-text-main transition-colors whitespace-nowrap"
-                    >
-                      Review
-                    </Link>
-                    <Link
-                      to={`${getNotebookPath(project)}&experiment=${experiment.id}`}
-                      onClick={(event) => event.stopPropagation()}
-                      className="inline-flex h-8 items-center justify-center rounded-md border border-border px-2 text-xs font-medium text-text-muted hover:bg-surface-hover hover:text-text-main transition-colors whitespace-nowrap"
-                    >
-                      Notebook
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setExperimentProjectId(project.id);
-                        setExperimentModalOpen(true);
-                      }}
-                      className="inline-flex h-8 items-center justify-center rounded-md border border-border px-2 text-xs font-medium text-text-muted hover:bg-surface-hover hover:text-text-main transition-colors whitespace-nowrap"
-                    >
-                      Add Dataset
-                    </button>
-                  </div>
-                </div>
-              </Card>
-            );
-          })}
-          {localNotebooks.map((notebook) => {
-            const typeBadge = getNotebookTypeBadge(notebook.mode);
-            const modeLabel = notebook.mode === 'research' ? 'Research' : notebook.mode === 'rd' ? 'R&D' : 'Analytical Job';
-            const modeColor = notebook.mode === 'research' ? 'emerald' : notebook.mode === 'rd' ? 'cyan' : 'amber';
-            const setupComplete = isNotebookSetupComplete(notebook);
-            const statusLabel = notebook.workflowStatus === 'evidence_ready' ? 'Evidence ready' : notebook.workflowStatus === 'setup_ready' ? 'Setup ready' : (setupComplete ? 'Ready for experiments' : 'Setup required');
-            const statusColor = notebook.workflowStatus === 'evidence_ready' ? 'text-primary' : notebook.workflowStatus === 'setup_ready' ? 'text-amber-600' : (setupComplete ? 'text-primary' : 'text-amber-600');
-            const actionLabel = getNotebookActionLabel(notebook.mode);
-            
-            // Data status
-            const hasDataImport = notebook.initialDataImport && !notebook.initialDataImport.skipped && notebook.initialDataImport.files.length > 0;
-            const dataStatusLabel = hasDataImport ? 'Data attached' : 'Data pending';
-            const dataStatusColor = hasDataImport ? 'text-primary' : 'text-text-muted';
-
-            return (
-              <Card
-                key={notebook.id}
-                className="cursor-pointer hover:border-primary/50 transition-colors group flex flex-col h-full"
-                onClick={() => {
-                  navigate(`/notebook?project=${notebook.id}`);
-                }}
-              >
-                <div className="p-4 border-b border-border bg-surface-hover/30 flex justify-between items-start">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-[9px] font-bold uppercase tracking-wider text-text-dim px-1.5 py-0.5 rounded border border-border bg-background">
-                        {typeBadge}
-                      </span>
-                    </div>
-                    <h3 className="font-semibold text-text-main group-hover:text-primary transition-colors">{notebook.title}</h3>
-                    <div className="flex items-center gap-1.5 text-xs text-text-muted mt-1.5">
-                      <Clock size={12} /> {new Date(notebook.lastUpdated).toLocaleDateString()}
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className={`text-sm font-bold text-${modeColor}-600`}>
-                      {modeLabel}
-                    </div>
-                    <div className="text-[10px] text-text-muted uppercase tracking-wider">Mode</div>
-                  </div>
-                </div>
-                <div className="flex-1 p-4 flex flex-col">
-                  <div className="h-[180px] mb-3">
-                    <div className="flex h-full flex-col items-center justify-center rounded-md border border-dashed border-primary/30 bg-primary/5 px-4 text-center">
-                      <FileText size={24} className="mb-2 text-primary" />
-                      <p className="text-xs font-semibold text-text-main">Project Notebook</p>
-                      <p className="mt-1 max-w-[180px] text-[11px] leading-relaxed text-text-muted line-clamp-3">
-                        {notebook.objective}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex-1 flex flex-col">
-                    <p className="mt-3 line-clamp-2 text-xs text-text-muted leading-relaxed">
-                      {notebook.objective}
-                    </p>
-                    <div className="mt-4 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="px-2 py-0.5 bg-surface border border-border rounded text-[10px] font-medium text-text-dim uppercase tracking-wider">
-                          {modeLabel}
-                        </span>
-                        <span className={`text-[10px] ${dataStatusColor} font-medium`}>
-                          {dataStatusLabel}
-                        </span>
-                      </div>
-                      <span className={`text-xs ${statusColor} flex items-center gap-1 font-semibold`}>
-                        {statusLabel}
-                      </span>
-                    </div>
-                    <div className="mt-3 space-y-1.5">
-                      <div className="flex flex-wrap gap-1.5 text-[10px]">
-                        {['Multi-experiment', 'Workflow mode', 'Local draft'].map((badge) => (
-                          <span key={badge} className="rounded-full border border-border bg-background px-2 py-0.5 font-medium text-text-muted">{badge}</span>
-                        ))}
-                      </div>
-                      <div className="text-[10px] font-medium text-text-dim tracking-wide">
-                        Setup <span className="text-primary/60">-&gt;</span> Experiments <span className="text-primary/60">-&gt;</span> Analysis <span className="text-primary/60">-&gt;</span> Report
-                      </div>
-                    </div>
-                  </div>
-                  <div className="mt-auto pt-4 grid grid-cols-4 gap-1.5 border-t border-border min-h-[52px]">
-                    <Link
-                      to={`/notebook?project=${notebook.id}`}
-                      onClick={(event) => event.stopPropagation()}
-                      className="inline-flex h-8 items-center justify-center rounded-md border border-primary bg-primary/10 px-2 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors whitespace-nowrap"
-                    >
-                      Open Notebook
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setFeedback(`${actionLabel} coming soon`);
-                        window.setTimeout(() => setFeedback(''), 2000);
-                      }}
-                      className="inline-flex h-8 items-center justify-center rounded-md border border-border px-2 text-xs font-medium text-text-muted hover:bg-surface-hover hover:text-text-main transition-colors whitespace-nowrap"
-                    >
-                      {actionLabel}
-                    </button>
-                    <button
-                      type="button"
-                      disabled
-                      onClick={(event) => event.stopPropagation()}
-                      title="Requires experiments before analysis."
-                      className="inline-flex h-8 items-center justify-center rounded-md border border-border px-2 text-xs font-medium text-text-muted opacity-50 whitespace-nowrap"
-                    >
-                      Analyze
-                    </button>
-                    <button
-                      type="button"
-                      disabled
-                      onClick={(event) => event.stopPropagation()}
-                      title="Requires analysis before export."
-                      className="inline-flex h-8 items-center justify-center rounded-md border border-border px-2 text-xs font-medium text-text-muted opacity-50 whitespace-nowrap"
-                    >
-                      Export
-                    </button>
-                  </div>
-                </div>
-              </Card>
-            );
-          })}
+                </Card>
+              );
+            })}
+          </div>
         </div>
       </div>
     </DashboardLayout>
@@ -715,7 +607,6 @@ export default function Dashboard() {
       }}
     />
 
-    {/* Experiment Context Banner */}
     {experimentModalOpen && experimentContext && (
       <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[60] max-w-md">
         <div className="rounded-md border border-primary bg-primary/10 px-4 py-2 shadow-lg">

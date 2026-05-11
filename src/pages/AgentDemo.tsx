@@ -553,6 +553,53 @@ function convertDatasetFeaturesToPeakInput(
   }));
 }
 
+const TECHNIQUE_DISPLAY: Record<AgentContext, {
+  featureLabel: string;
+  rangeLabel: string;
+  dominantLabel: string;
+  qualityLabel: string;
+  observedLabel: string;
+  formatRange: (min: number, max: number) => string;
+  formatPosition: (value: number) => string;
+}> = {
+  XRD: {
+    featureLabel: 'Detected peaks',
+    rangeLabel: '2θ range',
+    dominantLabel: 'Dominant reflections',
+    qualityLabel: 'Signal quality',
+    observedLabel: 'Observed peaks (2θ)',
+    formatRange: (min, max) => `${min.toFixed(1)}° – ${max.toFixed(1)}°`,
+    formatPosition: (value) => `${value.toFixed(1)}°`,
+  },
+  Raman: {
+    featureLabel: 'Detected bands',
+    rangeLabel: 'Raman shift range',
+    dominantLabel: 'Dominant bands',
+    qualityLabel: 'Spectral quality',
+    observedLabel: 'Observed bands (cm⁻¹)',
+    formatRange: (min, max) => `${Math.round(min)} – ${Math.round(max)} cm⁻¹`,
+    formatPosition: (value) => `${Math.round(value)} cm⁻¹`,
+  },
+  FTIR: {
+    featureLabel: 'Detected bands',
+    rangeLabel: 'Wavenumber range',
+    dominantLabel: 'Dominant absorption bands',
+    qualityLabel: 'Baseline quality',
+    observedLabel: 'Observed bands (cm⁻¹)',
+    formatRange: (min, max) => `${Math.round(min)} – ${Math.round(max)} cm⁻¹`,
+    formatPosition: (value) => `${Math.round(value)} cm⁻¹`,
+  },
+  XPS: {
+    featureLabel: 'Detected components',
+    rangeLabel: 'Binding energy window',
+    dominantLabel: 'Dominant core levels',
+    qualityLabel: 'Fit quality',
+    observedLabel: 'Observed core levels (eV)',
+    formatRange: (min, max) => `${Math.round(min)} – ${Math.round(max)} eV`,
+    formatPosition: (value) => `${value.toFixed(1)} eV`,
+  },
+};
+
 function getUnitForTechnique(technique: Technique): string {
   switch (technique) {
     case 'XRD': return '2θ';
@@ -804,12 +851,24 @@ function createDecisionResult(
     ? xrdAnalysis.detectedPeaks.length 
     : dataset.detectedFeatures.length;
   
-  // Build metrics from reasoning trace
+  // Build technique-specific metric cards
   const dominantClaim = fusionResult.reasoningTrace.find(t => t.isDominant);
+  const display = TECHNIQUE_DISPLAY[context];
+  const xs = dataset.dataPoints.length > 0
+    ? dataset.dataPoints.map((p) => p.x)
+    : peakInputs.map((p) => p.position);
+  const xMin = xs.length ? Math.min(...xs) : 0;
+  const xMax = xs.length ? Math.max(...xs) : 0;
+  const rangeValue = xs.length ? display.formatRange(xMin, xMax) : 'Not available';
+  const topPeaks = [...peakInputs].sort((a, b) => b.intensity - a.intensity).slice(0, 2);
+  const dominantValue = topPeaks.length > 0
+    ? topPeaks.map((p) => display.formatPosition(p.position)).join(', ')
+    : 'Pending';
   const metrics: Array<{ label: string; value: string; tone?: 'cyan' | 'emerald' | 'violet' | 'amber' }> = [
-    { label: config.featureName, value: String(featureCount), tone: 'cyan' },
-    { label: 'Evidence nodes', value: String(evidenceNodes.length), tone: 'emerald' },
-    { label: 'Evidence Status', value: formatReviewStatus(dominantClaim?.status ?? 'unsupported'), tone: 'violet' },
+    { label: display.featureLabel, value: String(featureCount), tone: 'cyan' },
+    { label: display.rangeLabel, value: rangeValue, tone: 'emerald' },
+    { label: display.dominantLabel, value: dominantValue, tone: 'violet' },
+    { label: display.qualityLabel, value: formatReviewStatus(dominantClaim?.status ?? 'unsupported'), tone: 'amber' },
   ];
   
   // Build detail rows from reasoning trace
