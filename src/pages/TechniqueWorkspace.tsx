@@ -362,7 +362,7 @@ export default function TechniqueWorkspace() {
   const evidenceOutputRows = activeTechnique === 'XRD'
     ? [
         ['Detected peaks', '9 diffraction peaks'],
-        ['Candidate phase', 'CuFe2O4 spinel'],
+        ['Candidate phase', project.phase],
         ['Evidence role', 'Primary'],
         ['Caveat', 'Requires surface validation (XPS)'],
       ]
@@ -989,7 +989,7 @@ export default function TechniqueWorkspace() {
                 </Button>
                 <button
                   type="button"
-                  onClick={() => navigate('/demo/agent?project=cu-fe2o4-spinel')}
+                  onClick={() => navigate(`/demo/agent?project=${project.id}`)}
                   className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md bg-gradient-to-r from-blue-600 to-indigo-600 px-3 text-xs font-semibold text-white shadow-md shadow-blue-600/10 transition-all hover:-translate-y-0.5 hover:shadow-indigo-600/20"
                 >
                   <Sparkles size={14} /> Run in Agent Mode

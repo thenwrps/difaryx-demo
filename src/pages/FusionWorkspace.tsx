@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle,
   ArrowRight,
@@ -18,13 +18,27 @@ import { xpsDemoData } from '../data/xpsDemoData';
 import { ftirDemoData } from '../data/ftirDemoData';
 import { ramanDemoData } from '../data/ramanDemoData';
 import type { FusionResult } from '../agents/fusionAgent/types';
+import { getRegistryProject, normalizeRegistryProjectId } from '../data/demoProjectRegistry';
+import { DEFAULT_PROJECT_ID } from '../data/demoProjects';
 
 export default function FusionWorkspace() {
+  const [searchParams] = useSearchParams();
+  const registryProject = getRegistryProject(normalizeRegistryProjectId(searchParams.get('project')) || DEFAULT_PROJECT_ID);
   const [activeTab, setActiveTab] = useState<'decision' | 'matrix' | 'claims' | 'contradictions' | 'report'>('decision');
   const [fusionResult, setFusionResult] = useState<FusionResult | null>(null);
+  const requiredFusionTechniques = ['xps', 'ftir', 'raman'] as const;
+  const missingFusionTechniques = requiredFusionTechniques.filter(
+    (technique) => !registryProject.selectedTechniques.includes(technique),
+  );
+  const hasFusionBundle = missingFusionTechniques.length === 0;
   
   // Run fusion analysis
   const handleRunFusion = () => {
+    if (!hasFusionBundle) {
+      setFusionResult(null);
+      return;
+    }
+
     // Import processed results from demo data
     const xpsResult = runXpsProcessing(xpsDemoData);
     const ftirResult = runFtirProcessing(ftirDemoData);
@@ -38,7 +52,7 @@ export default function FusionWorkspace() {
   // Auto-run fusion on mount
   React.useEffect(() => {
     handleRunFusion();
-  }, []);
+  }, [registryProject.id, hasFusionBundle]);
   
   // Get conclusion badge color
   const getConclusionBadgeColor = (status: 'strongly-supported' | 'supported' | 'partial') => {
@@ -93,11 +107,11 @@ export default function FusionWorkspace() {
         <div className="space-y-2 text-sm">
           <div>
             <span className="text-gray-500">Project:</span>
-            <span className="ml-2 font-medium">CuFe2O4 SBA-15</span>
+            <span className="ml-2 font-medium">{registryProject.title}</span>
           </div>
           <div>
             <span className="text-gray-500">Sample:</span>
-            <span className="ml-2 font-medium">cu-fe2o4-sba15</span>
+            <span className="ml-2 font-medium">{registryProject.materialSystem}</span>
           </div>
         </div>
       </div>
@@ -106,18 +120,20 @@ export default function FusionWorkspace() {
       <div className="bg-white rounded-lg border border-gray-200 p-4">
         <h3 className="text-sm font-semibold text-gray-700 mb-3">Included Techniques</h3>
         <div className="space-y-2">
-          <div className="flex items-center gap-2 text-sm">
-            <CheckCircle2 className="w-4 h-4 text-green-600" />
-            <span>Raman Spectroscopy</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm">
-            <CheckCircle2 className="w-4 h-4 text-green-600" />
-            <span>FTIR Spectroscopy</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm">
-            <CheckCircle2 className="w-4 h-4 text-green-600" />
-            <span>XPS</span>
-          </div>
+          {registryProject.selectedTechniques
+            .filter((technique) => technique !== 'multi')
+            .map((technique) => (
+              <div key={technique} className="flex items-center gap-2 text-sm">
+                <CheckCircle2 className="w-4 h-4 text-green-600" />
+                <span>{technique.toUpperCase()}</span>
+              </div>
+            ))}
+          {missingFusionTechniques.map((technique) => (
+            <div key={technique} className="flex items-center gap-2 text-sm text-amber-700">
+              <AlertTriangle className="w-4 h-4 text-amber-500" />
+              <span>{technique.toUpperCase()} pending</span>
+            </div>
+          ))}
         </div>
       </div>
       
@@ -140,10 +156,11 @@ export default function FusionWorkspace() {
       {/* Run Fusion Button */}
       <button
         onClick={handleRunFusion}
-        className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors"
+        disabled={!hasFusionBundle}
+        className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 disabled:text-gray-600 text-white font-medium py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors"
       >
         <Zap className="w-5 h-5" />
-        Run Fusion
+        {hasFusionBundle ? 'Run Fusion' : 'Fusion Pending Evidence'}
       </button>
     </div>
   );
@@ -226,7 +243,14 @@ export default function FusionWorkspace() {
   ) : (
     <div className="bg-gray-50 rounded-lg border border-gray-200 p-8 text-center">
       <Sparkles className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-      <p className="text-sm text-gray-600">Run fusion to see results</p>
+      <p className="text-sm font-semibold text-gray-700">
+        {hasFusionBundle ? 'Run fusion to see results' : `${registryProject.title} fusion evidence is pending`}
+      </p>
+      {!hasFusionBundle && (
+        <p className="mt-2 text-xs text-gray-500">
+          Missing {missingFusionTechniques.map((technique) => technique.toUpperCase()).join(', ')} evidence.
+        </p>
+      )}
     </div>
   );
 
@@ -513,10 +537,14 @@ export default function FusionWorkspace() {
   );
   
   return (
-    <DashboardLayout
-      leftPanel={leftPanel}
-      centerPanel={centerPanel}
-      rightPanel={rightPanel}
-    />
+    <DashboardLayout>
+      <div className="flex-1 overflow-y-auto bg-gray-50">
+        <div className="grid min-h-full gap-4 p-4 xl:grid-cols-[280px_minmax(0,1fr)_320px]">
+          <aside className="space-y-4">{leftPanel}</aside>
+          <main className="min-w-0">{centerPanel}</main>
+          <aside className="space-y-4">{rightPanel}</aside>
+        </div>
+      </div>
+    </DashboardLayout>
   );
 }

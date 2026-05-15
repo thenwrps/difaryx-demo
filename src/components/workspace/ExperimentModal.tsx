@@ -23,6 +23,7 @@ import {
   getConditionLockStatusLabel,
   lockExperimentConditions,
 } from '../../data/experimentConditionLock';
+import { getRegistryProject } from '../../data/demoProjectRegistry';
 
 interface ExperimentModalProps {
   open: boolean;
@@ -460,13 +461,14 @@ export function ExperimentModal({ open, defaultProjectId = DEFAULT_PROJECT_ID, o
   };
 
   const useDemoStarter = () => {
-    const starterTechnique = technique || 'FTIR';
+    const starterProject = getRegistryProject('fe3o4-nanoparticles');
+    const starterTechnique = technique || starterProject._raw.techniques[0] || 'FTIR';
     const starterValues = {
-      projectName: 'Fe3O4 Nanoparticles',
-      materialSystem: 'iron oxide nanoparticles',
-      researchDomain: 'materials characterization',
-      projectObjective: `Evaluate ${starterTechnique} demo signals for bonding-context and vibrational-evidence review.`,
-      techniqueScope: [starterTechnique] as Technique[],
+      projectName: starterProject.title,
+      materialSystem: starterProject.materialSystem,
+      researchDomain: starterProject.jobType === 'rd' ? 'R&D characterization' : `${starterProject.jobType} characterization`,
+      projectObjective: starterProject.objective,
+      techniqueScope: starterProject._raw.techniques,
     };
     setNewProject(starterValues);
     setTechnique(starterTechnique);
@@ -768,7 +770,7 @@ export function ExperimentModal({ open, defaultProjectId = DEFAULT_PROJECT_ID, o
           <div className="md:col-span-2 flex items-center justify-between rounded-md border border-primary/20 bg-primary/5 px-3 py-2">
             <p className="text-xs text-text-muted">Start with demo values for quick setup</p>
             <Button type="button" variant="outline" size="sm" onClick={useDemoStarter}>
-              Use Fe3O4 demo starter
+              Use registry demo starter
             </Button>
           </div>
           <TextInput label="Project name" required value={newProject.projectName} onChange={(value) => updateNewProjectField('projectName', value)} placeholder="e.g. Ferrite catalyst screen" />

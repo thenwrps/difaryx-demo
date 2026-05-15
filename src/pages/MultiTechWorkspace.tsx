@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { AlertTriangle, ArrowRight, BookOpen, CheckCircle2, FileText, LockKeyhole, Play, Save, Upload, X } from 'lucide-react';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
@@ -39,6 +39,17 @@ import {
   type Technique as UploadedTechnique,
   type UploadedSignalRun,
 } from '../data/uploadedSignalRuns';
+import {
+  demoProjectRegistry,
+  getRegistryProject,
+  isKnownProjectId,
+  normalizeRegistryProjectId,
+  agreementLabel,
+  agreementBadgeClass,
+  jobTypeLabel,
+  jobTypeBadgeClass,
+  claimStatusLabel,
+} from '../data/demoProjectRegistry';
 import {
   getConditionBoundaryNotes,
   getConditionLockStatusLabel,
@@ -83,139 +94,137 @@ interface GraphHighlight {
   role: 'selected' | 'linked';
 }
 
-// Demo evidence data for cross-tech interaction
+// Local interaction anchors for graph highlighting. Project claims and summaries come from the registry.
 const demoEvidenceItems: CrossTechEvidence[] = [
   {
     id: 'raman-a1g',
     technique: 'Raman',
-    description: 'A₁g mode at ~690 cm⁻¹ characteristic of spinel structure',
+    description: 'A1g mode at ~690 cm-1 characteristic of spinel structure',
     linkedEvidenceIds: ['xrd-spinel', 'ftir-mo-band'],
     claimId: 'spinel-ferrite',
     xValue: 690,
-    xUnit: 'cm⁻¹',
-    highlightLabel: 'A₁g spinel',
+    xUnit: 'cm-1',
+    highlightLabel: 'A1g spinel',
     highlightRole: 'primary',
   },
   {
     id: 'xrd-spinel',
     technique: 'XRD',
-    description: 'Spinel phase reflections at 2θ = 30.1°, 35.5°, 43.2°, 57.1°',
+    description: 'Spinel phase reflections at 2theta = 30.1, 35.5, 43.2, 57.1 deg',
     linkedEvidenceIds: ['raman-a1g'],
     claimId: 'spinel-ferrite',
     xValue: [30.1, 35.5, 43.2, 57.1],
-    xUnit: '2θ',
+    xUnit: '2theta',
     highlightLabel: 'Spinel reflections',
     highlightRole: 'primary',
   },
   {
-    id: 'xps-cu-fe',
+    id: 'xps-surface',
     technique: 'XPS',
-    description: 'Cu 2p₃/₂ at 933.8 eV and Fe 2p₃/₂ at 710.5 eV indicate mixed oxidation states',
+    description: 'Metal 2p and iron 2p regions provide oxidation-state context',
     linkedEvidenceIds: ['ftir-mo-band'],
     claimId: 'oxidation-state',
     xValue: [933.8, 710.5],
     xUnit: 'eV',
-    highlightLabel: 'Cu/Fe peaks',
+    highlightLabel: 'Surface chemistry',
     highlightRole: 'primary',
   },
   {
     id: 'ftir-mo-band',
     technique: 'FTIR',
-    description: 'Metal-oxygen stretching band at 580 cm⁻¹ consistent with ferrite framework',
-    linkedEvidenceIds: ['raman-a1g', 'xps-cu-fe'],
+    description: 'Metal-oxygen stretching band at 580 cm-1 supports ferrite framework context',
+    linkedEvidenceIds: ['raman-a1g', 'xps-surface'],
     claimId: 'metal-oxygen',
     xValue: 580,
-    xUnit: 'cm⁻¹',
+    xUnit: 'cm-1',
     highlightLabel: 'M-O stretch',
     highlightRole: 'primary',
   },
   {
     id: 'ftir-hydroxyl',
     technique: 'FTIR',
-    description: 'Hydroxyl/water bands at 3400 cm⁻¹ indicate surface-adsorbed species',
+    description: 'Hydroxyl/water bands at 3400 cm-1 indicate surface-adsorbed species',
     linkedEvidenceIds: [],
     claimId: 'surface-hydroxyl',
     xValue: 3400,
-    xUnit: 'cm⁻¹',
-    highlightLabel: 'OH/H₂O',
+    xUnit: 'cm-1',
+    highlightLabel: 'OH/H2O',
     highlightRole: 'primary',
   },
   {
     id: 'ftir-carbonate',
     technique: 'FTIR',
-    description: 'Carbonate/carboxylate bands at 1380 cm⁻¹ and 1580 cm⁻¹',
+    description: 'Carbonate/carboxylate bands at 1380 cm-1 and 1580 cm-1',
     linkedEvidenceIds: [],
     claimId: 'carbonate-surface',
     xValue: [1380, 1580],
-    xUnit: 'cm⁻¹',
+    xUnit: 'cm-1',
     highlightLabel: 'Carbonate',
     highlightRole: 'primary',
   },
 ];
-
 const demoClaims: CrossTechClaim[] = [
   {
     id: 'spinel-ferrite',
     title: 'Spinel ferrite assignment',
     description: 'Convergent structural evidence from Raman and XRD',
     linkedEvidenceIds: ['raman-a1g', 'xrd-spinel'],
-    interpretation: 'The Raman A₁g mode at ~690 cm⁻¹ and XRD reflections at characteristic 2θ positions provide complementary evidence for cubic spinel structure. Vibrational spectroscopy probes local symmetry while diffraction confirms long-range order, yielding convergent structural assignment.',
-    evidenceBasis: 'Raman A₁g mode is diagnostic of tetrahedral-site cation vibrations in spinel lattice. XRD reflections match reference patterns for cubic spinel phase (space group Fd-3m). Both techniques independently support the same structural conclusion.',
-    limitations: 'XRD provides bulk-averaged structure; surface reconstruction or amorphous surface layers may not be detected. Raman selection rules may obscure certain vibrational modes depending on laser polarization and crystal orientation.',
-    recommendedValidation: 'High-resolution TEM for direct lattice imaging. Synchrotron XRD for detailed Rietveld refinement. Polarized Raman to confirm symmetry assignment.',
+    interpretation: 'Raman local-symmetry evidence and XRD long-range-order evidence provide complementary support for the selected project assignment.',
+    evidenceBasis: 'Raman and XRD independently support the same structural working interpretation while retaining validation boundaries.',
+    limitations: 'XRD provides bulk-averaged structure; Raman probes local vibrational symmetry. Neither technique alone closes all surface or phase-purity questions.',
+    recommendedValidation: 'High-resolution imaging, refinement, or complementary spectroscopy to close project-specific validation gaps.',
   },
   {
     id: 'oxidation-state',
-    title: 'Cu/Fe oxidation-state consistency',
-    description: 'XPS binding energies support mixed-valence ferrite',
-    linkedEvidenceIds: ['xps-cu-fe'],
-    interpretation: 'XPS Cu 2p₃/₂ and Fe 2p₃/₂ binding energies indicate mixed oxidation states consistent with copper-iron ferrite composition. The presence of satellite features and peak positions support Cu²⁺ and Fe³⁺ as dominant species, though minor contributions from other oxidation states cannot be excluded.',
-    evidenceBasis: 'Cu 2p₃/₂ at 933.8 eV with satellite structure is characteristic of Cu²⁺. Fe 2p₃/₂ at 710.5 eV is consistent with Fe³⁺ in oxide environment. Peak shapes and satellite intensities align with literature values for spinel ferrites.',
-    limitations: 'XPS is surface-sensitive (~5 nm); bulk oxidation states may differ. Peak fitting is model-dependent and alternative oxidation-state distributions may yield similar spectra. Charging effects and adventitious carbon may shift binding energies.',
-    recommendedValidation: 'Depth-profiling XPS or angle-resolved XPS to assess surface vs bulk. Mössbauer spectroscopy for bulk Fe oxidation states. XANES for element-specific oxidation-state determination.',
+    title: 'Surface chemistry consistency',
+    description: 'XPS binding-energy regions provide oxidation-state context',
+    linkedEvidenceIds: ['xps-surface'],
+    interpretation: 'XPS provides surface-sensitive chemistry context for the selected project, with surface-versus-bulk consistency still validation-limited.',
+    evidenceBasis: 'Core-level peak positions and satellite context are treated as surface-sensitive evidence, not a complete bulk oxidation-state proof.',
+    limitations: 'XPS is surface-sensitive and peak fitting is model-dependent. Bulk consistency requires additional validation.',
+    recommendedValidation: 'Depth profiling, angle-resolved XPS, or bulk-sensitive spectroscopy to assess surface versus bulk consistency.',
   },
   {
     id: 'metal-oxygen',
-    title: 'Metal–oxygen bonding',
-    description: 'FTIR metal-oxygen band reinforces ferrite framework',
+    title: 'Metal-oxygen bonding',
+    description: 'FTIR metal-oxygen band reinforces framework context',
     linkedEvidenceIds: ['ftir-mo-band'],
-    interpretation: 'The FTIR metal-oxygen stretching band at 580 cm⁻¹ is consistent with M-O vibrations in spinel ferrite framework. This band position aligns with literature values for tetrahedral and octahedral metal-oxygen coordination in ferrite lattices.',
-    evidenceBasis: 'Metal-oxygen stretching modes in spinel ferrites typically appear in the 400–600 cm⁻¹ region. The observed band at 580 cm⁻¹ falls within this range and is attributed to Fe-O and Cu-O vibrations in the spinel structure.',
-    limitations: 'FTIR provides vibrational information but limited structural detail. Band assignment is empirical and may overlap with other oxide phases. Surface vs bulk contributions cannot be distinguished in transmission mode.',
-    recommendedValidation: 'Raman spectroscopy for complementary vibrational analysis. Neutron diffraction for precise oxygen positions. DFT calculations to assign vibrational modes.',
+    interpretation: 'The FTIR metal-oxygen stretching band provides bonding context for the selected framework.',
+    evidenceBasis: 'Metal-oxygen stretching is treated as supporting vibrational evidence rather than a standalone structural proof.',
+    limitations: 'Band assignment is empirical and may overlap with other oxide phases.',
+    recommendedValidation: 'Complementary vibrational analysis or structural refinement to confirm the assignment.',
   },
   {
     id: 'surface-hydroxyl',
     title: 'Surface hydroxyl/water species',
     description: 'FTIR hydroxyl bands indicate surface hydration',
     linkedEvidenceIds: ['ftir-hydroxyl'],
-    interpretation: 'Broad FTIR bands at 3400 cm⁻¹ indicate surface-adsorbed water and hydroxyl groups. These species are common on oxide surfaces exposed to ambient conditions and may influence surface reactivity and catalytic behavior.',
-    evidenceBasis: 'The 3400 cm⁻¹ band is characteristic of O-H stretching vibrations. Band broadness suggests hydrogen bonding and heterogeneous surface sites. Intensity indicates significant surface coverage under ambient conditions.',
-    limitations: 'FTIR cannot distinguish between physisorbed water and chemisorbed hydroxyl groups. Surface coverage may vary with humidity and sample history. Contribution to bulk properties is likely minimal.',
-    recommendedValidation: 'Temperature-programmed desorption to quantify water/hydroxyl content. In situ FTIR under controlled atmosphere. XPS O 1s to distinguish oxide, hydroxyl, and water oxygen.',
+    interpretation: 'Broad FTIR hydroxyl bands indicate surface hydration context.',
+    evidenceBasis: 'O-H stretching evidence is treated as surface context and requires controlled-condition validation.',
+    limitations: 'FTIR cannot distinguish physisorbed water from chemisorbed hydroxyl groups without additional controls.',
+    recommendedValidation: 'Controlled-atmosphere FTIR, temperature-programmed desorption, or O 1s XPS checks.',
   },
   {
     id: 'carbonate-surface',
     title: 'Carbonate/carboxylate surface contribution',
-    description: 'FTIR carbonate bands suggest surface contamination or CO₂ adsorption',
+    description: 'FTIR carbonate bands suggest surface species or CO2 adsorption',
     linkedEvidenceIds: ['ftir-carbonate'],
-    interpretation: 'FTIR bands at 1380 cm⁻¹ and 1580 cm⁻¹ are assigned to carbonate or carboxylate species on the surface. These may arise from atmospheric CO₂ adsorption or residual organic species from synthesis. Surface carbonates can affect catalytic activity and surface charge.',
-    evidenceBasis: 'Carbonate C-O stretching modes typically appear at 1300–1600 cm⁻¹. The observed bands match literature values for surface-bound carbonate or carboxylate. Absence of corresponding XPS C 1s analysis keeps assignment validation-limited.',
-    limitations: 'FTIR cannot distinguish between carbonate, bicarbonate, and carboxylate without isotopic labeling. Surface vs bulk contribution unclear. May be sample-preparation artifact rather than intrinsic property.',
-    recommendedValidation: 'XPS C 1s and O 1s for chemical-state analysis. Thermal treatment to assess stability. In situ FTIR with CO₂ exposure to confirm adsorption mechanism.',
+    interpretation: 'FTIR carbonate/carboxylate bands indicate possible surface species or preparation residue.',
+    evidenceBasis: 'Carbonate-band context remains validation-limited without a corresponding surface chemistry check.',
+    limitations: 'FTIR cannot distinguish carbonate, bicarbonate, and carboxylate without additional controls.',
+    recommendedValidation: 'XPS C 1s and O 1s, thermal treatment, or in situ FTIR with CO2 exposure.',
   },
   {
     id: 'carbonaceous-residue',
     title: 'Carbonaceous residue/disorder',
     description: 'Potential Raman D/G bands if present',
     linkedEvidenceIds: [],
-    interpretation: 'No clear evidence of carbonaceous residue or disorder in the current Raman spectrum. If D and G bands were observed at ~1350 cm⁻¹ and ~1580 cm⁻¹, they would indicate amorphous carbon or graphitic contamination from synthesis.',
-    evidenceBasis: 'Raman D and G bands are diagnostic of sp² carbon. Their absence suggests minimal carbonaceous contamination. FTIR carbonate bands do not correspond to Raman-active carbon species.',
-    limitations: 'Raman may not detect trace carbon if fluorescence or low cross-section. Carbon content below detection limit cannot be excluded.',
-    recommendedValidation: 'Combustion analysis for total carbon content. TEM for direct imaging of carbon phases. XPS C 1s for surface carbon speciation.',
+    interpretation: 'No clear carbonaceous-residue marker is represented in the current Raman context.',
+    evidenceBasis: 'Raman D/G checks are treated as a supporting contamination screen, not a full carbon quantification method.',
+    limitations: 'Raman may not detect trace carbon if fluorescence or low cross-section masks weak bands.',
+    recommendedValidation: 'Combustion analysis, TEM, or XPS C 1s for carbon speciation.',
   },
 ];
-
 // Review output interface
 interface ReviewOutput {
   conclusion: string;
@@ -260,11 +269,11 @@ function runCrossTechReview(context: {
   // If specific claim or evidence is selected
   if (selectedClaim || selectedEvidence) {
     const claim = selectedClaim || demoClaims.find((c) => c.id === selectedEvidence?.claimId);
-    
+
     if (claim) {
       // Generate claim-specific review
       const claimEvidence = demoEvidenceItems.filter((e) => claim.linkedEvidenceIds.includes(e.id));
-      
+
       return {
         conclusion: claim.interpretation || claim.description,
         basis: claimEvidence.map((e) => `${e.technique}: ${e.description}`),
@@ -279,7 +288,7 @@ function runCrossTechReview(context: {
   // Default: project-level review using all active techniques
   const activeTechniquesList = Array.from(activeTechniques);
   const projectEvidence = demoEvidenceItems.filter((e) => activeTechniques.has(e.technique));
-  
+
   return {
     conclusion: `Multi-technique characterization of ${projectName} provides convergent evidence for spinel ferrite structure with mixed Cu/Fe oxidation states. ${activeTechniquesList.join(', ')} techniques yield complementary structural, chemical, and vibrational information.`,
     basis: projectEvidence.map((e) => `${e.technique}: ${e.description}`),
@@ -320,15 +329,15 @@ function generateReasoningTrace(context: {
   if (selectedClaim) {
     const claimEvidence = demoEvidenceItems.filter((e) => selectedClaim.linkedEvidenceIds.includes(e.id));
     const techniques = [...new Set(claimEvidence.map((e) => e.technique))];
-    
+
     // Separate primary and supporting evidence
     const primaryEvidence = claimEvidence.filter((e) => e.highlightRole === 'primary');
     const supportingEvidence = claimEvidence.filter((e) => e.highlightRole === 'supporting');
-    
+
     return {
       claim: selectedClaim.title,
       observed: primaryEvidence.map((e) => e.description),
-      linked: primaryEvidence.length > 1 
+      linked: primaryEvidence.length > 1
         ? [`${techniques.join(' and ')} evidence converge on ${selectedClaim.title.toLowerCase()}`]
         : [],
       crossCheck: supportingEvidence.map((e) => `${e.technique}: ${e.description}`),
@@ -341,7 +350,7 @@ function generateReasoningTrace(context: {
   if (selectedEvidence) {
     const claim = demoClaims.find((c) => c.id === selectedEvidence.claimId);
     const allEvidence = [selectedEvidence, ...linkedEvidence];
-    
+
     return {
       claim: claim?.title || 'Evidence-driven interpretation',
       observed: [selectedEvidence.description],
@@ -357,7 +366,7 @@ function generateReasoningTrace(context: {
   // Project-level reasoning
   const activeTechniquesList = Array.from(activeTechniques);
   const projectEvidence = demoEvidenceItems.filter((e) => activeTechniques.has(e.technique));
-  
+
   return {
     claim: 'Project-level multi-technique interpretation',
     observed: projectEvidence.slice(0, 4).map((e) => `${e.technique}: ${e.description}`),
@@ -398,7 +407,7 @@ function runFusionReasoning(context: {
   // Claim-level reasoning
   if (selectedClaim) {
     const claimEvidence = demoEvidenceItems.filter((e) => selectedClaim.linkedEvidenceIds.includes(e.id));
-    
+
     return {
       scope: 'claim',
       title: `Cross-Tech Review: ${selectedClaim.title}`,
@@ -417,7 +426,7 @@ function runFusionReasoning(context: {
   if (selectedEvidence) {
     const claim = demoClaims.find((c) => c.id === selectedEvidence.claimId);
     const allEvidence = [selectedEvidence, ...linkedEvidence];
-    
+
     return {
       scope: 'evidence',
       title: `Cross-Tech Review: ${selectedEvidence.technique} Evidence`,
@@ -435,7 +444,7 @@ function runFusionReasoning(context: {
   // Project-level reasoning
   const activeTechniquesList = Array.from(activeTechniques);
   const projectEvidence = demoEvidenceItems.filter((e) => activeTechniques.has(e.technique));
-  
+
   return {
     scope: 'project',
     title: `Cross-Tech Review: ${projectName}`,
@@ -468,7 +477,7 @@ function generateNotebookDraft(
   projectName: string,
 ): string {
   const techniques = [...new Set(evidence.map((e) => e.technique))];
-  
+
   if (scope === 'claim' && claim) {
     return `# Cross-Tech Review: ${claim.title}
 
@@ -491,7 +500,7 @@ ${parseValidation(claim.recommendedValidation || '').map((v) => `- ${v}`).join('
 ${generateDecision(claim)}
 `;
   }
-  
+
   if (scope === 'evidence') {
     return `# Cross-Tech Review: Evidence-Driven Interpretation
 
@@ -511,7 +520,7 @@ ${claim ? parseLimitations(claim.limitations || '').map((l) => `- ${l}`).join('\
 ${claim ? generateDecision(claim) : 'Proceed with current interpretation; recommend cross-technique validation.'}
 `;
   }
-  
+
   // Project-level
   return `# Cross-Tech Review: ${projectName}
 
@@ -548,11 +557,11 @@ Use spinel ferrite assignment as a working interpretation for ${projectName}; ph
 
 function generateCrossTechConsistency(claim: CrossTechClaim, evidence: CrossTechEvidence[]): string {
   const techniques = [...new Set(evidence.map((e) => e.technique))];
-  
+
   if (claim.id === 'spinel-ferrite') {
     return 'Raman vibrational symmetry and XRD long-range order independently converge on cubic spinel structure. FTIR metal-oxygen band provides additional support. No contradictions observed across techniques.';
   } else if (claim.id === 'oxidation-state') {
-    return 'XPS surface analysis indicates Cu²⁺ and Fe³⁺ as dominant species. Complementary techniques provide structural context but do not directly probe oxidation states. Surface vs bulk consistency requires depth-profiling validation.';
+    return 'XPS surface analysis provides oxidation-state context. Complementary techniques provide structural context but do not directly probe oxidation states. Surface vs bulk consistency requires validation.';
   } else if (claim.id === 'metal-oxygen') {
     return 'FTIR metal-oxygen stretching and Raman vibrational modes provide complementary evidence for ferrite bonding framework. XPS oxidation states are consistent with expected metal-oxygen coordination. Evidence converges across techniques.';
   } else if (claim.id === 'surface-hydroxyl') {
@@ -562,7 +571,7 @@ function generateCrossTechConsistency(claim: CrossTechClaim, evidence: CrossTech
   } else if (claim.id === 'carbonaceous-residue') {
     return 'Raman shows no evidence of carbonaceous species. FTIR carbonate bands do not correspond to Raman-active carbon. XPS C 1s would provide stronger surface carbon speciation but is not included.';
   }
-  
+
   return `${techniques.length} technique${techniques.length === 1 ? '' : 's'} provide${techniques.length === 1 ? 's' : ''} evidence for this interpretation. Cross-technique consistency supports the conclusion.`;
 }
 
@@ -570,7 +579,7 @@ function generateDecision(claim: CrossTechClaim): string {
   if (claim.id === 'spinel-ferrite') {
     return 'Use spinel ferrite assignment as a working interpretation; phase purity and surface-state claims remain validation-limited.';
   } else if (claim.id === 'oxidation-state') {
-    return 'Accept Cu²⁺/Fe³⁺ oxidation states as working model; recommend depth-profiling for bulk validation.';
+    return 'Use the XPS oxidation-state context as a working surface model; recommend depth-profiling or bulk-sensitive validation.';
   } else if (claim.id === 'metal-oxygen') {
     return 'Metal-oxygen bonding framework is consistent with ferrite structure; proceed with structural model.';
   } else if (claim.id === 'surface-hydroxyl') {
@@ -580,7 +589,7 @@ function generateDecision(claim: CrossTechClaim): string {
   } else if (claim.id === 'carbonaceous-residue') {
     return 'No action required for carbonaceous contamination; proceed with current dataset.';
   }
-  
+
   return 'Proceed with current interpretation; recommend validation experiments before stronger assignment.';
 }
 
@@ -600,27 +609,27 @@ const matrixCells: MatrixCell[] = [
   { claimId: 'spinel-ferrite', technique: 'Raman', status: 'Supports', evidenceId: 'raman-a1g' },
   { claimId: 'spinel-ferrite', technique: 'XPS', status: 'Context' },
   { claimId: 'spinel-ferrite', technique: 'FTIR', status: 'Context', evidenceId: 'ftir-mo-band' },
-  
+
   { claimId: 'oxidation-state', technique: 'XRD', status: 'Context' },
   { claimId: 'oxidation-state', technique: 'Raman', status: 'Context' },
   { claimId: 'oxidation-state', technique: 'XPS', status: 'Supports', evidenceId: 'xps-cu-fe' },
   { claimId: 'oxidation-state', technique: 'FTIR', status: 'Context' },
-  
+
   { claimId: 'metal-oxygen', technique: 'XRD', status: 'Context' },
   { claimId: 'metal-oxygen', technique: 'Raman', status: 'Context', evidenceId: 'raman-a1g' },
   { claimId: 'metal-oxygen', technique: 'XPS', status: 'Context', evidenceId: 'xps-cu-fe' },
   { claimId: 'metal-oxygen', technique: 'FTIR', status: 'Supports', evidenceId: 'ftir-mo-band' },
-  
+
   { claimId: 'surface-hydroxyl', technique: 'XRD', status: 'Not addressed' },
   { claimId: 'surface-hydroxyl', technique: 'Raman', status: 'Not addressed' },
   { claimId: 'surface-hydroxyl', technique: 'XPS', status: 'Context' },
   { claimId: 'surface-hydroxyl', technique: 'FTIR', status: 'Supports', evidenceId: 'ftir-hydroxyl' },
-  
+
   { claimId: 'carbonate-surface', technique: 'XRD', status: 'Not addressed' },
   { claimId: 'carbonate-surface', technique: 'Raman', status: 'Ambiguous' },
   { claimId: 'carbonate-surface', technique: 'XPS', status: 'Not addressed' },
   { claimId: 'carbonate-surface', technique: 'FTIR', status: 'Supports', evidenceId: 'ftir-carbonate' },
-  
+
   { claimId: 'carbonaceous-residue', technique: 'XRD', status: 'Not addressed' },
   { claimId: 'carbonaceous-residue', technique: 'Raman', status: 'Not addressed' },
   { claimId: 'carbonaceous-residue', technique: 'XPS', status: 'Potential limitation' },
@@ -685,8 +694,16 @@ function getUploadedTechniqueLimitations(technique: UploadedTechnique): string[]
 export default function MultiTechWorkspace() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const project = getProject(searchParams.get('project') ?? DEFAULT_PROJECT_ID);
-  
+  const requestedProjectId = searchParams.get('project');
+  const resolvedProjectId = normalizeRegistryProjectId(requestedProjectId) ?? DEFAULT_PROJECT_ID;
+  const invalidProjectRequested =
+    Boolean(requestedProjectId) && !isKnownProjectId(requestedProjectId);
+  const project = getProject(resolvedProjectId) ?? getProject(DEFAULT_PROJECT_ID)!;
+
+  // Canonical registry project - shared source of truth for cross-page data.
+  const registryProject = useMemo(() => getRegistryProject(project.id), [project.id]);
+  const crossTech = registryProject.crossTechniqueComparison;
+
   // Get available techniques from project
   const availableTechniques = project.techniqueMetadata.map(t => t.key);
   const techniqueCount = availableTechniques.length;
@@ -701,7 +718,7 @@ export default function MultiTechWorkspace() {
   const [hoveredEvidenceId, setHoveredEvidenceId] = useState<string | null>(null);
   const [selectedClaimId, setSelectedClaimId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'conclusion' | 'justification' | 'evidence' | 'interpretation'>('conclusion');
-  const [activeRightTab, setActiveRightTab] = useState<'inference' | 'support' | 'limits' | 'agent'>('inference');
+  const [activeRightTab, setActiveRightTab] = useState<'inference' | 'comparison' | 'references' | 'limits'>('inference');
   const [reviewOutput, setReviewOutput] = useState<FusionResult | null>(null);
   const [isTechniqueDropdownOpen, setIsTechniqueDropdownOpen] = useState(false);
   const [workflowFeedback, setWorkflowFeedback] = useState('');
@@ -735,6 +752,15 @@ export default function MultiTechWorkspace() {
     conditionAvailableTechniques,
   );
   const conditionLockStatus = getConditionLockStatusLabel(experimentConditionLock);
+
+  useEffect(() => {
+    setActiveTechniques(new Set(availableTechniques));
+    setPrimaryTechniqueKey(availableTechniques.includes('XRD') ? 'XRD' : availableTechniques[0]);
+    setSelectedEvidenceId(null);
+    setHoveredEvidenceId(null);
+    setSelectedClaimId(null);
+    setActiveRightTab('inference');
+  }, [project.id]);
 
   const claimBoundary = CLAIM_BOUNDARY_BY_TECHNIQUE[selectedUploadTechnique];
   const activeUploadQuality = latestUploadedRun?.evidenceQuality ?? uploadErrorQuality;
@@ -777,7 +803,7 @@ export default function MultiTechWorkspace() {
     uploadedFileName ? 'File selected' : 'No file selected',
     'Conditions not attached',
     latestUploadedRun?.evidenceQuality ? 'Gate assessed' : 'Gate pending',
-  ].join(' · ');
+  ].join(' - ');
 
   const setTemporaryUploadFeedback = (message: string) => {
     setUploadFeedback(message);
@@ -900,12 +926,12 @@ export default function MultiTechWorkspace() {
   const getGraphHighlights = (technique: Technique): GraphHighlight[] => {
     const highlights: GraphHighlight[] = [];
     const activeEvidenceId = selectedEvidenceId ?? hoveredEvidenceId;
-    
+
     if (!activeEvidenceId) return highlights;
-    
+
     const selectedEvidence = demoEvidenceItems.find((e) => e.id === activeEvidenceId);
     if (!selectedEvidence) return highlights;
-    
+
     // Add selected evidence highlight if it matches this technique
     if (selectedEvidence.technique === technique && selectedEvidence.xValue !== undefined) {
       const values = Array.isArray(selectedEvidence.xValue) ? selectedEvidence.xValue : [selectedEvidence.xValue];
@@ -918,7 +944,7 @@ export default function MultiTechWorkspace() {
         });
       });
     }
-    
+
     // Add linked evidence highlights
     const linkedIds = selectedEvidence.linkedEvidenceIds;
     linkedIds.forEach((linkedId) => {
@@ -935,7 +961,7 @@ export default function MultiTechWorkspace() {
         });
       }
     });
-    
+
     // If claim is selected, add all evidence for that claim
     if (selectedClaimId) {
       const claimEvidence = demoEvidenceItems.filter((e) => e.claimId === selectedClaimId && e.technique === technique);
@@ -957,7 +983,7 @@ export default function MultiTechWorkspace() {
         }
       });
     }
-    
+
     return highlights;
   };
 
@@ -977,12 +1003,12 @@ export default function MultiTechWorkspace() {
     if (reviewOutput && reviewOutput.highlightedEvidenceIds.includes(evidenceId)) {
       return true;
     }
-    
+
     // Check if evidence is highlighted by user interaction (hover/click)
     const activeEvidenceId = selectedEvidenceId ?? hoveredEvidenceId;
     if (!activeEvidenceId) return false;
     if (evidenceId === activeEvidenceId) return true;
-    
+
     // Check if this evidence is linked to the active evidence
     const linkedIds = getLinkedEvidenceIds(activeEvidenceId);
     return linkedIds.includes(evidenceId);
@@ -1042,7 +1068,7 @@ export default function MultiTechWorkspace() {
   const handleRunReview = () => {
     // Convert demoEvidenceItems to PeakInput format and call fusionEngine
     const peakInputsByTechnique = new Map<Technique, PeakInput[]>();
-    
+
     // Group evidence by technique
     demoEvidenceItems
       .filter((e) => activeTechniques.has(e.technique))
@@ -1050,10 +1076,10 @@ export default function MultiTechWorkspace() {
         if (!peakInputsByTechnique.has(e.technique)) {
           peakInputsByTechnique.set(e.technique, []);
         }
-        
+
         // Handle array xValue by creating multiple peaks
         const xValues = Array.isArray(e.xValue) ? e.xValue : [e.xValue];
-        
+
         xValues.forEach((xVal, index) => {
           if (xVal && xVal > 0) {
             peakInputsByTechnique.get(e.technique)!.push({
@@ -1065,17 +1091,17 @@ export default function MultiTechWorkspace() {
           }
         });
       });
-    
+
     // Create evidence nodes for each technique using central function
     const allEvidenceNodes: EvidenceNode[] = [];
     peakInputsByTechnique.forEach((peaks, technique) => {
       const nodes = createEvidenceNodes({ technique, peaks });
       allEvidenceNodes.push(...nodes);
     });
-    
+
     // Call fusionEngine with evidence nodes - single source of truth
     const fusionResult: FusionResult = evaluateFusionEngine({ evidence: allEvidenceNodes });
-    
+
     // Use FusionResult directly - no wrapper conversion
     setReviewOutput(fusionResult);
   };
@@ -1136,14 +1162,13 @@ ${result.decision}
                 value={project.id}
                 onChange={(event) => {
                   const newProjectId = event.target.value;
-                  searchParams.set('project', newProjectId);
-                  window.location.href = `/workspace/multi?${searchParams.toString()}`;
+                  navigate(`/workspace/multi?project=${newProjectId}`);
                 }}
                 className="h-8 max-w-full rounded border border-border bg-background px-3 text-sm font-semibold text-text-main outline-none hover:border-primary/40 focus:border-primary sm:max-w-[240px]"
               >
-                {demoProjects.map((proj) => (
+                {demoProjectRegistry.map((proj) => (
                   <option key={proj.id} value={proj.id}>
-                    {formatChemicalFormula(proj.name)}
+                    {formatChemicalFormula(proj.title)}
                   </option>
                 ))}
               </select>
@@ -1179,7 +1204,7 @@ ${result.decision}
               >
                 <Upload size={14} />
               </button>
-              <button 
+              <button
                 onClick={handleRunReview}
                 className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-primary text-white transition-colors hover:bg-primary/90"
                 title="Run Review"
@@ -1238,7 +1263,7 @@ ${result.decision}
                   : `Techniques: ${Array.from(activeTechniques).length}`
                 }
               </span>
-              <span>Working assignment: {formatChemicalFormula('CuFe2O4')} spinel ferrite</span>
+              <span>Working assignment: {formatChemicalFormula(project.material)}</span>
               <span className="font-semibold text-text-main">
                 {Array.from(activeTechniques).length === 1 ? 'Next: Review evidence' : 'Next: Agent refinement'}
               </span>
@@ -1246,6 +1271,13 @@ ${result.decision}
             </div>
           </div>
         </div>
+
+        {invalidProjectRequested && (
+          <div className="mb-1 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[11px] text-amber-900">
+            <span className="font-semibold">Project not found.</span>{' '}
+            Showing {registryProject.title} demo dataset.
+          </div>
+        )}
 
         {uploadPanelExpanded && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setUploadPanelExpanded(false)}>
@@ -1754,9 +1786,9 @@ ${result.decision}
         )}
 
         {/* Main 2-column layout: Left (technique grid) | Right (vertical sections) */}
-        <div className="grid min-h-0 flex-1 grid-cols-1 gap-1.5 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="grid min-h-0 max-w-full flex-1 grid-cols-1 gap-1.5 overflow-hidden lg:grid-cols-[minmax(0,1fr)_340px]">
           {/* Left Panel: Adaptive technique grid */}
-          <div className="min-h-0 overflow-y-auto">
+          <div className="min-h-0 min-w-0 max-w-full overflow-y-auto overflow-x-hidden">
             {availableTechniques.length === 0 ? (
               <Card className="flex h-full items-center justify-center p-8">
                 <div className="text-center">
@@ -1787,16 +1819,16 @@ ${result.decision}
                 const techniqueDatasets = getDatasetsByTechnique(project.id, technique);
                 const dataset = techniqueDatasets[0];
 
-                const compactStatus = technique === 'XRD' ? 'Reflections detected · Supported'
-                  : technique === 'Raman' ? 'A₁g mode detected · Supported'
-                  : technique === 'FTIR' ? 'M–O band detected · Supported'
+                const compactStatus = technique === 'XRD' ? 'Reflections detected - Supported'
+                  : technique === 'Raman' ? 'A1g mode detected - Supported'
+                  : technique === 'FTIR' ? 'M-O band detected - Supported'
                   : 'Surface assignment pending';
 
                 return (
-                  <Card className="overflow-hidden">
+                  <Card className="min-w-0 max-w-full overflow-hidden">
                     <div className="border-b border-border bg-surface-hover/40 px-3 py-1.5">
                       <div className="flex items-center justify-between">
-                        <h2 className="text-sm font-bold text-text-main">{technique} · {metadata?.role || 'Analysis'}</h2>
+                        <h2 className="min-w-0 truncate text-sm font-bold text-text-main">{technique} - {metadata?.role || 'Analysis'}</h2>
                         <Link to={getWorkspaceRoute(project, technique, dataset?.id)}>
                           <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs px-3">
                             Open <ArrowRight size={12} />
@@ -1833,16 +1865,16 @@ ${result.decision}
                       const techniqueDatasets = getDatasetsByTechnique(project.id, technique);
                       const dataset = techniqueDatasets[0];
 
-                      const compactStatus = technique === 'XRD' ? 'Reflections detected · Supported'
-                        : technique === 'Raman' ? 'A₁g mode detected · Supported'
-                        : technique === 'FTIR' ? 'M–O band detected · Supported'
-                        : 'Surface assignment pending';
+                      const compactStatus = technique === 'XRD' ? 'Reflections detected - Supported'
+                  : technique === 'Raman' ? 'A1g mode detected - Supported'
+                  : technique === 'FTIR' ? 'M-O band detected - Supported'
+                  : 'Surface assignment pending';
 
                       return (
-                        <Card key={technique} className="overflow-hidden">
+                        <Card key={technique} className="min-w-0 max-w-full overflow-hidden">
                           <div className="border-b border-border bg-surface-hover/40 px-3 py-1.5">
                             <div className="flex items-center justify-between">
-                              <h2 className="text-sm font-bold text-text-main">{technique} · {metadata?.role || 'Analysis'}</h2>
+                              <h2 className="min-w-0 truncate text-sm font-bold text-text-main">{technique} - {metadata?.role || 'Analysis'}</h2>
                               <Link to={getWorkspaceRoute(project, technique, dataset?.id)}>
                                 <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs px-3">
                                   Open <ArrowRight size={12} />
@@ -1900,16 +1932,16 @@ ${result.decision}
                       const techniqueDatasets = getDatasetsByTechnique(project.id, technique);
                       const dataset = techniqueDatasets[0];
 
-                      const compactStatus = technique === 'XRD' ? 'Reflections detected · Supported'
-                        : technique === 'Raman' ? 'A₁g mode detected · Supported'
-                        : technique === 'FTIR' ? 'M–O band detected · Supported'
-                        : 'Surface assignment pending';
+                      const compactStatus = technique === 'XRD' ? 'Reflections detected - Supported'
+                  : technique === 'Raman' ? 'A1g mode detected - Supported'
+                  : technique === 'FTIR' ? 'M-O band detected - Supported'
+                  : 'Surface assignment pending';
 
                       return (
-                        <Card className="overflow-hidden">
+                        <Card className="min-w-0 max-w-full overflow-hidden">
                           <div className="border-b border-border bg-surface-hover/40 px-3 py-1.5">
                             <div className="flex items-center justify-between">
-                              <h2 className="text-sm font-bold text-text-main">{technique} · {metadata?.role || 'Analysis'}</h2>
+                              <h2 className="min-w-0 truncate text-sm font-bold text-text-main">{technique} - {metadata?.role || 'Analysis'}</h2>
                               <Link to={getWorkspaceRoute(project, technique, dataset?.id)}>
                                 <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs px-3">
                                   Open <ArrowRight size={12} />
@@ -1940,22 +1972,22 @@ ${result.decision}
                     })()}
 
                     {/* Two supporting cards in columns */}
-                    <div className="grid grid-cols-2 gap-1">
+                    <div className="grid min-w-0 grid-cols-2 gap-1 overflow-hidden">
                       {supportingTechniques.map((technique) => {
                         const metadata = project.techniqueMetadata.find(t => t.key === technique);
                         const techniqueDatasets = getDatasetsByTechnique(project.id, technique);
                         const dataset = techniqueDatasets[0];
 
-                        const compactStatus = technique === 'XRD' ? 'Reflections detected · Supported'
-                          : technique === 'Raman' ? 'A₁g mode detected · Supported'
-                          : technique === 'FTIR' ? 'M–O band detected · Supported'
-                          : 'Surface assignment pending';
+                        const compactStatus = technique === 'XRD' ? 'Reflections detected - Supported'
+                  : technique === 'Raman' ? 'A1g mode detected - Supported'
+                  : technique === 'FTIR' ? 'M-O band detected - Supported'
+                  : 'Surface assignment pending';
 
                         return (
-                          <Card key={technique} className="overflow-hidden">
+                          <Card key={technique} className="min-w-0 max-w-full overflow-hidden">
                             <div className="border-b border-border bg-surface-hover/40 px-2 py-1">
                               <div className="flex items-center justify-between">
-                                <h2 className="text-xs font-bold text-text-main">{technique} · {metadata?.role || 'Analysis'}</h2>
+                                <h2 className="min-w-0 truncate text-xs font-bold text-text-main">{technique} - {metadata?.role || 'Analysis'}</h2>
                                 <Link to={getWorkspaceRoute(project, technique, dataset?.id)}>
                                   <Button variant="ghost" size="sm" className="h-6 gap-1 text-[10px] px-2">
                                     Open <ArrowRight size={10} />
@@ -1990,22 +2022,22 @@ ${result.decision}
               } else {
                 // Four techniques: 2x2 grid
                 return (
-                  <div className="grid h-full grid-cols-2 grid-rows-2 gap-0.5">
+                  <div className="grid h-full min-w-0 grid-cols-2 grid-rows-2 gap-0.5 overflow-hidden">
                     {selectedTechniques.map((technique) => {
                       const metadata = project.techniqueMetadata.find(t => t.key === technique);
                       const techniqueDatasets = getDatasetsByTechnique(project.id, technique);
                       const dataset = techniqueDatasets[0];
 
-                      const compactStatus = technique === 'XRD' ? 'Reflections detected · Supported'
-                        : technique === 'Raman' ? 'A₁g mode detected · Supported'
-                        : technique === 'FTIR' ? 'M–O band detected · Supported'
-                        : 'Surface assignment pending';
+                      const compactStatus = technique === 'XRD' ? 'Reflections detected - Supported'
+                  : technique === 'Raman' ? 'A1g mode detected - Supported'
+                  : technique === 'FTIR' ? 'M-O band detected - Supported'
+                  : 'Surface assignment pending';
 
                       return (
-                        <Card key={technique} className="overflow-hidden">
+                        <Card key={technique} className="min-w-0 max-w-full overflow-hidden">
                           <div className="border-b border-border bg-surface-hover/40 px-2 py-1">
                             <div className="flex items-center justify-between">
-                              <h2 className="text-xs font-bold text-text-main">{technique} · {metadata?.role || 'Analysis'}</h2>
+                              <h2 className="min-w-0 truncate text-xs font-bold text-text-main">{technique} - {metadata?.role || 'Analysis'}</h2>
                               <Link to={getWorkspaceRoute(project, technique, dataset?.id)}>
                                 <Button variant="ghost" size="sm" className="h-6 gap-1 text-[10px] px-2">
                                   Open <ArrowRight size={10} />
@@ -2041,12 +2073,12 @@ ${result.decision}
           </div>
 
           {/* Right Panel: Tabbed Scientific Interface */}
-          <div className="min-h-0 overflow-y-auto">
-            <Card className="h-full">
+          <div className="min-h-0 min-w-0 max-w-full overflow-y-auto overflow-x-hidden">
+            <Card className="h-full min-w-0 max-w-full overflow-hidden">
               {/* Tab Navigation */}
               <div className="border-b border-border px-2 py-1.5">
                 <div className="flex gap-1">
-                  {(['inference', 'support', 'limits', 'agent'] as const).map((tab) => (
+                  {(['inference', 'comparison', 'references', 'limits'] as const).map((tab) => (
                     <button
                       key={tab}
                       onClick={() => setActiveRightTab(tab)}
@@ -2079,55 +2111,43 @@ ${result.decision}
                     <div className="space-y-2">
                       <div className="rounded-lg border border-border bg-surface p-2">
                         <div className="text-[9px] font-semibold uppercase tracking-wider text-text-muted">Current assignment</div>
-                        <div className="mt-1 text-sm font-bold text-text-main">{formatChemicalFormula('CuFe2O4')} spinel ferrite</div>
+                        <div className="mt-1 text-sm font-bold text-text-main">{formatChemicalFormula(registryProject.materialSystem)}</div>
                       </div>
 
                       <div className="grid grid-cols-2 gap-2">
                         <div className="rounded border border-border bg-background p-2">
                           <div className="text-[9px] font-semibold uppercase tracking-wider text-text-muted">Inference state</div>
-                          <div className="mt-1 text-[10px] font-semibold text-text-main">Working interpretation</div>
+                          <div className="mt-1 text-[10px] font-semibold text-text-main">{claimStatusLabel(registryProject.claimStatus)}</div>
                         </div>
                         <div className="rounded border border-border bg-background p-2">
-                          <div className="text-[9px] font-semibold uppercase tracking-wider text-text-muted">Confidence</div>
-                          <div className="mt-1 text-[10px] font-semibold text-text-main">Moderate</div>
+                          <div className="text-[9px] font-semibold uppercase tracking-wider text-text-muted">Agreement</div>
+                          <div className="mt-1 text-[10px] font-semibold text-text-main">{agreementLabel(crossTech.agreementLevel)}</div>
                         </div>
                       </div>
 
                       <div className="rounded-lg border border-border bg-surface p-2">
-                        <div className="text-[9px] font-semibold uppercase tracking-wider text-text-muted">Basis</div>
-                        <p className="mt-1 text-[10px] leading-relaxed text-text-main">
-                          {Array.from(activeTechniques).length === 1
-                            ? `${Array.from(activeTechniques)[0]} evidence supports the working interpretation. Additional techniques recommended for stronger assignment.`
-                            : Array.from(activeTechniques).includes('XRD')
-                              ? `XRD phase reflections align with a spinel ferrite pattern. ${Array.from(activeTechniques).filter(t => t !== 'XRD').join(' and ')} provide${Array.from(activeTechniques).length === 2 ? 's' : ''} supporting evidence.`
-                              : `${Array.from(activeTechniques).join(', ')} evidence supports the working interpretation.`
-                          }
-                        </p>
+                        <div className="text-[9px] font-semibold uppercase tracking-wider text-text-muted">Reasoning summary</div>
+                        <p className="mt-1 text-[10px] leading-relaxed text-text-main">{crossTech.agreementSummary}</p>
                       </div>
 
                       <div className="space-y-1">
-                        {project.techniqueMetadata.filter(m => activeTechniques.has(m.key)).map((metadata) => {
-                          const statusMap: Record<string, { label: string; color: string }> = {
-                            'XRD': { label: 'Bulk phase', color: 'text-emerald-600' },
-                            'Raman': { label: 'Lattice mode', color: 'text-emerald-600' },
-                            'XPS': { label: 'Surface state', color: 'text-amber-600' },
-                            'FTIR': { label: 'Bonding context', color: 'text-emerald-600' },
-                          };
-                          const status = statusMap[metadata.key];
-                          if (!status) return null;
-
+                        {crossTech.matrix.filter((row) => activeTechniques.has(row.techniqueLabel as Technique)).map((row) => {
                           return (
-                            <div key={metadata.key} className="flex items-center justify-between rounded border border-border bg-background px-2 py-1">
-                              <span className="text-[10px] text-text-muted">{status.label}:</span>
-                              <span className={`text-[10px] font-semibold ${status.color}`}>
-                                {metadata.key === 'XPS' ? 'Pending' : 'Supported'}
+                            <div key={row.techniqueId} className="flex items-center justify-between rounded border border-border bg-background px-2 py-1">
+                              <span className="text-[10px] text-text-muted">{row.techniqueLabel}: {row.role}</span>
+                              <span className="text-[10px] font-semibold text-text-main">
+                                {row.supportsClaim === 'yes' ? 'Supported' : row.supportsClaim === 'partial' ? 'Partial' : 'Limited'}
                               </span>
                             </div>
                           );
                         })}
                         <div className="flex items-center justify-between rounded border border-border bg-background px-2 py-1">
                           <span className="text-[10px] text-text-muted">Claim status:</span>
-                          <span className="text-[10px] font-semibold text-text-main">Validation-limited</span>
+                          <span className="text-[10px] font-semibold text-text-main">{claimStatusLabel(registryProject.claimStatus)}</span>
+                        </div>
+                        <div className="flex items-center justify-between rounded border border-border bg-background px-2 py-1">
+                          <span className="text-[10px] text-text-muted">Report readiness:</span>
+                          <span className="text-[10px] font-semibold text-text-main">{registryProject.reportReadiness}%</span>
                         </div>
                       </div>
 
@@ -2144,91 +2164,90 @@ ${result.decision}
                   </div>
                 )}
 
-                {activeRightTab === 'support' && (
+                {activeRightTab === 'comparison' && (
                   <div className="space-y-3">
                     <div>
-                      <h3 className="text-xs font-bold text-text-main">Analysis Support</h3>
-                      <p className="mt-0.5 text-[10px] text-text-muted">Processed observations linked to scientific claims.</p>
+                      <h3 className="text-xs font-bold text-text-main">Comparison Matrix</h3>
+                      <p className="mt-0.5 text-[10px] text-text-muted">
+                        Registry evidence mapped by technique, role, support, limitation, and next action.
+                      </p>
                     </div>
 
                     <div className="space-y-2">
-                      {(() => {
-                        const selectedTechniques = Array.from(activeTechniques);
-                        // Show primary first if in 3-tech mode
-                        const orderedTechniques = selectedTechniques.length === 3 && selectedTechniques.includes(primaryTechniqueKey)
-                          ? [primaryTechniqueKey, ...selectedTechniques.filter(t => t !== primaryTechniqueKey)]
-                          : selectedTechniques;
-
-                        const supportData: Record<string, { role: string; observation: string; support: string; status: string; statusColor: string }> = {
-                          'XRD': {
-                            role: 'Bulk phase assignment',
-                            observation: 'Processed reflections at 2θ = 30.1°, 35.5°, 43.2°, 57.1°',
-                            support: 'Supports spinel ferrite bulk-phase assignment.',
-                            status: 'Supported',
-                            statusColor: 'bg-emerald-500/10 text-emerald-600',
-                          },
-                          'Raman': {
-                            role: 'Lattice vibration consistency',
-                            observation: 'A₁g mode near ~690 cm⁻¹',
-                            support: 'Supports spinel-like lattice vibration.',
-                            status: 'Supported',
-                            statusColor: 'bg-emerald-500/10 text-emerald-600',
-                          },
-                          'FTIR': {
-                            role: 'Metal–oxygen bonding context',
-                            observation: 'M–O band near ~580 cm⁻¹',
-                            support: 'Supports ferrite framework bonding.',
-                            status: 'Supported',
-                            statusColor: 'bg-emerald-500/10 text-emerald-600',
-                          },
-                          'XPS': {
-                            role: 'Surface-state validation',
-                            observation: 'Cu 2p / Fe 2p regions detected',
-                            support: 'Surface-state assignment remains pending.',
-                            status: 'Pending',
-                            statusColor: 'bg-amber-500/10 text-amber-600',
-                          },
-                        };
-
-                        return orderedTechniques.map((technique, index) => {
-                          const data = supportData[technique];
-                          if (!data) return null;
-
-                          const metadata = project.techniqueMetadata.find(t => t.key === technique);
-                          const isPrimary = selectedTechniques.length === 3 && technique === primaryTechniqueKey;
-
-                          return (
-                            <div key={technique} className="rounded-lg border border-border bg-surface p-2">
-                              <div className="flex items-center justify-between mb-1">
-                                <h4 className="text-[10px] font-bold text-text-main">{technique} · {metadata?.role || 'Analysis'}</h4>
-                                {isPrimary && (
-                                  <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[8px] font-semibold text-primary">Primary</span>
-                                )}
-                              </div>
-                              <div className="space-y-1">
-                                <div>
-                                  <div className="text-[9px] font-semibold text-text-muted">Role</div>
-                                  <div className="text-[9px] text-text-main">{data.role}</div>
-                                </div>
-                                <div>
-                                  <div className="text-[9px] font-semibold text-text-muted">Observation</div>
-                                  <div className="text-[9px] text-text-main">{data.observation}</div>
-                                </div>
-                                <div>
-                                  <div className="text-[9px] font-semibold text-text-muted">Support</div>
-                                  <div className="text-[9px] text-text-main">{data.support}</div>
-                                </div>
-                                <div className="flex items-center justify-between pt-0.5">
-                                  <span className="text-[9px] font-semibold text-text-muted">Status</span>
-                                  <span className={`rounded px-1.5 py-0.5 text-[8px] font-semibold ${data.statusColor}`}>
-                                    {data.status}
-                                  </span>
-                                </div>
-                              </div>
+                      {crossTech.matrix.map((row) => (
+                        <div key={row.techniqueId} className="rounded-lg border border-border bg-surface p-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <h4 className="text-[10px] font-bold text-text-main">{row.techniqueLabel}</h4>
+                            <span
+                              className={`rounded border px-1.5 py-0.5 text-[8px] font-semibold uppercase ${
+                                row.supportsClaim === 'yes'
+                                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                  : row.supportsClaim === 'partial'
+                                    ? 'border-amber-200 bg-amber-50 text-amber-700'
+                                    : row.supportsClaim === 'na'
+                                      ? 'border-slate-200 bg-slate-50 text-slate-600'
+                                      : 'border-red-200 bg-red-50 text-red-700'
+                              }`}
+                            >
+                              {row.supportsClaim === 'yes' ? 'supports' : row.supportsClaim}
+                            </span>
+                          </div>
+                          <div className="mt-1 grid gap-1 text-[9px] text-text-main">
+                            <div>
+                              <span className="font-semibold text-text-muted">Role: </span>
+                              {row.role}
                             </div>
-                          );
-                        });
-                      })()}
+                            <div>
+                              <span className="font-semibold text-text-muted">Key finding: </span>
+                              {row.keyFinding}
+                            </div>
+                            <div>
+                              <span className="font-semibold text-text-muted">Limitation: </span>
+                              {row.limitation}
+                            </div>
+                            <div>
+                              <span className="font-semibold text-text-muted">Next action: </span>
+                              {row.nextAction}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {activeRightTab === 'references' && (
+                  <div className="space-y-3">
+                    <div>
+                      <h3 className="text-xs font-bold text-text-main">References</h3>
+                      <p className="mt-0.5 text-[10px] text-text-muted">
+                        Evidence validation inputs required by the selected project.
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      {crossTech.references.map((ref) => (
+                        <div key={ref.label} className="rounded-lg border border-border bg-surface p-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <h4 className="text-[10px] font-bold text-text-main">{ref.label}</h4>
+                              <p className="mt-0.5 text-[9px] text-text-muted">{ref.type.replace('_', ' ')}</p>
+                            </div>
+                            <span
+                              className={`rounded border px-1.5 py-0.5 text-[8px] font-semibold uppercase ${
+                                ref.status === 'available'
+                                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                  : ref.status === 'required' || ref.status === 'missing'
+                                    ? 'border-amber-200 bg-amber-50 text-amber-700'
+                                    : 'border-slate-200 bg-slate-50 text-slate-600'
+                              }`}
+                            >
+                              {ref.status.replace('_', ' ')}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-[9px] leading-relaxed text-text-main">{ref.summary}</p>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
@@ -2241,98 +2260,51 @@ ${result.decision}
                     </div>
 
                     <div className="space-y-2">
-                      <div className="rounded-lg border border-border bg-surface p-2">
-                        <h4 className="text-[10px] font-bold text-text-main">Phase purity</h4>
-                        <p className="mt-1 text-[9px] text-text-muted">Not fully resolved from current evidence.</p>
-                      </div>
-
-                      <div className="rounded-lg border border-border bg-surface p-2">
-                        <h4 className="text-[10px] font-bold text-text-main">Surface chemistry</h4>
-                        <p className="mt-1 text-[9px] text-text-muted">XRD is bulk-averaged; surface state may differ.</p>
-                      </div>
-
-                      <div className="rounded-lg border border-border bg-surface p-2">
-                        <h4 className="text-[10px] font-bold text-text-main">Cation distribution</h4>
-                        <p className="mt-1 text-[9px] text-text-muted">Not assigned from current signal set.</p>
-                      </div>
-
-                      <div className="rounded-lg border border-border bg-surface p-2">
-                        <h4 className="text-[10px] font-bold text-text-main">XPS validation</h4>
-                        <p className="mt-1 text-[9px] text-text-muted">Required before final oxidation-state or surface-chemistry claims.</p>
-                      </div>
-
                       <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-2.5">
-                        <div className="flex items-center justify-between">
-                          <h4 className="text-[10px] font-bold text-amber-700">Claim boundary</h4>
-                          <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[8px] font-semibold text-amber-700">Overclaim risk: Moderate</span>
+                        <div className="flex items-center justify-between gap-2">
+                          <h4 className="text-[10px] font-bold text-amber-700">Validation gap</h4>
+                          <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[8px] font-semibold text-amber-700">
+                            {registryProject.validationGapCount} open
+                          </span>
                         </div>
-                        <p className="mt-1.5 text-[9px] leading-relaxed text-text-muted">
-                          Use {formatChemicalFormula('CuFe2O4')} spinel ferrite as a working inference. Phase purity, cation distribution, and surface-state claims remain validation-limited.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {activeRightTab === 'agent' && (
-                  <div className="space-y-3">
-                    <div>
-                      <h3 className="text-xs font-bold text-text-main">Agent Refinement</h3>
-                      <p className="mt-0.5 text-[10px] text-text-muted">Send selected processed evidence to Agent Mode.</p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="rounded-lg border border-border bg-surface p-2">
-                        <div className="text-[9px] font-semibold uppercase tracking-wider text-text-muted">Agent task</div>
-                        <p className="mt-1 text-[9px] text-text-main">Refine the working inference using selected processed evidence.</p>
+                        <p className="mt-1.5 text-[9px] leading-relaxed text-text-muted">{crossTech.validationGap}</p>
                       </div>
 
                       <div className="rounded-lg border border-border bg-surface p-2">
-                        <div className="text-[9px] font-semibold uppercase tracking-wider text-text-muted">Context included</div>
-                        <div className="mt-1 flex flex-wrap gap-1">
-                          {Array.from(activeTechniques).map((tech) => (
-                            <span key={tech} className="rounded bg-primary/10 px-1.5 py-0.5 text-[8px] font-semibold text-primary">
-                              {tech}
-                            </span>
+                        <h4 className="text-[10px] font-bold text-text-main">Cannot conclude</h4>
+                        <ul className="mt-1 space-y-1 text-[9px] text-text-muted">
+                          {registryProject.agentWorkflow.claimBoundary.cannotConclude.map((item) => (
+                            <li key={item} className="flex gap-1">
+                              <span>-</span>
+                              <span>{item}</span>
+                            </li>
                           ))}
-                        </div>
-                      </div>
-
-                      <div className="rounded-lg border border-border bg-surface p-2">
-                        <div className="text-[9px] font-semibold uppercase tracking-wider text-text-muted">Expected output</div>
-                        <ul className="mt-1 space-y-0.5 text-[9px] text-text-muted">
-                          <li className="flex gap-1">
-                            <span className="text-primary">•</span>
-                            <span>Evidence-linked interpretation</span>
-                          </li>
-                          <li className="flex gap-1">
-                            <span className="text-primary">•</span>
-                            <span>Support mapping</span>
-                          </li>
-                          <li className="flex gap-1">
-                            <span className="text-primary">•</span>
-                            <span>Claim boundary</span>
-                          </li>
-                          <li className="flex gap-1">
-                            <span className="text-primary">•</span>
-                            <span>Validation gaps</span>
-                          </li>
-                          <li className="flex gap-1">
-                            <span className="text-primary">•</span>
-                            <span>Notebook-ready discussion</span>
-                          </li>
                         </ul>
                       </div>
 
-                      <Button
-                        type="button"
-                        variant="primary"
-                        size="sm"
-                        className="w-full gap-1.5"
-                        onClick={handleRefineInterpretation}
-                      >
-                        <Play size={14} /> Open Agent Mode
-                      </Button>
+                      <div className="rounded-lg border border-border bg-surface p-2">
+                        <h4 className="text-[10px] font-bold text-text-main">Missing evidence</h4>
+                        <ul className="mt-1 space-y-1 text-[9px] text-text-muted">
+                          {crossTech.missingEvidence.map((item) => (
+                            <li key={item} className="flex gap-1">
+                              <span>-</span>
+                              <span>{item}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      <div className="rounded-lg border border-border bg-surface p-2">
+                        <h4 className="text-[10px] font-bold text-text-main">Required next validation action</h4>
+                        <p className="mt-1 text-[9px] text-text-muted">{crossTech.recommendedNextAction}</p>
+                      </div>
+
+                      <div className="rounded-lg border border-border bg-surface p-2">
+                        <h4 className="text-[10px] font-bold text-text-main">Claim boundary</h4>
+                        <p className="mt-1 text-[9px] leading-relaxed text-text-muted">
+                          {registryProject.notebook.validationBoundary}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 )}
