@@ -6,6 +6,7 @@ import type { ParameterGroupId } from '../../../utils/projectEvidence';
 import { getProvenanceLabel, getProvenanceStyle } from '../../../utils/projectEvidence';
 import type { AgentEvidenceWorkspace } from '../../../utils/agentEvidenceModel';
 import type { RegistryProject } from '../../../data/demoProjectRegistry';
+import type { RuntimeMode } from '../../../runtime/difaryxRuntimeMode';
 
 // Mode configuration with tab IDs
 const AGENT_MODES = {
@@ -51,7 +52,6 @@ const AGENT_MODES = {
 } as const;
 
 type AgentMode = keyof typeof AGENT_MODES;
-type RuntimeMode = 'demo' | 'connected';
 
 interface NormalizedToolTraceEntry {
   id: string;
@@ -541,6 +541,8 @@ function ToolTraceCompact({
   runtimeMode: RuntimeMode;
 }) {
   if (trace.length === 0) return null;
+  const sourceMode = runtimeMode === 'demo' ? 'demo_preloaded' : 'google_drive_connected';
+  const permissionMode = runtimeMode === 'demo' ? 'read_only' : 'approval_required';
 
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-3">
@@ -557,6 +559,10 @@ function ToolTraceCompact({
         }`}>
           {runtimeMode === 'demo' ? 'Demo deterministic' : 'Connected gated'}
         </span>
+      </div>
+      <div className="mb-2 grid grid-cols-2 gap-1 text-[10px] text-slate-500">
+        <span>Source: {sourceMode}</span>
+        <span>Permission: {permissionMode}</span>
       </div>
       <div className="space-y-2">
         {trace.map((entry) => (
@@ -842,7 +848,7 @@ function AgentComparePlaceholder() {
         Agent Compare
       </h3>
       <p className="text-xs text-slate-500 leading-relaxed">
-        Gemini comparison is not connected in this demo. Agent comparison currently reflects deterministic demo reasoning.
+        External agent comparison is not connected in this demo. Agent comparison currently reflects deterministic demo reasoning.
       </p>
     </div>
   );

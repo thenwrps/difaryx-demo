@@ -524,7 +524,7 @@ function buildComparisonContext(): ComparisonContext {
     paperScholar:
       'External literature comparison is not connected in this demo. Use this section to document manual reference checks.',
     agentCompare:
-      'Gemini comparison is not connected in this demo. Agent comparison currently reflects deterministic demo reasoning.',
+      'External agent comparison is not connected in this demo. Agent comparison currently reflects deterministic demo reasoning.',
   };
 }
 

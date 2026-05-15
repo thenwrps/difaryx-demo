@@ -55,6 +55,12 @@ import {
   getConditionLockStatusLabel,
   getLatestExperimentConditionLock,
 } from '../data/experimentConditionLock';
+import { getProjectEvidenceSnapshot } from '../utils/evidenceSnapshot';
+import {
+  createEvidenceBundleFromSnapshot,
+  getEvidenceBundleBadgeLabel,
+  getTechniqueCoverageFromBundle,
+} from '../runtime/evidenceBundle';
 
 // Cross-tech evidence types
 interface CrossTechEvidence {
@@ -703,6 +709,22 @@ export default function MultiTechWorkspace() {
   // Canonical registry project - shared source of truth for cross-page data.
   const registryProject = useMemo(() => getRegistryProject(project.id), [project.id]);
   const crossTech = registryProject.crossTechniqueComparison;
+  const evidenceSnapshot = useMemo(() => getProjectEvidenceSnapshot(project.id, {
+    source: searchParams.get('source'),
+    uploadedRunId: searchParams.get('upload') ?? searchParams.get('uploadedRunId'),
+    analysisSessionId: searchParams.get('sessionId') ?? searchParams.get('analysisId'),
+    driveFileId: searchParams.get('driveFileId') ?? searchParams.get('driveImportId'),
+  }), [project.id, searchParams]);
+  const evidenceBundle = useMemo(
+    () => createEvidenceBundleFromSnapshot(evidenceSnapshot, {
+      includeDemoContext: searchParams.get('bundle') === 'mixed' || searchParams.get('source') === 'mixed',
+    }),
+    [evidenceSnapshot, searchParams],
+  );
+  const bundleTechniqueCoverage = useMemo(
+    () => getTechniqueCoverageFromBundle(evidenceBundle),
+    [evidenceBundle],
+  );
 
   // Get available techniques from project
   const availableTechniques = project.techniqueMetadata.map(t => t.key);
@@ -1158,6 +1180,12 @@ ${result.decision}
               </p>
             </div>
             <div className="flex max-w-full flex-wrap items-center justify-start gap-1.5 sm:justify-end">
+              <div
+                className="inline-flex h-8 max-w-[260px] items-center gap-1.5 rounded border border-cyan-200 bg-cyan-50 px-2.5 text-[10px] font-semibold text-cyan-700"
+                title={`${evidenceBundle.bundleId}: ${bundleTechniqueCoverage.map((item) => `${item.technique} ${item.status}`).join(', ')}`}
+              >
+                <span className="truncate">{getEvidenceBundleBadgeLabel(evidenceBundle)} / {evidenceBundle.evidenceCompletenessScore}%</span>
+              </div>
               <select
                 value={project.id}
                 onChange={(event) => {
@@ -1269,6 +1297,25 @@ ${result.decision}
               </span>
               {workflowFeedback && <span className="font-semibold text-primary">{workflowFeedback}</span>}
             </div>
+          </div>
+        </div>
+
+        <div className="mb-1.5 rounded-md border border-border bg-surface px-2.5 py-1.5">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-text-muted">
+            <span className="font-semibold text-text-main">Bundle: {evidenceBundle.bundleId}</span>
+            <span>Source: {evidenceBundle.sourceLabel}</span>
+            <span>Files: {evidenceBundle.files.length}</span>
+            <span>Available: {evidenceBundle.availableTechniques.join(', ') || 'None'}</span>
+            <span>Missing: {evidenceBundle.missingRequiredTechniques.join(', ') || 'None'}</span>
+            <span>Permission: {evidenceBundle.permissionMode}</span>
+          </div>
+          <div className="mt-1 grid grid-cols-2 gap-1 sm:grid-cols-4">
+            {bundleTechniqueCoverage.map((item) => (
+              <div key={item.technique} className="rounded border border-border bg-background px-2 py-1">
+                <div className="text-[10px] font-bold text-text-main">{item.technique}</div>
+                <div className="truncate text-[10px] text-text-muted">{item.status} / {item.sourceLabel}</div>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -1717,7 +1764,7 @@ ${result.decision}
                         <li>Experiment conditions: {conditionLockStatus}</li>
                         <li>Limitations retained for report/export review.</li>
                       </ul>
-                      <Link to={`/notebook?project=${project.id}&source=uploaded-beta&template=analytical`}>
+                      <Link to={`/notebook?project=${project.id}&source=uploaded-beta&upload=${encodeURIComponent(latestUploadedRun.id)}&template=analytical`}>
                         <Button variant="outline" size="sm" className="mt-3 w-full gap-1.5">
                           <BookOpen size={13} /> Continue to Notebook
                         </Button>

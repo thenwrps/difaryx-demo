@@ -57,6 +57,8 @@ import {
   type RegistryProject,
 } from '../data/demoProjectRegistry';
 import { DemoProjectGraph } from '../components/graphs/DemoProjectGraph';
+import { getProjectEvidenceSnapshot } from '../utils/evidenceSnapshot';
+import { getRuntimeBadgeClass, getRuntimeBadgeLabel } from '../runtime/difaryxRuntimeMode';
 
 /* ─── workflow chain (top of dashboard) ─── */
 const WORKFLOW_STEPS = [
@@ -129,15 +131,33 @@ function EvidenceCoverageBar({ project }: { project: DemoProject }) {
 /* ─── project card — graph-first layout ─── */
 function ProjectCard({ project }: { project: RegistryProject }) {
   const navigate = useNavigate();
+  const evidenceSnapshot = getProjectEvidenceSnapshot(project.id);
+  const evidenceSourceCount = evidenceSnapshot.availableTechniques.length + evidenceSnapshot.pendingTechniques.length;
+  const evidenceCoverageLabel = `${evidenceSnapshot.availableTechniques.length}/${evidenceSourceCount || 0} sources`;
+  const firstValidationGap = evidenceSnapshot.validationGaps[0];
+  const claimBoundaryLabel =
+    evidenceSnapshot.claimBoundary.requiresValidation[0] ??
+    evidenceSnapshot.claimBoundary.notSupportedYet[0] ??
+    'Claim boundary preserved.';
+  const evidenceSummary = evidenceSnapshot.evidenceEntries[0]?.support ?? project.evidenceSummary;
+  const runtimeContext = {
+    sourceMode: evidenceSnapshot.sourceMode ?? 'demo_preloaded',
+    runtimeMode: evidenceSnapshot.runtimeMode ?? 'demo',
+    permissionMode: evidenceSnapshot.permissionMode ?? 'read_only',
+    sourceLabel: evidenceSnapshot.sourceLabel ?? 'Demo evidence',
+    approvalStatus: evidenceSnapshot.approvalStatus ?? 'not_required',
+  } as const;
 
   // Canonical registry project — single source of truth shared across app
   const projectJobLabel = `${jobTypeLabel(project.jobType)} PROJECT`;
   const exportReady = project.reportReadiness >= 80;
-  const readinessLabel = project.reportReadiness >= 80
-    ? 'Report-ready'
-    : project.reportReadiness >= 50
-    ? 'Discussion-ready'
-    : 'Requires processing';
+  const readinessLabel = evidenceSnapshot.pendingTechniques.length > 0
+    ? 'Validation-limited'
+    : project.reportReadiness >= 80
+      ? 'Report-ready'
+      : project.reportReadiness >= 50
+        ? 'Discussion-ready'
+        : 'Requires processing';
   const readinessColor = project.reportReadiness >= 80
     ? 'text-primary'
     : project.reportReadiness >= 50
@@ -177,14 +197,19 @@ function ProjectCard({ project }: { project: RegistryProject }) {
 
       {/* body */}
       <div className="flex-1 p-4 flex flex-col gap-2">
-        <p className="text-[11px] text-text-muted leading-relaxed line-clamp-2">{project.evidenceSummary}</p>
+        <p className="text-[11px] text-text-muted leading-relaxed line-clamp-2">{formatChemicalFormula(evidenceSummary)}</p>
 
         {/* technique pills + readiness */}
         <div className="flex items-center justify-between">
           <div className="flex flex-wrap gap-1">
-            {project.selectedTechniques.map((tech) => (
+            {evidenceSnapshot.availableTechniques.map((tech) => (
               <span key={tech} className="rounded-full border border-primary/30 bg-primary/5 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary">
-                {tech.toUpperCase()}
+                {tech}
+              </span>
+            ))}
+            {evidenceSnapshot.pendingTechniques.map((tech) => (
+              <span key={`pending-${tech}`} className="rounded-full border border-amber-500/30 bg-amber-500/5 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-700">
+                {tech} pending
               </span>
             ))}
           </div>
@@ -203,8 +228,21 @@ function ProjectCard({ project }: { project: RegistryProject }) {
             {project.statusLabel}
           </span>
           <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[9px] font-medium text-text-muted">
-            {project.validationGapCount} validation gap{project.validationGapCount === 1 ? '' : 's'}
+            {evidenceSnapshot.validationGaps.length} validation gap{evidenceSnapshot.validationGaps.length === 1 ? '' : 's'}
           </span>
+          <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[9px] font-medium text-text-muted">
+            {evidenceCoverageLabel}
+          </span>
+          <span className={`rounded-full border px-2 py-0.5 text-[9px] font-medium ${getRuntimeBadgeClass(runtimeContext)}`}>
+            {getRuntimeBadgeLabel(runtimeContext)}
+          </span>
+        </div>
+
+        <div className="text-[10px] font-medium text-text-dim tracking-wide">
+          <span className="text-text-muted">Assignment:</span> {formatChemicalFormula(evidenceSnapshot.supportedAssignment)}
+        </div>
+        <div className="text-[10px] font-medium text-text-dim tracking-wide line-clamp-1" title={firstValidationGap?.description ?? claimBoundaryLabel}>
+          <span className="text-text-muted">Boundary:</span> {firstValidationGap?.description ?? claimBoundaryLabel}
         </div>
 
         {/* pipeline */}

@@ -1,8 +1,14 @@
 import React from 'react';
-import { Bot, CheckCircle2, Database, Download, Link2, User } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Bot, Database, Download, Link2, User } from 'lucide-react';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
 import { Card } from '../components/ui/Card';
 import { DEFAULT_PROJECT_ID } from '../data/demoProjects';
+import { ConnectedAccountStatus } from '../components/runtime/ConnectedAccountStatus';
+import {
+  getDefaultConnectedAccountState,
+  getGoogleConnectedShellState,
+} from '../runtime/connectedAccounts';
 
 function Field({ label, value }: { label: string; value: string }) {
   return (
@@ -32,6 +38,11 @@ function ToggleRow({ label, description, checked = true }: { label: string; desc
 }
 
 export default function SettingsPage() {
+  const localAccountState = getDefaultConnectedAccountState();
+  const googleAccountShell = getGoogleConnectedShellState();
+  const mockDriveWorkspacePath = '/workspace/xrd?project=cu-fe2o4-spinel&source=google_drive_connected&driveFileId=drive-cufe2o4-xrd';
+  const mockDriveReportPath = '/reports?project=cu-fe2o4-spinel&source=google_drive_connected&driveFileId=drive-cufe2o4-xrd';
+
   return (
     <DashboardLayout>
       <div className="p-8 h-full overflow-y-auto">
@@ -43,7 +54,7 @@ export default function SettingsPage() {
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           <Card className="p-5 xl:col-span-2">
-            <h2 className="text-sm font-semibold flex items-center gap-2"><Database size={16} className="text-primary" /> Demo Dataset · Deterministic Scientific Workflow</h2>
+            <h2 className="text-sm font-semibold flex items-center gap-2"><Database size={16} className="text-primary" /> Demo Dataset / Deterministic Scientific Workflow</h2>
             <p className="mt-2 max-w-3xl text-sm leading-relaxed text-text-muted">
               This demo uses a deterministic scientific workflow for reliability. The same structured pipeline is designed to connect with model and tool-based execution layers.
             </p>
@@ -88,21 +99,21 @@ export default function SettingsPage() {
 
           <Card className="p-5 xl:col-span-2">
             <h2 className="text-sm font-semibold flex items-center gap-2"><Link2 size={16} className="text-primary" /> Connected Accounts</h2>
-            <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="rounded-md border border-border bg-background/50 p-4 flex items-start gap-3">
-                <CheckCircle2 size={18} className="text-cyan mt-0.5" />
-                <div>
-                  <div className="text-sm font-medium text-text-main">Google access</div>
-                  <div className="text-xs text-text-muted mt-1">Demo routes remain open while account connection is simulated.</div>
-                </div>
-              </div>
-              <div className="rounded-md border border-border bg-background/50 p-4 flex items-start gap-3">
-                <CheckCircle2 size={18} className="text-cyan mt-0.5" />
-                <div>
-                  <div className="text-sm font-medium text-text-main">Email access</div>
-                  <div className="text-xs text-text-muted mt-1">Demo routes remain open while email access is simulated.</div>
-                </div>
-              </div>
+            <p className="mt-2 max-w-3xl text-sm leading-relaxed text-text-muted">
+              Connection shell only. Google Drive and Gmail destinations are represented for approval readiness, but no OAuth scopes, backend calls, or external writes are active.
+            </p>
+            <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <ConnectedAccountStatus state={localAccountState} capabilities={['storage_future']} />
+              <ConnectedAccountStatus state={googleAccountShell} capabilities={['drive_import', 'drive_export_future', 'gmail_draft_future']} />
+            </div>
+            <div className="mt-4 flex flex-wrap items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2">
+              <span className="text-xs font-semibold text-blue-900">Mock Drive evidence preview only; no real Drive files are accessed.</span>
+              <Link to={mockDriveWorkspacePath} className="inline-flex h-7 items-center rounded-md border border-blue-200 bg-white px-2 text-xs font-bold text-blue-700 hover:bg-blue-100">
+                Preview Drive import
+              </Link>
+              <Link to={mockDriveReportPath} className="inline-flex h-7 items-center rounded-md border border-blue-200 bg-white px-2 text-xs font-bold text-blue-700 hover:bg-blue-100">
+                Use mock Drive evidence
+              </Link>
             </div>
           </Card>
         </div>

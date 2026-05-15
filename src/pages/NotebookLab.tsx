@@ -69,6 +69,29 @@ import {
   getConditionLockSectionLines,
   getConditionLockStatusLabel,
 } from '../data/experimentConditionLock';
+import { getProjectEvidenceSnapshot, type ProjectEvidenceSnapshot } from '../utils/evidenceSnapshot';
+import {
+  getRuntimeBadgeClass,
+  getRuntimeBadgeLabel,
+  requiresApproval,
+} from '../runtime/difaryxRuntimeMode';
+import { ApprovalActionDialog } from '../components/runtime/ApprovalActionDialog';
+import { ConnectedAccountStatus } from '../components/runtime/ConnectedAccountStatus';
+import {
+  createApprovalActionPreview,
+  type ApprovalActionPreview,
+  type ApprovalActionType,
+  type ApprovalRiskLevel,
+} from '../runtime/actionApproval';
+import {
+  getDefaultConnectedAccountState,
+  getGoogleConnectedShellState,
+} from '../runtime/connectedAccounts';
+import {
+  createEvidenceBundleFromSnapshot,
+  getEvidenceBundleBadgeLabel,
+  getTechniqueCoverageFromBundle,
+} from '../runtime/evidenceBundle';
 
 const NOTEBOOK_TEMPLATE_MODES: NotebookTemplateMode[] = ['research', 'rd', 'analytical'];
 const NOTEBOOK_TABS = ['Objective / Context', 'Evidence', 'Interpretation', 'Validation Gap', 'Decision'] as const;
@@ -463,6 +486,28 @@ function buildNotebookSummaryRows(
   });
 }
 
+function getSnapshotStatusLabel(snapshot: ProjectEvidenceSnapshot, fallbackStatus: string) {
+  if (snapshot.evidenceEntries.length === 0) return 'Requires dataset';
+  if (snapshot.pendingTechniques.length > 0 || snapshot.validationGaps.length > 0) {
+    return 'Validation-limited';
+  }
+  return fallbackStatus;
+}
+
+function getSnapshotEvidenceLine(snapshot: ProjectEvidenceSnapshot) {
+  return snapshot.evidenceEntries[0]?.support ?? `Evidence review pending for ${snapshot.projectName}.`;
+}
+
+function getSnapshotClaimBoundaryLines(snapshot: ProjectEvidenceSnapshot) {
+  return [
+    ...snapshot.claimBoundary.supported.map((line) => `Supported: ${line}`),
+    ...snapshot.claimBoundary.requiresValidation.map((line) => `Requires validation: ${line}`),
+    ...snapshot.claimBoundary.notSupportedYet.map((line) => `Not supported yet: ${line}`),
+    ...(snapshot.claimBoundary.contextual ?? []).map((line) => `Contextual: ${line}`),
+    ...(snapshot.claimBoundary.pending ?? []).map((line) => `Pending: ${line}`),
+  ];
+}
+
 export default function NotebookLab() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -476,13 +521,30 @@ export default function NotebookLab() {
     () => normalizeNotebookTemplateMode(searchParams.get('template')),
   );
   const [feedback, setFeedback] = useState('');
+  const [approvalAction, setApprovalAction] = useState<ApprovalActionPreview | null>(null);
+  const evidenceSnapshot = useMemo(() => getProjectEvidenceSnapshot(project.id, {
+    source: searchParams.get('source'),
+    analysisSessionId: searchParams.get('sessionId') ?? searchParams.get('analysisId'),
+    uploadedRunId: searchParams.get('upload') ?? searchParams.get('uploadedRunId'),
+    driveFileId: searchParams.get('driveFileId') ?? searchParams.get('driveImportId'),
+  }), [project.id, feedback, searchParams]);
+  const evidenceBundle = useMemo(
+    () => createEvidenceBundleFromSnapshot(evidenceSnapshot, {
+      includeDemoContext: searchParams.get('bundle') === 'mixed' || searchParams.get('source') === 'mixed',
+    }),
+    [evidenceSnapshot, searchParams],
+  );
+  const bundleTechniqueCoverage = useMemo(
+    () => getTechniqueCoverageFromBundle(evidenceBundle),
+    [evidenceBundle],
+  );
   const [experimentModalOpen, setExperimentModalOpen] = useState(false);
   const [isProjectRailCollapsed, setIsProjectRailCollapsed] = useState(false);
   const [expandedProjectIds, setExpandedProjectIds] = useState<string[]>(() => [searchParams.get('project') ?? 'cu-fe2o4-spinel']);
   const [selectedProjectId, setSelectedProjectId] = useState<string>(() => searchParams.get('project') ?? project.id);
   const [selectedExperimentId, setSelectedExperimentId] = useState<string | null>(() => searchParams.get('experiment'));
   const [activeNotebookTab, setActiveNotebookTab] = useState<ActiveNotebookTab>('Objective / Context');
-  const [selectedEvidenceTechnique, setSelectedEvidenceTechnique] = useState<Technique>(() => project.techniques[0] ?? 'XRD');
+  const [selectedEvidenceTechnique, setSelectedEvidenceTechnique] = useState<Technique>(() => evidenceSnapshot.primaryTechnique);
   const [isEvidenceDrawerOpen, setIsEvidenceDrawerOpen] = useState(false);
   const [localExperiments, setLocalExperiments] = useState(() => getLocalExperiments());
   const [wizardNotebooks, setWizardNotebooks] = useState<ProjectNotebook[]>(() => getLocalProjectNotebooks());
@@ -509,10 +571,13 @@ export default function NotebookLab() {
   const [attachRunOpen, setAttachRunOpen] = useState(false);
 
   useEffect(() => {
-    if (!project.techniques.includes(selectedEvidenceTechnique)) {
-      setSelectedEvidenceTechnique(project.techniques[0] ?? 'XRD');
+    const selectableTechniques = evidenceSnapshot.availableTechniques.length
+      ? evidenceSnapshot.availableTechniques
+      : [evidenceSnapshot.primaryTechnique];
+    if (!selectableTechniques.includes(selectedEvidenceTechnique)) {
+      setSelectedEvidenceTechnique(selectableTechniques[0] ?? evidenceSnapshot.primaryTechnique);
     }
-  }, [project.id, project.techniques, selectedEvidenceTechnique]);
+  }, [project.id, evidenceSnapshot.availableTechniques, evidenceSnapshot.primaryTechnique, selectedEvidenceTechnique]);
   const runResult = useMemo(() => loadAgentRunResult(project.id), [project.id]);
   const workspaceRun = useMemo(() => getProcessingRun(runId), [runId]);
   const workspaceDataset = useMemo(
@@ -536,19 +601,27 @@ export default function NotebookLab() {
   const experimentConditionBoundaryNotes = getConditionBoundaryNotes(experimentConditionLock, project.techniques);
   const experimentConditionStatus = getConditionLockStatusLabel(experimentConditionLock);
   const attachedRunRecord = useMemo(() => getProcessingRun(attachedRun), [attachedRun]);
-  const selectedTechniqueForExport = project.techniques.includes(selectedEvidenceTechnique)
+  const selectableExportTechniques = evidenceSnapshot.availableTechniques.length
+    ? evidenceSnapshot.availableTechniques
+    : [evidenceSnapshot.primaryTechnique];
+  const selectedTechniqueForExport = selectableExportTechniques.includes(selectedEvidenceTechnique)
     ? selectedEvidenceTechnique
-    : project.techniques[0] ?? 'XRD';
+    : selectableExportTechniques[0] ?? evidenceSnapshot.primaryTechnique;
   const selectedEvidenceDataset = useMemo(
-    () => getProjectDatasets(project.id).find((dataset) => dataset.technique === selectedTechniqueForExport) ?? null,
-    [project.id, selectedTechniqueForExport],
+    () =>
+      getProjectDatasets(project.id).find((dataset) => dataset.technique === selectedTechniqueForExport) ??
+      (evidenceSnapshot.activeDataset?.technique === selectedTechniqueForExport ? evidenceSnapshot.activeDataset : null),
+    [project.id, selectedTechniqueForExport, evidenceSnapshot.activeDataset],
   );
-  const hasMatchedNotebookData = hasMatchedXrdDemoData(project.id);
+  const hasUploadedEvidenceSnapshot = evidenceSnapshot.sourceMode === 'user_uploaded';
+  const hasMatchedNotebookData = hasUploadedEvidenceSnapshot
+    ? evidenceSnapshot.evidenceEntries.length > 0
+    : hasMatchedXrdDemoData(project.id);
   const projectNotebookContent = getProjectNotebookContent(project.id);
   const notebookTemplate = NOTEBOOK_TEMPLATES[templateMode];
   const workflowProcessingResult = useMemo(
-    () => getLatestProcessingResult(project.id) ?? createProcessingResultFromXrdDemo(project.id),
-    [project.id, feedback],
+    () => evidenceSnapshot.reportContext ?? getLatestProcessingResult(project.id) ?? createProcessingResultFromXrdDemo(project.id),
+    [project.id, feedback, evidenceSnapshot.reportContext],
   );
   const workflowRefinement = useMemo(
     () =>
@@ -560,18 +633,31 @@ export default function NotebookLab() {
     const entryFromRoute = getNotebookEntry(entryId);
     if (entryFromRoute?.templateMode === templateMode) return entryFromRoute;
     return (
+      (evidenceSnapshot.notebookContext?.templateMode === templateMode ? evidenceSnapshot.notebookContext : null) ??
       getLatestNotebookEntry(project.id, templateMode) ??
       createNotebookEntryFromRefinement(workflowRefinement, templateMode)
     );
-  }, [entryId, project.id, templateMode, workflowRefinement, feedback]);
+  }, [entryId, project.id, templateMode, workflowRefinement, feedback, evidenceSnapshot.notebookContext]);
   const workflowReportSection = useMemo(
     () => createReportSectionFromNotebookEntry(workflowNotebookEntry),
     [workflowNotebookEntry],
   );
   const notebookTemplateDetails = NOTEBOOK_TEMPLATE_DETAILS[templateMode];
   const displayNotebookStatus = hasMatchedNotebookData
-    ? claimStatusLabel(registryProject.claimStatus)
+    ? evidenceBundle.missingRequiredTechniques.length > 0 || evidenceBundle.validationGaps.length > 0
+      ? 'Validation-limited'
+      : getSnapshotStatusLabel(evidenceSnapshot, claimStatusLabel(registryProject.claimStatus))
     : 'Requires dataset';
+  const runtimeContext = {
+    sourceMode: evidenceSnapshot.sourceMode ?? 'demo_preloaded',
+    runtimeMode: evidenceSnapshot.runtimeMode ?? 'demo',
+    permissionMode: evidenceSnapshot.permissionMode ?? 'read_only',
+    sourceLabel: evidenceSnapshot.sourceLabel ?? 'Demo evidence',
+    approvalStatus: evidenceSnapshot.approvalStatus ?? 'not_required',
+  } as const;
+  const connectedAccountState = runtimeContext.sourceMode === 'google_drive_connected'
+    ? getGoogleConnectedShellState()
+    : getDefaultConnectedAccountState();
   const canExportNotebook = hasMatchedNotebookData && registryProject.reportReadiness >= 80;
   const primaryNotebookSection = workflowNotebookEntry.sections[0];
   const supportingNotebookSections = workflowNotebookEntry.sections.slice(1);
@@ -628,7 +714,9 @@ export default function NotebookLab() {
     };
   }, [project, runResult, workspaceDataset, workspaceRun]);
   const keyEvidenceItems = hasMatchedNotebookData
-    ? projectNotebookContent.keyEvidence
+    ? evidenceSnapshot.evidenceEntries.map((entry) =>
+        `${entry.technique}: ${entry.support}${entry.limitations ? ` (${entry.limitations})` : ''}`,
+      ).slice(0, 5)
     : [
         'No matched processing result is linked to this notebook entry.',
         'Evidence has not been generated for this project in the deterministic XRD demo workflow.',
@@ -658,27 +746,55 @@ export default function NotebookLab() {
   };
 
   const confidenceLabel = claimStatusLabel(registryProject.claimStatus);
+  const uploadedRouteParams = new URLSearchParams();
+  ['source', 'bundle', 'sessionId', 'analysisId', 'upload', 'uploadedRunId', 'driveFileId', 'driveImportId'].forEach((key) => {
+    const value = searchParams.get(key);
+    if (value) uploadedRouteParams.set(key, value);
+  });
+  const uploadedRouteSuffix = uploadedRouteParams.toString() ? `&${uploadedRouteParams.toString()}` : '';
+  const snapshotDiscussionLine = hasUploadedEvidenceSnapshot
+    ? `${getSnapshotEvidenceLine(evidenceSnapshot)} ${getSnapshotClaimBoundaryLines(evidenceSnapshot)[0] ?? 'Uploaded evidence remains validation-limited.'}`
+    : projectNotebookContent.discussion;
 
   const evidenceTraceItems = [
-    ...project.techniqueMetadata.map((item) => ({
-      technique: item.label,
-      role: item.role,
-      status: item.status,
-      confidence: item.dataAvailable ? (hasMatchedNotebookData ? displayNotebookStatus : 'Pending evidence') : 'Not linked',
-    })),
-    ...(['XRD', 'Raman', 'FTIR', 'XPS'] as const)
-      .filter((technique) => !project.techniqueMetadata.some((item) => item.label === technique))
-      .map((technique) => ({
+    ...evidenceSnapshot.availableTechniques.map((technique) => {
+      const item = project.techniqueMetadata.find((metadata) => metadata.key === technique);
+      const entry = evidenceSnapshot.evidenceEntries.find((candidate) => candidate.technique === technique);
+      return {
         technique,
-        role: technique === 'XRD' ? 'Bulk phase' : technique === 'XPS' ? 'Surface state' : technique === 'FTIR' ? 'Bonding context' : 'Lattice mode',
-        status: 'not-linked',
-        confidence: 'Optional validation',
-      })),
+        role: item?.role ?? (technique === 'XRD' ? 'Bulk phase' : technique === 'XPS' ? 'Surface state' : technique === 'FTIR' ? 'Bonding context' : 'Lattice mode'),
+        status: 'available',
+        confidence: entry?.support ?? displayNotebookStatus,
+      };
+    }),
+    ...evidenceSnapshot.pendingTechniques.map((technique) => ({
+      technique,
+      role: technique === 'XRD' ? 'Bulk phase validation' : technique === 'XPS' ? 'Surface-state validation' : technique === 'FTIR' ? 'Bonding-context validation' : 'Vibrational validation',
+      status: 'pending validation',
+      confidence: 'Pending validation evidence',
+    })),
   ];
 
   const showFeedback = (message: string) => {
     setFeedback(message);
     window.setTimeout(() => setFeedback(''), 1800);
+  };
+
+  const openApprovalPreview = (
+    actionType: ApprovalActionType,
+    actionLabel: string,
+    destinationLabel: string,
+    riskLevel?: ApprovalRiskLevel,
+  ) => {
+    setApprovalAction(createApprovalActionPreview({
+      actionId: `notebook-${actionType}-${Date.now()}`,
+      actionType,
+      actionLabel,
+      destinationLabel,
+      evidenceSnapshot,
+      runtimeContext,
+      riskLevel,
+    }));
   };
 
   const exportFeedbackMessage = (format: DemoExportFormat) => {
@@ -692,7 +808,7 @@ export default function NotebookLab() {
   };
 
   const copyShareLink = async () => {
-    const url = `${window.location.origin}/notebook?project=${project.id}&template=${templateMode}&entry=${workflowNotebookEntry.id}${workspaceRun ? `&run=${workspaceRun.id}` : ''}`;
+    const url = `${window.location.origin}/notebook?project=${project.id}&template=${templateMode}&entry=${workflowNotebookEntry.id}${workspaceRun ? `&run=${workspaceRun.id}` : ''}${uploadedRouteSuffix}`;
     try {
       await navigator.clipboard.writeText(url);
       showFeedback('Share link copied');
@@ -704,11 +820,16 @@ export default function NotebookLab() {
   const exportMarkdown = () => {
     const lockedContext = getLockedContext(project.id);
     const evidenceMarkdown = keyEvidenceItems.map((item) => `- ${item}`).join('\n');
-    const validationMarkdown = projectNotebookContent.validationNotes.map((item) => `- ${item}`).join('\n');
+    const validationMarkdown = [
+      ...evidenceSnapshot.validationGaps.map((gap) => `${gap.description} Resolution: ${gap.suggestedResolution}`),
+      ...evidenceSnapshot.pendingTechniques.map((technique) => `${technique} validation evidence is pending.`),
+    ].map((item) => `- ${item}`).join('\n');
     const traceMarkdown = technicalTrace.map((step, index) => `${index + 1}. ${sanitizeTraceStep(step)}`).join('\n');
     const sourceRunLines = projectNotebookContent.runLog.map(([label, value]) => `${label}: ${value}`).join('\n');
     const claimBoundaryMarkdown = (
-      workflowNotebookEntry.sections.find((section) => section.heading === 'Claim Boundary')?.lines ?? [
+      getSnapshotClaimBoundaryLines(evidenceSnapshot).length
+        ? getSnapshotClaimBoundaryLines(evidenceSnapshot)
+        : workflowNotebookEntry.sections.find((section) => section.heading === 'Claim Boundary')?.lines ?? [
         'Requires validation: matched processing result is required before claim-boundary review.',
       ]
     ).map((line) => `- ${line}`).join('\n');
@@ -731,7 +852,7 @@ Claim Boundary: ${lockedContext.claimBoundary}
     const markdown = `# DIFARYX Notebook Memory
 
 ## Experiment
-${projectNotebookContent.experimentTitle}
+${evidenceSnapshot.projectName}
 
 ${lockedContextMarkdown}## Source Workflow
 Evidence processing + interpretation refinement
@@ -746,13 +867,20 @@ ${notebookTemplate.label}
 ${displayNotebookStatus}
 
 ## Summary
-${projectNotebookContent.summary}
+${getSnapshotEvidenceLine(evidenceSnapshot)}
 
 ## Refined Discussion
-${projectNotebookContent.discussion}
+${snapshotDiscussionLine}
 
 ## Key Evidence
 ${evidenceMarkdown}
+
+## Evidence Bundle
+Bundle ID: ${evidenceBundle.bundleId}
+Source: ${getEvidenceBundleBadgeLabel(evidenceBundle)}
+Files: ${evidenceBundle.files.map((file) => `${file.technique}: ${file.fileName} (${file.sourceLabel})`).join('; ') || 'No evidence files linked'}
+Technique Coverage: ${bundleTechniqueCoverage.map((item) => `${item.technique}: ${item.status}`).join(', ')}
+Completeness: ${evidenceBundle.evidenceCompletenessScore}%
 
 ## Claim Boundary
 ${claimBoundaryMarkdown}
@@ -788,6 +916,17 @@ ${sourceRunLines}
       return;
     }
 
+    if (requiresApproval(runtimeContext)) {
+      setExportMenuOpen(false);
+      openApprovalPreview(
+        'notebook_commit',
+        `${format.toUpperCase()} notebook export`,
+        'Notebook memory local export preview',
+        'low',
+      );
+      return;
+    }
+
     if (format === 'md') {
       exportMarkdown();
       setExportMenuOpen(false);
@@ -799,8 +938,8 @@ ${sourceRunLines}
         title: 'DIFARYX Notebook Memory',
         sections: [
           { heading: 'Experiment', lines: [projectNotebookContent.experimentTitle] },
-          { heading: 'Summary', lines: [projectNotebookContent.summary] },
-          { heading: 'Interpretation', lines: [projectNotebookContent.discussion] },
+          { heading: 'Summary', lines: [getSnapshotEvidenceLine(evidenceSnapshot)] },
+          { heading: 'Interpretation', lines: [snapshotDiscussionLine] },
           { heading: 'Key Evidence', lines: keyEvidenceItems },
           { heading: 'Experiment Conditions', lines: experimentConditionLines },
           { heading: 'Status', lines: [displayNotebookStatus] },
@@ -816,6 +955,16 @@ ${sourceRunLines}
   };
 
   const exportNotebookCsv = (kind: 'raw' | 'features' | 'summary') => {
+    if (requiresApproval(runtimeContext)) {
+      openApprovalPreview(
+        'report_export',
+        `${kind} CSV export`,
+        'Notebook evidence CSV local export preview',
+        'medium',
+      );
+      return;
+    }
+
     const exportedAt = new Date().toISOString();
     const projectSlug = toCsvSlug(project.id);
 
@@ -884,6 +1033,16 @@ ${sourceRunLines}
       return;
     }
 
+    if (requiresApproval(runtimeContext)) {
+      openApprovalPreview(
+        'notebook_commit',
+        'Notebook commit',
+        'Notebook scientific memory preview',
+        'low',
+      );
+      return;
+    }
+
     saveProcessingResult(workflowProcessingResult);
     const refinement = refineDiscussionFromProcessing(workflowProcessingResult, templateMode);
     saveAgentDiscussionRefinement(refinement);
@@ -892,9 +1051,20 @@ ${sourceRunLines}
     showFeedback(`${NOTEBOOK_TEMPLATES[templateMode].label} entry saved`);
   };
 
+  const handleReportHandoffClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (!requiresApproval(runtimeContext)) return;
+    event.preventDefault();
+    openApprovalPreview(
+      'report_generation',
+      'Report handoff',
+      'Evidence-to-report builder local preview',
+      'medium',
+    );
+  };
+
   const copyAgentSummary = async () => {
     const summary = hasMatchedNotebookData
-      ? projectNotebookContent.discussion
+      ? snapshotDiscussionLine
       : 'No matched processing result is linked to this project. Notebook interpretation remains pending.';
     try {
       await navigator.clipboard.writeText(summary);
@@ -1187,7 +1357,7 @@ ${sourceRunLines}
                 <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
                   <div className="min-w-0">
                     <div className="flex min-w-0 flex-wrap items-center gap-2 text-[11px] text-text-muted">
-                      <span className="text-sm font-bold text-text-main">Notebook Lab / {registryProject.title}</span>
+                      <span className="text-sm font-bold text-text-main">Notebook Lab / {evidenceSnapshot.projectName}</span>
                       <span>{jobTypeLabel(registryProject.jobType)} / {notebookTemplate.label}</span>
                       <span className={hasMatchedNotebookData ? claimStatusColorClass(registryProject.claimStatus) : 'font-semibold text-amber-600'}>{displayNotebookStatus}</span>
                     </div>
@@ -1195,7 +1365,11 @@ ${sourceRunLines}
                       <span>Mode: <span className="font-semibold text-text-main">{notebookTemplate.label}</span></span>
                       <span>Claim status: <span className="font-semibold text-text-main">{displayNotebookStatus}</span></span>
                       <span>Readiness: <span className="font-semibold text-text-main">{registryProject.reportReadiness}%</span></span>
-                      <span>Validation gaps: <span className="font-semibold text-text-main">{registryProject.validationGapCount}</span></span>
+                      <span>Sample: <span className="font-semibold text-text-main">{formatChemicalFormula(evidenceSnapshot.sampleIdentity)}</span></span>
+                      <span>Evidence: <span className="font-semibold text-text-main">{evidenceSnapshot.availableTechniques.join(', ') || 'Pending'}</span></span>
+                      <span>Bundle: <span className="font-semibold text-text-main">{getEvidenceBundleBadgeLabel(evidenceBundle)}</span></span>
+                      <span>Pending: <span className="font-semibold text-text-main">{evidenceSnapshot.pendingTechniques.join(', ') || 'None'}</span></span>
+                      <span>Validation gaps: <span className="font-semibold text-text-main">{evidenceSnapshot.validationGaps.length}</span></span>
                       <span>Export: <span className="font-semibold text-text-main">{registryProject.reportReadiness >= 80 ? 'Ready' : 'Blocked'}</span></span>
                       {getLockedContext(project.id) ? (
                         <span className="rounded border border-amber-500/30 bg-amber-500/5 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">Locked context preserved</span>
@@ -1210,7 +1384,8 @@ ${sourceRunLines}
                     <Button variant="outline" size="sm" className="h-7 gap-1.5 px-2 text-xs" onClick={() => setIsEvidenceDrawerOpen(true)}><FlaskConical size={12} /> Evidence Trace</Button>
                     <Button variant="primary" size="sm" disabled={!hasMatchedNotebookData} title={!hasMatchedNotebookData ? 'Requires matched processing result before saving.' : undefined} className="h-7 gap-1.5 px-2 text-xs" onClick={saveWorkflowNotebookEntry}><Save size={12} /> Save Entry</Button>
                     <Link
-                      to={`/reports?project=${project.id}&template=${templateMode}&entry=${workflowNotebookEntry.id}`}
+                      to={`/reports?project=${project.id}&template=${templateMode}&entry=${workflowNotebookEntry.id}${uploadedRouteSuffix}`}
+                      onClick={handleReportHandoffClick}
                       className="inline-flex h-7 items-center rounded-md border border-primary/30 bg-primary/5 px-2 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors"
                     >
                       Send to Report <ArrowRight size={12} className="ml-1" />
@@ -1331,20 +1506,27 @@ ${sourceRunLines}
             {activeNotebookTab === 'Objective / Context' && (() => {
               const lockedContext = getLockedContext(project.id);
               const characterizationGoal = hasMatchedNotebookData
-                ? projectNotebookContent.phaseLabel
-                : `Establish a matched processing result for ${project.name} before characterization goal is defined.`;
+                ? evidenceSnapshot.supportedAssignment
+                : `Establish a matched processing result for ${evidenceSnapshot.projectName} before characterization goal is defined.`;
               const topDecision = project.nextDecisions[0];
               const decisionQuestion = topDecision
                 ? topDecision.description || topDecision.label
                 : hasMatchedNotebookData
-                  ? `Is the current evidence sufficient to advance the ${project.name} interpretation beyond validation-limited status?`
-                  : `What dataset is required to begin ${project.name} characterization?`;
+                  ? `Is the current evidence sufficient to advance the ${evidenceSnapshot.projectName} interpretation beyond validation-limited status?`
+                  : `What dataset is required to begin ${evidenceSnapshot.projectName} characterization?`;
               const objectiveRows: Array<[string, React.ReactNode, boolean?]> = [
                 ['Research Objective', project.objective],
-                ['Sample system', lockedContext?.sampleIdentity ?? project.material],
+                ['Sample identity', lockedContext?.sampleIdentity ?? evidenceSnapshot.sampleIdentity],
+                ['Active dataset', evidenceSnapshot.activeDataset?.fileName ?? evidenceSnapshot.evidenceEntries[0]?.datasetLabel ?? 'Pending evidence source'],
+                ['Runtime source', getRuntimeBadgeLabel(runtimeContext)],
+                ['Evidence bundle', `${evidenceBundle.bundleId} / ${getEvidenceBundleBadgeLabel(evidenceBundle)}`],
+                ['Files included', evidenceBundle.files.map((file) => `${file.technique}: ${file.fileName}`).join('; ') || 'No evidence files linked'],
+                ['Technique coverage', bundleTechniqueCoverage.map((item) => `${item.technique}: ${item.status}`).join(', ')],
+                ['Bundle completeness', `${evidenceBundle.evidenceCompletenessScore}%`],
                 ['Claim status', claimStatusLabel(registryProject.claimStatus)],
                 ['Job type / notebook mode', `${jobTypeLabel(registryProject.jobType)} / ${notebookTemplate.label}`],
-                ['Techniques', project.techniques.join(', ')],
+                ['Available techniques', evidenceSnapshot.availableTechniques.join(', ') || 'None linked'],
+                ['Pending validation', evidenceSnapshot.pendingTechniques.join(', ') || 'None'],
                 ['Condition lock', experimentConditionStatus],
                 ['Workflow path', registryProject.workflowPath.join(' -> ')],
                 ...(lockedContext?.sourceDataset ? [['Source dataset', lockedContext.sourceDataset] as [string, React.ReactNode]] : []),
@@ -1360,6 +1542,19 @@ ${sourceRunLines}
                   </div>
                 )}
                 <div className="rounded-md border border-border bg-surface divide-y divide-border">
+                  <div className="flex flex-wrap items-center gap-2 px-3 py-2">
+                    <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${getRuntimeBadgeClass(runtimeContext)}`}>
+                      {getRuntimeBadgeLabel(runtimeContext, 'source')}
+                    </span>
+                    <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${getRuntimeBadgeClass(runtimeContext)}`}>
+                      {getRuntimeBadgeLabel(runtimeContext, 'permission')}
+                    </span>
+                    <ConnectedAccountStatus
+                      state={connectedAccountState}
+                      capabilities={runtimeContext.sourceMode === 'google_drive_connected' ? ['drive_import', 'drive_export_future', 'gmail_draft_future'] : ['storage_future']}
+                      compact
+                    />
+                  </div>
                   {objectiveRows.map(([label, value, highlight]) => (
                     <div key={label} className={`flex flex-col gap-0.5 px-3 py-2 sm:flex-row sm:items-baseline sm:gap-3 ${highlight ? 'bg-primary/5' : ''}`}>
                       <div className={`shrink-0 text-[10px] font-semibold uppercase tracking-wider sm:w-40 ${highlight ? 'text-primary' : 'text-text-dim'}`}>{label}</div>
@@ -1395,7 +1590,7 @@ ${sourceRunLines}
               <div className="space-y-2">
                 <div className="rounded-md border border-border bg-surface px-3 py-2">
                   <span className="text-[10px] font-semibold uppercase tracking-wider text-text-dim">Peak Detection: </span>
-                  <span className="text-sm text-text-main">{projectNotebookContent.peakDetection}</span>
+                  <span className="text-sm text-text-main">{evidenceSnapshot.activeDataset ? projectNotebookContent.peakDetection : `${evidenceSnapshot.primaryTechnique} evidence source pending.`}</span>
                 </div>
                 <div className="rounded-md border border-primary/20 bg-surface px-3 py-2">
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1413,7 +1608,7 @@ ${sourceRunLines}
                         onChange={(event) => setSelectedEvidenceTechnique(event.target.value as Technique)}
                         className="h-7 rounded-md border border-border bg-background px-2 text-xs font-semibold text-text-main outline-none focus:border-primary"
                       >
-                        {project.techniques.map((technique) => (
+                        {selectableExportTechniques.map((technique) => (
                           <option key={technique} value={technique}>{technique}</option>
                         ))}
                       </select>
@@ -1427,7 +1622,8 @@ ${sourceRunLines}
                         <Download size={12} /> Export Evidence Summary CSV
                       </Button>
                       <Link
-                        to={`/reports?project=${project.id}&template=${templateMode}&entry=${workflowNotebookEntry.id}`}
+                        to={`/reports?project=${project.id}&template=${templateMode}&entry=${workflowNotebookEntry.id}${uploadedRouteSuffix}`}
+                        onClick={handleReportHandoffClick}
                         className="inline-flex h-7 items-center rounded-md border border-primary/30 bg-primary/5 px-2 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors"
                       >
                         Send to Report <ArrowRight size={12} className="ml-1" />
@@ -1449,17 +1645,30 @@ ${sourceRunLines}
                 <div>
                   <div className="text-[10px] font-semibold uppercase tracking-wider text-text-dim mb-1">Evidence Sources</div>
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    {hasMatchedNotebookData ? projectNotebookContent.supportingData.map((item) => (
-                      <div key={item.technique} className="rounded-md border border-border bg-surface px-2.5 py-2">
+                    {hasMatchedNotebookData ? (
+                      <>
+                      {evidenceSnapshot.evidenceEntries.map((item) => (
+                      <div key={item.id} className="rounded-md border border-border bg-surface px-2.5 py-2">
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-sm font-bold text-text-main">{item.technique}</span>
-                          <span className={`text-xs font-semibold ${item.strength === 'Review' ? 'text-amber-600' : item.strength === 'Ready' ? 'text-primary' : 'text-cyan'}`}>{item.strength}</span>
+                          <span className={`text-xs font-semibold ${item.status === 'pending' ? 'text-amber-600' : 'text-primary'}`}>{item.status === 'pending' ? 'Pending' : 'Available'}</span>
                         </div>
-                        <p className="mt-1 text-sm leading-snug text-text-main">{item.evidence}</p>
-                        <p className="mt-0.5 text-[11px] text-text-muted">Dataset: {item.dataset}</p>
-                        <p className="text-[11px] text-text-muted">{item.caveat}</p>
+                        <p className="mt-1 text-sm leading-snug text-text-main">{item.support}</p>
+                        <p className="mt-0.5 text-[11px] text-text-muted">Dataset: {item.datasetLabel}</p>
+                        {item.limitations && <p className="text-[11px] text-text-muted">{item.limitations}</p>}
                       </div>
-                    )) : (
+                    ))}
+                      {evidenceSnapshot.pendingTechniques.map((technique) => (
+                        <div key={`pending-source-${technique}`} className="rounded-md border border-amber-500/30 bg-amber-500/5 px-2.5 py-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-sm font-bold text-text-main">{technique}</span>
+                            <span className="text-xs font-semibold text-amber-700">Pending validation</span>
+                          </div>
+                          <p className="mt-1 text-sm leading-snug text-text-main">{technique} evidence is required before closing the validation boundary.</p>
+                        </div>
+                      ))}
+                      </>
+                    ) : (
                       <div className="col-span-2 rounded-md border border-dashed border-border bg-surface/50 px-3 py-2 text-center">
                         <p className="text-xs text-text-muted">No evidence sources linked yet. Process data in a workspace to generate evidence.</p>
                       </div>
@@ -1497,7 +1706,7 @@ ${sourceRunLines}
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <div>
                       <span className="text-[10px] font-semibold uppercase tracking-wider text-text-dim">Phase Identification: </span>
-                      <span className="text-sm font-semibold text-text-main">{hasMatchedNotebookData ? projectNotebookContent.phaseLabel : `No phase assignment for ${project.name} until matched data is linked.`}</span>
+                      <span className="text-sm font-semibold text-text-main">{hasMatchedNotebookData ? evidenceSnapshot.supportedAssignment : `No phase assignment for ${evidenceSnapshot.projectName} until matched data is linked.`}</span>
                     </div>
                     <span className="text-[11px] text-text-muted">Confidence: {confidenceLabel}</span>
                   </div>
@@ -1505,7 +1714,7 @@ ${sourceRunLines}
                 <div className="rounded-md border border-primary/20 bg-surface px-3 py-2">
                   <div className="text-[10px] font-bold uppercase tracking-wider text-primary mb-1">Reasoning Summary - {notebookTemplateDetails.primaryLabel}</div>
                   <p className="text-sm leading-snug text-text-main">
-                    {hasMatchedNotebookData ? projectNotebookContent.discussion : 'No matched processing result is linked to this notebook entry.'}
+                    {hasMatchedNotebookData ? snapshotDiscussionLine : 'No matched processing result is linked to this notebook entry.'}
                   </p>
                   <div className="mt-1.5 rounded border border-primary/20 bg-primary/5 px-2 py-1">
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-primary">Discussion readiness: </span>
@@ -1530,8 +1739,11 @@ ${sourceRunLines}
                   <div className="rounded-md border border-amber-500/20 bg-surface px-3 py-2">
                     <div className="text-[10px] font-semibold uppercase tracking-wider text-amber-700 mb-1">Caveats</div>
                     <div className="space-y-0.5">
-                      {projectNotebookContent.supportingData.map((item) => (
-                        <p key={`caveat-${item.technique}`} className="text-xs leading-snug text-text-muted">- <span className="font-semibold text-text-main">{item.technique}:</span> {item.caveat}</p>
+                      {evidenceSnapshot.evidenceEntries.map((item) => (
+                        <p key={`caveat-${item.id}`} className="text-xs leading-snug text-text-muted">- <span className="font-semibold text-text-main">{item.technique}:</span> {item.limitations ?? 'Evidence included in validation boundary.'}</p>
+                      ))}
+                      {evidenceSnapshot.pendingTechniques.map((technique) => (
+                        <p key={`pending-caveat-${technique}`} className="text-xs leading-snug text-text-muted">- <span className="font-semibold text-text-main">{technique}:</span> Pending validation evidence.</p>
                       ))}
                     </div>
                   </div>
@@ -1587,7 +1799,7 @@ ${sourceRunLines}
                 <div className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2">
                   <div className="text-[10px] font-semibold uppercase tracking-wider text-amber-700 mb-1">Limitations</div>
                   <div className="space-y-1">
-                    {(project.validationGaps.length > 0 ? project.validationGaps : []).map((gap) => (
+                    {(evidenceSnapshot.validationGaps.length > 0 ? evidenceSnapshot.validationGaps : []).map((gap) => (
                       <div key={gap.id} className="rounded border border-border bg-background px-2.5 py-1.5">
                         <div className="flex items-center justify-between gap-2">
                           <div className="text-sm font-semibold leading-snug text-text-main">{gap.description}</div>
@@ -1596,7 +1808,7 @@ ${sourceRunLines}
                         <p className="mt-0.5 text-xs text-text-muted">{gap.suggestedResolution}</p>
                       </div>
                     ))}
-                    {project.validationGaps.length === 0 && (
+                    {evidenceSnapshot.validationGaps.length === 0 && (
                       <p className="text-sm text-text-muted">No open validation gaps are registered for this project.</p>
                     )}
                   </div>
@@ -1605,9 +1817,9 @@ ${sourceRunLines}
                   <div className="text-[10px] font-semibold uppercase tracking-wider text-text-dim mb-1">Missing References And Boundary</div>
                   <div className="space-y-1">
                     <p className="text-sm leading-snug text-text-main">
-                      <span className="font-semibold">Boundary:</span> {registryProject.notebook.validationBoundary}
+                      <span className="font-semibold">Boundary:</span> {getSnapshotClaimBoundaryLines(evidenceSnapshot)[0] ?? registryProject.notebook.validationBoundary}
                     </p>
-                    {registryProject.notebook.missingReferences.map((reference) => (
+                    {[...registryProject.notebook.missingReferences, ...evidenceSnapshot.pendingTechniques.map((technique) => `${technique} validation evidence pending`)].map((reference) => (
                       <p key={reference} className="text-xs leading-snug text-text-muted">- {reference}</p>
                     ))}
                   </div>
@@ -1616,13 +1828,13 @@ ${sourceRunLines}
                   <div className="text-[10px] font-semibold uppercase tracking-wider text-text-dim mb-1">Missing Evidence</div>
                   {hasMatchedNotebookData ? (
                     <div className="space-y-1">
-                      {projectNotebookContent.supportingData.filter((item) => item.strength !== 'Ready').length === 0 ? (
+                      {evidenceSnapshot.pendingTechniques.length === 0 ? (
                         <p className="text-xs text-text-muted">All linked technique evidence is marked ready for this project.</p>
-                      ) : projectNotebookContent.supportingData.filter((item) => item.strength !== 'Ready').map((item) => (
-                        <div key={`missing-${item.technique}`} className="flex items-start gap-2 rounded border border-border bg-background px-2 py-1 text-xs">
-                          <span className="font-bold text-text-main w-14 shrink-0">{item.technique}</span>
-                          <span className="text-text-muted flex-1">{item.caveat}</span>
-                          <span className={`shrink-0 font-semibold ${item.strength === 'Review' ? 'text-amber-600' : 'text-cyan'}`}>{item.strength}</span>
+                      ) : evidenceSnapshot.pendingTechniques.map((technique) => (
+                        <div key={`missing-${technique}`} className="flex items-start gap-2 rounded border border-border bg-background px-2 py-1 text-xs">
+                          <span className="font-bold text-text-main w-14 shrink-0">{technique}</span>
+                          <span className="text-text-muted flex-1">{technique} evidence is pending for validation closure.</span>
+                          <span className="shrink-0 font-semibold text-amber-600">Pending</span>
                         </div>
                       ))}
                     </div>
@@ -1633,7 +1845,12 @@ ${sourceRunLines}
                 <div className="rounded-md border border-border bg-surface px-3 py-2">
                   <div className="text-[10px] font-semibold uppercase tracking-wider text-text-dim mb-1">Follow-up Validation</div>
                   <div className="space-y-1">
-                    {(hasMatchedNotebookData ? projectNotebookContent.validationNotes : ['Load a matched processing result before validation closure.']).map((item, index) => (
+                    {(hasMatchedNotebookData
+                      ? [
+                          ...evidenceSnapshot.validationGaps.map((gap) => gap.suggestedResolution),
+                          ...evidenceSnapshot.pendingTechniques.map((technique) => `Add ${technique} evidence before validation closure.`),
+                        ]
+                      : ['Load a matched processing result before validation closure.']).map((item, index) => (
                       <div key={item} className="flex items-start gap-2 rounded border border-border bg-background px-2 py-1 text-sm leading-snug text-text-muted">
                         <div className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">{index + 1}</div>
                         {item}
@@ -1652,7 +1869,7 @@ ${sourceRunLines}
             {activeNotebookTab === 'Decision' && (() => {
               const decisionState = !hasMatchedNotebookData
                 ? 'Hold'
-                : project.validationGaps.length > 0 ? 'Validate next' : 'Proceed';
+                : evidenceSnapshot.validationGaps.length > 0 || evidenceSnapshot.pendingTechniques.length > 0 ? 'Validate next' : 'Proceed';
               const decisionStateColor = decisionState === 'Proceed'
                 ? 'text-primary border-primary/30 bg-primary/10'
                 : decisionState === 'Validate next' ? 'text-amber-700 border-amber-500/30 bg-amber-500/10'
@@ -1674,7 +1891,8 @@ ${sourceRunLines}
                   <div className="grid grid-cols-1 gap-x-3 gap-y-0.5 text-sm text-text-main sm:grid-cols-2">
                     <div><span className="text-text-dim">Status: </span>{decisionState}</div>
                     <div><span className="text-text-dim">Notebook readiness: </span>{displayNotebookStatus}</div>
-                    <div><span className="text-text-dim">Open validation gaps: </span>{project.validationGaps.length}</div>
+                    <div><span className="text-text-dim">Open validation gaps: </span>{evidenceSnapshot.validationGaps.length}</div>
+                    <div><span className="text-text-dim">Pending techniques: </span>{evidenceSnapshot.pendingTechniques.join(', ') || 'None'}</div>
                     <div><span className="text-text-dim">Evidence linked: </span>{hasMatchedNotebookData ? 'Linked' : 'Pending'}</div>
                   </div>
                 </div>
@@ -1683,8 +1901,8 @@ ${sourceRunLines}
                   <p className="mt-0.5 text-sm text-text-main">Claim status: <span className="font-semibold">{confidenceLabel}</span></p>
                   <p className="text-xs leading-snug text-text-muted">
                     {hasMatchedNotebookData
-                      ? `Rationale based on ${projectNotebookContent.supportingData.length} technique evidence source${projectNotebookContent.supportingData.length === 1 ? '' : 's'} and ${project.validationGaps.length} open validation gap${project.validationGaps.length === 1 ? '' : 's'}.`
-                      : `No matched processing result is linked to ${project.name}; confidence remains pending.`}
+                      ? `Rationale based on ${evidenceSnapshot.availableTechniques.length} available technique evidence source${evidenceSnapshot.availableTechniques.length === 1 ? '' : 's'}, ${evidenceSnapshot.pendingTechniques.length} pending technique${evidenceSnapshot.pendingTechniques.length === 1 ? '' : 's'}, and ${evidenceSnapshot.validationGaps.length} open validation gap${evidenceSnapshot.validationGaps.length === 1 ? '' : 's'}.`
+                      : `No matched processing result is linked to ${evidenceSnapshot.projectName}; confidence remains pending.`}
                   </p>
                 </div>
                 <div>
@@ -1714,7 +1932,7 @@ ${sourceRunLines}
                 <div className="flex items-start justify-between gap-3 border-b border-border p-4">
                   <div>
                     <div className="text-[11px] font-bold uppercase tracking-wider text-primary">Evidence Trace</div>
-                    <h2 className="mt-1 text-base font-bold text-text-main">{project.name}</h2>
+                    <h2 className="mt-1 text-base font-bold text-text-main">{evidenceSnapshot.projectName}</h2>
                     <p className="mt-1 text-xs text-text-muted">Technique roles, evidence status, and confidence context.</p>
                   </div>
                   <Button variant="ghost" size="sm" className="px-2" onClick={() => setIsEvidenceDrawerOpen(false)}>
@@ -1737,10 +1955,16 @@ ${sourceRunLines}
                   <div className="rounded-lg border border-border bg-background p-3">
                     <div className="text-xs font-semibold uppercase tracking-wider text-text-muted">Project-specific sources</div>
                     <div className="mt-2 space-y-2">
-                      {project.evidenceSources.map((source) => (
-                        <div key={source.datasetId} className="rounded-md border border-border bg-surface p-2">
+                      {evidenceSnapshot.evidenceEntries.map((source) => (
+                        <div key={source.id} className="rounded-md border border-border bg-surface p-2">
                           <div className="text-xs font-bold text-text-main">{source.technique} - {source.datasetLabel}</div>
-                          <p className="mt-1 text-[11px] leading-relaxed text-text-muted">{source.description}</p>
+                          <p className="mt-1 text-[11px] leading-relaxed text-text-muted">{source.support}</p>
+                        </div>
+                      ))}
+                      {evidenceSnapshot.pendingTechniques.map((technique) => (
+                        <div key={`drawer-pending-${technique}`} className="rounded-md border border-amber-500/30 bg-amber-500/5 p-2">
+                          <div className="text-xs font-bold text-text-main">{technique} - Pending validation</div>
+                          <p className="mt-1 text-[11px] leading-relaxed text-text-muted">Evidence required before closing the claim boundary.</p>
                         </div>
                       ))}
                     </div>
@@ -1804,7 +2028,7 @@ ${sourceRunLines}
                   </div>
                   <p className="mt-2 text-xs leading-relaxed text-text-main">
                     {hasMatchedNotebookData
-                      ? projectNotebookContent.discussion
+                      ? snapshotDiscussionLine
                       : 'No matched processing result is linked to this notebook entry.'}
                   </p>
                 </div>
@@ -1812,7 +2036,7 @@ ${sourceRunLines}
                   <div className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">Report section</div>
                   <p className="mt-2 text-xs leading-relaxed text-text-main">
                     {hasMatchedNotebookData
-                      ? projectNotebookContent.reportPreview
+                      ? (hasUploadedEvidenceSnapshot ? getSnapshotEvidenceLine(evidenceSnapshot) : projectNotebookContent.reportPreview)
                       : 'No report-oriented section is available until a matched processing result is linked to this project.'}
                   </p>
                 </div>
@@ -1991,7 +2215,7 @@ ${sourceRunLines}
                   </div>
                   <div className="mt-2 space-y-2">
                     {(hasMatchedNotebookData
-                      ? [projectNotebookContent.discussion]
+                      ? [snapshotDiscussionLine]
                       : ['This project does not have a matched processing result in the deterministic notebook workflow. Load compatible data before creating report-ready discussion.']).map((line) => (
                       <p key={line} className="text-sm leading-relaxed text-text-main">{line}</p>
                     ))}
@@ -2044,7 +2268,7 @@ ${sourceRunLines}
                 <div className="mt-3 rounded-lg border border-border bg-background p-3">
                   <p className="text-sm leading-relaxed text-text-main">
                     {hasMatchedNotebookData
-                      ? projectNotebookContent.reportPreview
+                      ? (hasUploadedEvidenceSnapshot ? getSnapshotEvidenceLine(evidenceSnapshot) : projectNotebookContent.reportPreview)
                       : 'No report-oriented section is available until a matched processing result is linked to this project.'}
                   </p>
                 </div>
@@ -2130,7 +2354,7 @@ ${sourceRunLines}
               <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted border-b border-border pb-2">{notebookTemplateDetails.primaryLabel}</h3>
               <div className="rounded-lg border border-border bg-surface p-4">
                 {(hasMatchedNotebookData
-                  ? [projectNotebookContent.discussion]
+                  ? [snapshotDiscussionLine]
                   : ['No matched processing result is linked to this notebook entry. Evidence has not been generated for this project in the deterministic XRD demo workflow.']).map((line) => (
                   <p key={line} className="text-sm leading-relaxed text-text-main">{line}</p>
                 ))}
@@ -2183,7 +2407,14 @@ ${sourceRunLines}
             </section>
 
             <section className="space-y-3">
-              <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted border-b border-border pb-2">Report Exports</h3>
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2">
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted">Report Exports</h3>
+                <ConnectedAccountStatus
+                  state={connectedAccountState}
+                  capabilities={runtimeContext.sourceMode === 'google_drive_connected' ? ['drive_export_future', 'gmail_draft_future'] : ['storage_future']}
+                  compact
+                />
+              </div>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <Button
                   variant="outline"
@@ -2217,7 +2448,7 @@ ${sourceRunLines}
             <section className="space-y-3">
               <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted border-b border-border pb-2">Summary</h3>
               <p className="text-sm text-text-main leading-relaxed">
-                {hasMatchedNotebookData ? projectNotebookContent.summary : 'No matched processing result is linked to this notebook entry.'}
+                {hasMatchedNotebookData ? getSnapshotEvidenceLine(evidenceSnapshot) : 'No matched processing result is linked to this notebook entry.'}
               </p>
             </section>
 
@@ -2226,7 +2457,7 @@ ${sourceRunLines}
               <div className="bg-surface p-4 rounded-md border border-border">
                 <div className="text-sm leading-relaxed text-text-main">
                   {hasMatchedNotebookData
-                    ? projectNotebookContent.reportPreview
+                    ? (hasUploadedEvidenceSnapshot ? getSnapshotEvidenceLine(evidenceSnapshot) : projectNotebookContent.reportPreview)
                     : 'Report-ready discussion is unavailable until a matched processing result is linked to this project.'}
                 </div>
                 <div className="mt-3 flex items-center justify-between gap-4">
@@ -2422,6 +2653,14 @@ ${sourceRunLines}
         onCreated={() => {
           setLocalExperiments(getLocalExperiments());
           showFeedback('Experiment, dataset, and condition record added');
+        }}
+      />
+      <ApprovalActionDialog
+        action={approvalAction}
+        onClose={() => setApprovalAction(null)}
+        onContinueLocal={() => {
+          setApprovalAction(null);
+          showFeedback('Local notebook preview retained. No external action executed.');
         }}
       />
     </DashboardLayout>

@@ -83,12 +83,18 @@ import {
   type RegistryProject,
   type DemoReferencePlaceholder,
 } from '../data/demoProjectRegistry';
+import {
+  getRuntimeBadgeClass,
+  getRuntimeBadgeLabel,
+  getRuntimeContextForEvidenceSource,
+  requiresApproval,
+  type RuntimeMode,
+} from '../runtime/difaryxRuntimeMode';
 
 type TechniqueContext = Technique;
 type AgentMode = 'deterministic' | 'guided' | 'autonomous';
 type ModelMode = 'deterministic' | 'vertex-gemini' | 'gemma';
 type ExecutionMode = 'auto' | 'step';
-type RuntimeMode = 'demo' | 'connected';
 type ReasoningStepStatus = 'pending' | 'running' | 'complete';
 type RunStatus = 'idle' | 'running' | 'complete';
 type ToolStatus = ReasoningStepStatus | 'error';
@@ -219,11 +225,6 @@ const MODEL_MODE_LABELS: Record<ModelMode, string> = {
   deterministic: 'Deterministic Workflow',
   'vertex-gemini': 'Model Layer Pending',
   gemma: 'Open Model Pending',
-};
-
-const RUNTIME_MODE_LABELS: Record<RuntimeMode, string> = {
-  demo: 'Demo',
-  connected: 'Connected gated',
 };
 
 const CONTEXT_ORDER: TechniqueContext[] = ['XRD', 'XPS', 'FTIR', 'Raman'];
@@ -913,8 +914,26 @@ import {
   type ParameterGroupId,
 } from '../utils/projectEvidence';
 import { getProjectEvidenceSnapshot } from '../utils/evidenceSnapshot';
+import { ApprovalActionDialog } from '../components/runtime/ApprovalActionDialog';
+import { ConnectedAccountStatus } from '../components/runtime/ConnectedAccountStatus';
 import {
-  clearProjectWorkspaceParameters,
+  createApprovalActionPreview,
+  type ApprovalActionPreview,
+  type ApprovalActionType,
+  type ApprovalRiskLevel,
+} from '../runtime/actionApproval';
+import {
+  getDefaultConnectedAccountState,
+  getGoogleConnectedShellState,
+} from '../runtime/connectedAccounts';
+import {
+  createEvidenceBundleFromSnapshot,
+  getEvidenceBundleBadgeLabel,
+  getTechniqueCoverageFromBundle,
+} from '../runtime/evidenceBundle';
+import {
+  clearTechniqueParameterOverrides,
+  getParameterOverrideStorageKey,
   readProjectWorkspaceParameters,
   writeProjectWorkspaceParameters,
 } from '../utils/workspaceParameterOverrides';
@@ -1173,6 +1192,7 @@ export default function AgentDemo() {
   const [agentState, setAgentState] = useState<AgentDemoState>(() =>
     makeInitialState(projectIdFromUrl, modeFromUrl),
   );
+  const [approvalAction, setApprovalAction] = useState<ApprovalActionPreview | null>(null);
   const [actionsDropdownOpen, setActionsDropdownOpen] = useState(false);
   const runningGuardRef = useRef(false);
   const runTokenRef = useRef(0);
@@ -1217,8 +1237,36 @@ export default function AgentDemo() {
 
   const registryProject = getRegistryProject(agentState.projectId);
   const evidenceSnapshot = useMemo(
-    () => getProjectEvidenceSnapshot(agentState.projectId),
-    [agentState.projectId],
+    () => getProjectEvidenceSnapshot(agentState.projectId, {
+      source: searchParams.get('source'),
+      analysisSessionId: searchParams.get('sessionId') ?? searchParams.get('analysisId'),
+      uploadedRunId: searchParams.get('upload') ?? searchParams.get('uploadedRunId'),
+      driveFileId: searchParams.get('driveFileId') ?? searchParams.get('driveImportId'),
+      runtimeMode,
+    }),
+    [agentState.projectId, runtimeMode, searchParams],
+  );
+  const runtimeContext = runtimeMode === 'connected'
+    ? getRuntimeContextForEvidenceSource('google_drive_connected', 'connected')
+    : {
+        sourceMode: evidenceSnapshot.sourceMode ?? 'demo_preloaded',
+        runtimeMode: evidenceSnapshot.runtimeMode ?? 'demo',
+        permissionMode: evidenceSnapshot.permissionMode ?? 'read_only',
+        sourceLabel: evidenceSnapshot.sourceLabel ?? 'Demo evidence',
+        approvalStatus: evidenceSnapshot.approvalStatus ?? 'not_required',
+      } as const;
+  const connectedAccountState = runtimeContext.sourceMode === 'google_drive_connected'
+    ? getGoogleConnectedShellState()
+    : getDefaultConnectedAccountState();
+  const evidenceBundle = useMemo(
+    () => createEvidenceBundleFromSnapshot(evidenceSnapshot, {
+      includeDemoContext: searchParams.get('bundle') === 'mixed' || searchParams.get('source') === 'mixed',
+    }),
+    [evidenceSnapshot, searchParams],
+  );
+  const bundleTechniqueCoverage = useMemo(
+    () => getTechniqueCoverageFromBundle(evidenceBundle),
+    [evidenceBundle],
   );
   const currentProject = registryProject._raw;
   const datasetOptions = useMemo(
@@ -1278,6 +1326,12 @@ export default function AgentDemo() {
       ? 0
       : Math.min(100, ((agentState.reasoningState.currentStepIndex + 1) / stages.length) * 100);
   const templateMode = normalizeNotebookTemplateMode(searchParams.get('template'));
+  const evidenceRouteParams = new URLSearchParams();
+  ['source', 'bundle', 'sessionId', 'analysisId', 'upload', 'uploadedRunId', 'driveFileId', 'driveImportId'].forEach((key) => {
+    const value = searchParams.get(key);
+    if (value) evidenceRouteParams.set(key, value);
+  });
+  const evidenceRouteSuffix = evidenceRouteParams.toString() ? `&${evidenceRouteParams.toString()}` : '';
   const workflowProcessingResult = useMemo(
     () => {
       const requestedProcessingResult = getProcessingResult(searchParams.get('processing'));
@@ -1314,11 +1368,25 @@ export default function AgentDemo() {
     }));
   };
 
-  const guardConnectedRuntime = (actionLabel: string) => {
-    if (runtimeMode === 'demo') return false;
+  const guardConnectedRuntime = (
+    actionLabel: string,
+    actionType: ApprovalActionType,
+    destinationLabel: string,
+    riskLevel?: ApprovalRiskLevel,
+  ) => {
+    if (!requiresApproval(runtimeContext)) return false;
+    setApprovalAction(createApprovalActionPreview({
+      actionId: `agent-${actionType}-${Date.now()}`,
+      actionType,
+      actionLabel,
+      destinationLabel,
+      evidenceSnapshot,
+      runtimeContext,
+      riskLevel,
+    }));
     appendLog({
       stamp: '[approval]',
-      message: `${actionLabel} is gated in connected mode. No external action was executed.`,
+      message: `${actionLabel} is approval-gated in ${getRuntimeBadgeLabel(runtimeContext, 'runtime')}. No external action was executed.`,
       type: 'system',
     });
     setAgentState((current) => ({
@@ -1329,7 +1397,7 @@ export default function AgentDemo() {
         approvalStatus: 'gated',
       })),
     }));
-    showFeedback('Connected mode is approval-gated in this demo.');
+    showFeedback(`${getRuntimeBadgeLabel(runtimeContext, 'permission')}: no external action executed.`);
     return true;
   };
 
@@ -1616,7 +1684,7 @@ export default function AgentDemo() {
   };
 
   const handlePrimaryRun = () => {
-    if (guardConnectedRuntime('Workflow execution')) return;
+    if (guardConnectedRuntime('Workflow execution', 'external_share', 'Connected workflow execution preview', 'high')) return;
     if (agentState.reasoningState.executionMode === 'auto') {
       void runAuto();
       return;
@@ -1625,7 +1693,7 @@ export default function AgentDemo() {
   };
 
   const handleExportReport = () => {
-    if (guardConnectedRuntime('Report export')) return;
+    if (guardConnectedRuntime('Report export', 'report_export', 'Local report export preview', 'medium')) return;
     if (!currentResult) return;
     appendLog({
       stamp: '[report]',
@@ -1636,7 +1704,7 @@ export default function AgentDemo() {
   };
 
   const handleRefineInterpretation = () => {
-    if (guardConnectedRuntime('Interpretation refinement')) return;
+    if (guardConnectedRuntime('Interpretation refinement', 'interpretation_refinement', 'Local interpretation refinement preview', 'medium')) return;
     saveProcessingResult(workflowProcessingResult);
     const refinement = refineDiscussionFromProcessing(workflowProcessingResult, templateMode);
     saveAgentDiscussionRefinement(refinement);
@@ -1649,7 +1717,7 @@ export default function AgentDemo() {
   };
 
   const handleSaveToNotebook = () => {
-    if (guardConnectedRuntime('Notebook handoff')) return;
+    if (guardConnectedRuntime('Notebook handoff', 'notebook_commit', 'Notebook memory handoff preview', 'low')) return;
     if (currentResult) {
       const runResult = toAgentRunResult(
         currentResult,
@@ -1671,7 +1739,7 @@ export default function AgentDemo() {
       message: `Saved deterministic demo notebook entry from the current interpretation context as ${notebookEntry.templateLabel}.`,
       type: 'success',
     });
-    navigate(`/notebook?project=${selectedProject.id}&entry=${notebookEntry.id}&template=${templateMode}`);
+    navigate(`/notebook?project=${selectedProject.id}&entry=${notebookEntry.id}&template=${templateMode}${evidenceRouteSuffix}`);
   };
 
   const handleOpenSourceProcessing = () => {
@@ -1679,17 +1747,16 @@ export default function AgentDemo() {
   };
 
   const handleViewClaimBoundary = () => {
-    const refinement = refineDiscussionFromProcessing(workflowProcessingResult, templateMode);
     appendLog({
       stamp: '[boundary]',
-      message: `Claim boundary reviewed: ${refinement.claimBoundary.supported.length} supported, ${refinement.claimBoundary.requiresValidation.length} requiring validation.`,
+      message: `Bundle ${evidenceBundle.bundleId} reviewed: ${bundleTechniqueCoverage.filter((item) => item.status === 'available').length} techniques available, ${evidenceBundle.missingRequiredTechniques.length} missing required, claim boundary remains validation-limited.`,
       type: 'info',
     });
     showFeedback('Claim boundary ready in the review log.');
   };
 
   const handleGenerateReproducibleReport = () => {
-    if (guardConnectedRuntime('Reproducible report generation')) return;
+    if (guardConnectedRuntime('Reproducible report generation', 'report_generation', 'Deterministic reproducible report preview', 'medium')) return;
     if (!currentResult) return;
     appendLog({
       stamp: '[repro]',
@@ -1744,6 +1811,26 @@ export default function AgentDemo() {
     setWorkspaceParameters(readProjectWorkspaceParameters(registryProject._raw.id, getProjectTechniques(registryProject._raw)));
     setDraftParameters({});
   }, [registryProject.id]);
+
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const projectTechniques = getProjectTechniques(currentProject);
+    const storageKeys = new Set(
+      projectTechniques
+        .map((technique) => getParameterOverrideStorageKey(currentProject.id, technique))
+        .filter(Boolean),
+    );
+    if (storageKeys.size === 0) return;
+
+    const handleStorage = (event: StorageEvent) => {
+      if (!event.key || !storageKeys.has(event.key)) return;
+      setWorkspaceParameters(readProjectWorkspaceParameters(currentProject.id, projectTechniques));
+      setDraftParameters({});
+    };
+
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, [currentProject.id]);
 
   // Build agent context from current project, mode, and applied parameter overrides
   const agentContext = useMemo(
@@ -1848,10 +1935,27 @@ export default function AgentDemo() {
   };
 
   const handleResetParameters = () => {
-    setWorkspaceParameters({});
-    setDraftParameters({});
-    clearProjectWorkspaceParameters(currentProject.id, getProjectTechniques(currentProject));
-    showFeedback('Parameters reset to demo defaults.');
+    const draftGroupIds = Object.keys(draftParameters) as ParameterGroupId[];
+    const groupsToReset = draftGroupIds.length > 0
+      ? draftGroupIds
+      : [agentState.selectedTechnique as ParameterGroupId];
+
+    setWorkspaceParameters((current) => {
+      const next = { ...current };
+      groupsToReset.forEach((groupId) => {
+        delete next[groupId];
+        clearTechniqueParameterOverrides(currentProject.id, groupId);
+      });
+      return next;
+    });
+    setDraftParameters((current) => {
+      const next = { ...current };
+      groupsToReset.forEach((groupId) => {
+        delete next[groupId];
+      });
+      return next;
+    });
+    showFeedback(`${groupsToReset.join(', ')} parameters reset to demo defaults.`);
   };
 
   const handleFocusedTechniqueChange = (techniqueId: TechniqueId) => {
@@ -1865,6 +1969,8 @@ export default function AgentDemo() {
       }));
     }
   };
+
+  const runtimeGovernance = runtimeContext;
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-[#F7F9FC] text-slate-700 font-sans">
@@ -1982,16 +2088,37 @@ export default function AgentDemo() {
                     ? 'bg-slate-50 border-slate-200 text-slate-700'
                     : 'bg-amber-50 border-amber-200 text-amber-700'
                 }`}
-                title="Runtime governance mode"
+                title={`Runtime governance: sourceMode=${runtimeGovernance.sourceMode}; permissionMode=${runtimeGovernance.permissionMode}`}
               >
-                {Object.entries(RUNTIME_MODE_LABELS).map(([key, label]) => (
-                  <option key={key} value={key}>
-                    Runtime: {label}
-                  </option>
-                ))}
+                <option value="demo">Runtime: Demo</option>
+                <option value="connected">Runtime: Connected gated</option>
               </select>
               <ChevronDown size={12} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             </div>
+            <div className={`h-7 px-2.5 flex items-center gap-1.5 border rounded text-[10px] font-semibold ${getRuntimeBadgeClass(runtimeContext)}`}>
+              <Database size={11} />
+              <span>{getRuntimeBadgeLabel(runtimeContext)}</span>
+            </div>
+            <div
+              className="h-7 max-w-[230px] px-2.5 flex items-center gap-1.5 bg-cyan-50 border border-cyan-200 rounded text-[10px] font-semibold text-cyan-700"
+              title={`${evidenceBundle.bundleId}: ${bundleTechniqueCoverage.map((item) => `${item.technique} ${item.status}`).join(', ')}`}
+            >
+              <Layers size={11} />
+              <span className="truncate">{getEvidenceBundleBadgeLabel(evidenceBundle)} / {evidenceBundle.evidenceCompletenessScore}%</span>
+            </div>
+            <ConnectedAccountStatus
+              state={connectedAccountState}
+              capabilities={runtimeContext.sourceMode === 'google_drive_connected' ? ['drive_import', 'drive_export_future', 'gmail_draft_future'] : ['storage_future']}
+              compact
+            />
+            {runtimeContext.sourceMode === 'google_drive_connected' && (
+              <div className="h-7 max-w-[220px] px-2.5 flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded text-[10px] font-semibold text-blue-700">
+                <Database size={11} />
+                <span className="truncate" title={evidenceSnapshot.activeDataset?.fileName ?? 'Mock Drive evidence preview'}>
+                  {evidenceSnapshot.activeDataset?.fileName ?? 'Mock Drive evidence preview'}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Right: Auto/Step Toggle, Run Button, Actions Dropdown */}
@@ -2147,6 +2274,14 @@ export default function AgentDemo() {
           runtimeMode={runtimeMode}
         />
       </div>
+      <ApprovalActionDialog
+        action={approvalAction}
+        onClose={() => setApprovalAction(null)}
+        onContinueLocal={() => {
+          setApprovalAction(null);
+          showFeedback('Local preview retained. No external action executed.');
+        }}
+      />
     </div>
   );
 }

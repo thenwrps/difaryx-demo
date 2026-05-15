@@ -49,10 +49,16 @@ import {
 import type { Technique } from '../../data/demoProjects';
 import {
   clearTechniqueParameterOverrides,
+  getParameterOverrideStorageKey,
   readTechniqueParameterOverrides,
   writeTechniqueParameterOverrides,
 } from '../../utils/workspaceParameterOverrides';
 import { getProjectEvidenceSnapshot } from '../../utils/evidenceSnapshot';
+import {
+  getRuntimeBadgeClass,
+  getRuntimeBadgeLabel,
+  getRuntimeContextForEvidenceSource,
+} from '../../runtime/difaryxRuntimeMode';
 
 const RIGHT_TABS = ['Evidence', 'Parameters', 'Graph', 'Boundary', 'Trace'] as const;
 type RightTab = (typeof RIGHT_TABS)[number];
@@ -541,8 +547,13 @@ export function TechniqueWorkspaceShell({ technique, mode = 'project', fileName,
   const project = useMemo(() => getProjectFromQuery(requestedProjectId), [requestedProjectId]);
   const projectId = project?.id ?? null;
   const evidenceSnapshot = useMemo(
-    () => (projectId ? getProjectEvidenceSnapshot(projectId) : null),
-    [projectId],
+    () => (projectId ? getProjectEvidenceSnapshot(projectId, {
+      source: searchParams.get('source'),
+      analysisSessionId: querySessionId,
+      uploadedRunId: searchParams.get('upload') ?? searchParams.get('uploadedRunId'),
+      driveFileId: searchParams.get('driveFileId') ?? searchParams.get('driveImportId'),
+    }) : null),
+    [projectId, querySessionId, searchParams],
   );
   const focusedEvidence = useMemo(
     () => (project ? getFocusedEvidenceSource(project, technique) : null),
@@ -561,6 +572,15 @@ export function TechniqueWorkspaceShell({ technique, mode = 'project', fileName,
   const datasetStatus = isQuickMode
     ? quickAnalysisSession ? getStatusLabel(quickAnalysisSession.status) : 'Processing'
     : focusedEvidence?.status || (project ? 'Required' : 'Standalone');
+  const runtimeContext = isQuickMode
+    ? getRuntimeContextForEvidenceSource('user_uploaded')
+    : {
+        sourceMode: evidenceSnapshot?.sourceMode ?? 'demo_preloaded',
+        runtimeMode: evidenceSnapshot?.runtimeMode ?? 'demo',
+        permissionMode: evidenceSnapshot?.permissionMode ?? 'read_only',
+        sourceLabel: evidenceSnapshot?.sourceLabel ?? 'Demo evidence',
+        approvalStatus: evidenceSnapshot?.approvalStatus ?? 'not_required',
+      } as const;
   const quickGraphData = useMemo(() => buildQuickGraphData(quickAnalysisSession), [quickAnalysisSession]);
   const graphData = quickGraphData ?? focusedEvidence?.graphData;
   const hasProjectEvidence = Boolean(
@@ -610,6 +630,32 @@ export function TechniqueWorkspaceShell({ technique, mode = 'project', fileName,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionStorageKey, quickAnalysisSession?.analysisId, projectId, technique]);
+
+  useEffect(() => {
+    if (!projectId || typeof window === 'undefined') return;
+    const overrideStorageKey = getParameterOverrideStorageKey(projectId, technique);
+    if (!overrideStorageKey) return;
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key !== overrideStorageKey) return;
+      const sharedOverrides = readTechniqueParameterOverrides(projectId, technique);
+      const sharedParameters = mapSharedOverridesToSessionParameters(config, sharedOverrides);
+      setSessionState((prev) => {
+        if (prev.storageKey !== sessionStorageKey) return prev;
+        const nextParameters = { ...prev.parameters };
+        config.parameters.forEach((control) => {
+          nextParameters[control.id] = sharedParameters[control.id] ?? control.defaultValue;
+        });
+        return {
+          ...prev,
+          parameters: nextParameters,
+        };
+      });
+    };
+
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, [config, projectId, sessionStorageKey, technique]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -941,6 +987,9 @@ export function TechniqueWorkspaceShell({ technique, mode = 'project', fileName,
           <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold ${statusBadgeClass(datasetStatus)}`}>
             {datasetStatus}
           </span>
+          <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold ${getRuntimeBadgeClass(runtimeContext)}`}>
+            {getRuntimeBadgeLabel(runtimeContext, 'source')}
+          </span>
           {isQuickMode && (
             <>
               <span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-bold text-slate-700">
@@ -1014,6 +1063,9 @@ export function TechniqueWorkspaceShell({ technique, mode = 'project', fileName,
               )}
               <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${statusBadgeClass(processingStateLabel)}`}>
                 {processingStateLabel}
+              </span>
+              <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${getRuntimeBadgeClass(runtimeContext)}`}>
+                {getRuntimeBadgeLabel(runtimeContext, 'permission')}
               </span>
               <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${statusBadgeClass(saveStateLabel)}`}>
                 {saveStateLabel}

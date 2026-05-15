@@ -27,6 +27,31 @@ import {
   type NotebookTemplateMode,
 } from '../data/workflowPipeline';
 import { exportDemoArtifact, type DemoExportFormat, type DemoExportSection } from '../utils/demoExport';
+import { getProjectEvidenceSnapshot, type ProjectEvidenceSnapshot } from '../utils/evidenceSnapshot';
+import {
+  getRuntimeBadgeClass,
+  getRuntimeBadgeLabel,
+  requiresApproval,
+} from '../runtime/difaryxRuntimeMode';
+import { ApprovalActionDialog } from '../components/runtime/ApprovalActionDialog';
+import { ConnectedAccountStatus } from '../components/runtime/ConnectedAccountStatus';
+import {
+  createApprovalActionPreview,
+  type ApprovalActionPreview,
+  type ApprovalActionType,
+  type ApprovalRiskLevel,
+} from '../runtime/actionApproval';
+import {
+  getDefaultConnectedAccountState,
+  getGoogleConnectedShellState,
+} from '../runtime/connectedAccounts';
+import {
+  createEvidenceBundleFromSnapshot,
+  getEvidenceBundleBadgeLabel,
+  getTechniqueCoverageFromBundle,
+  getValidationGapsFromBundle,
+  type EvidenceBundle,
+} from '../runtime/evidenceBundle';
 
 function reportTypeLabel(mode: NotebookTemplateMode) {
   if (mode === 'rd') return 'Technical Evidence Report';
@@ -35,44 +60,82 @@ function reportTypeLabel(mode: NotebookTemplateMode) {
 }
 
 function buildReportSections(
-  projectName: string,
+  snapshot: ProjectEvidenceSnapshot,
+  bundle: EvidenceBundle,
   registryProject: ReturnType<typeof getRegistryProject>,
   reportSection: ReturnType<typeof createReportSectionFromNotebookEntry>,
 ): DemoExportSection[] {
+  const availableTechniques = snapshot.availableTechniques.join(', ') || 'No technique evidence linked';
+  const pendingTechniques = snapshot.pendingTechniques.join(', ') || 'None';
+  const bundleCoverage = getTechniqueCoverageFromBundle(bundle);
+  const bundleValidationLines = getValidationGapsFromBundle(bundle).map((gap) => `${gap.description} Resolution: ${gap.suggestedResolution}`);
+  const validationLines = [
+    ...snapshot.validationGaps.map((gap) => `${gap.description} Resolution: ${gap.suggestedResolution}`),
+    ...snapshot.pendingTechniques.map((technique) => `${technique} validation evidence remains pending.`),
+  ];
+  const claimBoundaryLines = [
+    ...snapshot.claimBoundary.supported.map((line) => `Supported: ${line}`),
+    ...snapshot.claimBoundary.requiresValidation.map((line) => `Requires validation: ${line}`),
+    ...snapshot.claimBoundary.notSupportedYet.map((line) => `Not supported yet: ${line}`),
+    ...(snapshot.claimBoundary.contextual ?? []).map((line) => `Contextual: ${line}`),
+    ...(snapshot.claimBoundary.pending ?? []).map((line) => `Pending: ${line}`),
+  ];
+
   return [
     {
       heading: 'Executive Summary',
       lines: [
-        registryProject.evidenceSummary,
+        snapshot.evidenceEntries[0]?.support ?? registryProject.evidenceSummary,
+        `Supported assignment: ${snapshot.supportedAssignment}.`,
         `Claim status: ${claimStatusLabel(registryProject.claimStatus)}.`,
       ],
     },
     {
       heading: 'Experimental Context',
       lines: [
-        `Project: ${projectName}`,
+        `Project: ${snapshot.projectName}`,
         `Objective: ${registryProject.objective}`,
-        `Sample/system: ${registryProject.context.sampleDescription}`,
-        `Available techniques: ${registryProject.techniques.filter((tech) => tech.available).map((tech) => tech.label).join(', ') || 'No technique evidence linked'}`,
+        `Sample/system: ${snapshot.sampleIdentity}`,
+        `Source mode: ${snapshot.sourceMode ?? 'demo_preloaded'}`,
+        `Source label: ${snapshot.sourceLabel ?? 'Demo evidence'}`,
+        `Active dataset: ${snapshot.activeDataset?.fileName ?? snapshot.evidenceEntries[0]?.datasetLabel ?? 'Pending evidence source'}`,
+        `Available techniques: ${availableTechniques}`,
+        `Pending validation techniques: ${pendingTechniques}`,
       ],
     },
     {
-      heading: 'Evidence Summary',
-      lines: registryProject.evidenceResults.length
-        ? registryProject.evidenceResults.map((item) => `${item.displayName}: ${item.summary}`)
+      heading: 'Evidence Bundle',
+      lines: snapshot.evidenceEntries.length
+        ? [
+            `Bundle: ${bundle.bundleId}`,
+            `Bundle source: ${getEvidenceBundleBadgeLabel(bundle)} / ${bundle.permissionMode}`,
+            `Files: ${bundle.files.map((file) => `${file.technique}:${file.fileName}`).join('; ')}`,
+            `Technique coverage: ${bundleCoverage.map((item) => `${item.technique}:${item.status}`).join(', ')}`,
+            `Completeness: ${bundle.evidenceCompletenessScore}%`,
+            ...snapshot.evidenceEntries.map((item) => `${item.technique}: ${item.support}`),
+            ...snapshot.pendingTechniques.map((technique) => `${technique}: pending validation evidence`),
+          ]
         : ['No structured evidence is linked to this project yet.'],
     },
     {
       heading: 'Interpretation',
-      lines: reportSection.lines.length ? reportSection.lines : [registryProject.notebook.interpretation],
+      lines: snapshot.sourceMode === 'user_uploaded'
+        ? [
+            snapshot.evidenceEntries[0]?.support ?? 'Uploaded evidence is available, but bounded interpretation remains pending.',
+            `Supported assignment: ${snapshot.supportedAssignment}.`,
+            'Interpretation remains validation-limited until project-specific references and complementary evidence are reviewed.',
+          ]
+        : reportSection.lines.length ? reportSection.lines : [registryProject.notebook.interpretation],
     },
     {
       heading: 'Validation Boundary',
-      lines: [
-        registryProject.notebook.validationBoundary,
-        registryProject.crossTechniqueComparison.validationGap,
-        ...registryProject.crossTechniqueComparison.missingEvidence,
-      ],
+      lines: claimBoundaryLines.length ? claimBoundaryLines : [registryProject.notebook.validationBoundary],
+    },
+    {
+      heading: 'Validation Gap',
+      lines: [...validationLines, ...bundleValidationLines].length
+        ? [...new Set([...validationLines, ...bundleValidationLines])]
+        : ['No open validation gaps are registered for this project.'],
     },
     {
       heading: 'Recommended Next Action',
@@ -83,6 +146,10 @@ function buildReportSections(
       lines: [
         `Notebook entry: ${reportSection.notebookEntryId}`,
         `Source: ${reportSection.sourceLabel}`,
+        `Runtime source: ${snapshot.sourceLabel ?? 'Demo evidence'}`,
+        `Runtime mode: ${snapshot.runtimeMode ?? 'demo'} / ${snapshot.permissionMode ?? 'read_only'}`,
+        `Evidence snapshot: ${snapshot.projectId} / ${availableTechniques} / pending ${pendingTechniques}`,
+        `Evidence bundle: ${bundle.bundleId} / ${bundle.sourceMode} / ${bundle.sourceLabel}`,
         ...registryProject.experimentHistory.map((event) => `${event.timestampLabel}: ${event.title} - ${event.summary}`),
       ],
     },
@@ -96,10 +163,23 @@ export default function ReportBuilder() {
   const registryProject = getRegistryProject(project.id);
   const templateMode = normalizeNotebookTemplateMode(searchParams.get('template'));
   const [feedback, setFeedback] = useState('');
+  const [approvalAction, setApprovalAction] = useState<ApprovalActionPreview | null>(null);
+  const evidenceSnapshot = useMemo(() => getProjectEvidenceSnapshot(project.id, {
+    source: searchParams.get('source'),
+    analysisSessionId: searchParams.get('sessionId') ?? searchParams.get('analysisId'),
+    uploadedRunId: searchParams.get('upload') ?? searchParams.get('uploadedRunId'),
+    driveFileId: searchParams.get('driveFileId') ?? searchParams.get('driveImportId'),
+  }), [project.id, feedback, searchParams]);
+  const evidenceBundle = useMemo(
+    () => createEvidenceBundleFromSnapshot(evidenceSnapshot, {
+      includeDemoContext: searchParams.get('bundle') === 'mixed' || searchParams.get('source') === 'mixed',
+    }),
+    [evidenceSnapshot, searchParams],
+  );
 
   const workflowProcessingResult = useMemo(
-    () => getLatestProcessingResult(project.id) ?? createProcessingResultFromXrdDemo(project.id),
-    [project.id],
+    () => evidenceSnapshot.reportContext ?? getLatestProcessingResult(project.id) ?? createProcessingResultFromXrdDemo(project.id),
+    [project.id, evidenceSnapshot.reportContext],
   );
   const workflowRefinement = useMemo(
     () => getLatestAgentDiscussionRefinement(project.id, templateMode) ?? refineDiscussionFromProcessing(workflowProcessingResult, templateMode),
@@ -108,31 +188,81 @@ export default function ReportBuilder() {
   const workflowNotebookEntry = useMemo(() => {
     const fromRoute = getNotebookEntry(searchParams.get('entry'));
     if (fromRoute?.projectId === project.id) return fromRoute;
-    return getLatestNotebookEntry(project.id, templateMode) ?? createNotebookEntryFromRefinement(workflowRefinement, templateMode);
-  }, [project.id, searchParams, templateMode, workflowRefinement]);
+    return (
+      (evidenceSnapshot.notebookContext?.templateMode === templateMode ? evidenceSnapshot.notebookContext : null) ??
+      getLatestNotebookEntry(project.id, templateMode) ??
+      createNotebookEntryFromRefinement(workflowRefinement, templateMode)
+    );
+  }, [project.id, searchParams, templateMode, workflowRefinement, evidenceSnapshot.notebookContext]);
   const workflowReportSection = useMemo(
     () => createReportSectionFromNotebookEntry(workflowNotebookEntry),
     [workflowNotebookEntry],
   );
   const reportSections = useMemo(
-    () => buildReportSections(project.name, registryProject, workflowReportSection),
-    [project.name, registryProject, workflowReportSection],
+    () => buildReportSections(evidenceSnapshot, evidenceBundle, registryProject, workflowReportSection),
+    [evidenceSnapshot, evidenceBundle, registryProject, workflowReportSection],
   );
   const reportTemplate = NOTEBOOK_TEMPLATES[templateMode];
-  const reportStatus = registryProject.reportReadiness >= 80 ? 'Ready for internal review' : 'Draft - validation-limited';
+  const reportStatus =
+    evidenceBundle.missingRequiredTechniques.length > 0 || evidenceBundle.validationGaps.length > 0 || registryProject.reportReadiness < 80
+      ? 'Draft - validation-limited'
+      : 'Ready for internal review';
+  const runtimeContext = {
+    sourceMode: evidenceSnapshot.sourceMode ?? 'demo_preloaded',
+    runtimeMode: evidenceSnapshot.runtimeMode ?? 'demo',
+    permissionMode: evidenceSnapshot.permissionMode ?? 'read_only',
+    sourceLabel: evidenceSnapshot.sourceLabel ?? 'Demo evidence',
+    approvalStatus: evidenceSnapshot.approvalStatus ?? 'not_required',
+  } as const;
+  const connectedAccountState = runtimeContext.sourceMode === 'google_drive_connected'
+    ? getGoogleConnectedShellState()
+    : getDefaultConnectedAccountState();
   const reportVersion = `v${Math.max(1, Math.round(registryProject.reportReadiness / 20))}.0`;
   const preparedAt = new Date().toLocaleDateString();
   const filenameBase = `difaryx_${project.id}_${reportTemplate.reportTemplate}_report`;
+  const uploadedRouteParams = new URLSearchParams();
+  ['source', 'bundle', 'sessionId', 'analysisId', 'upload', 'uploadedRunId', 'driveFileId', 'driveImportId'].forEach((key) => {
+    const value = searchParams.get(key);
+    if (value) uploadedRouteParams.set(key, value);
+  });
+  const uploadedRouteSuffix = uploadedRouteParams.toString() ? `&${uploadedRouteParams.toString()}` : '';
 
   const showFeedback = (message: string) => {
     setFeedback(message);
     window.setTimeout(() => setFeedback(''), 1800);
   };
 
+  const openApprovalPreview = (
+    actionType: ApprovalActionType,
+    actionLabel: string,
+    destinationLabel: string,
+    riskLevel?: ApprovalRiskLevel,
+  ) => {
+    setApprovalAction(createApprovalActionPreview({
+      actionId: `report-${actionType}-${Date.now()}`,
+      actionType,
+      actionLabel,
+      destinationLabel,
+      evidenceSnapshot,
+      runtimeContext,
+      riskLevel,
+    }));
+  };
+
   const exportReport = (format: DemoExportFormat) => {
+    if (requiresApproval(runtimeContext)) {
+      openApprovalPreview(
+        'report_export',
+        `${format.toUpperCase()} report export`,
+        'Formal report artifact local preview',
+        'medium',
+      );
+      return;
+    }
+
     exportDemoArtifact(format, {
       filenameBase,
-      title: `${project.name} ${reportTypeLabel(templateMode)}`,
+      title: `${evidenceSnapshot.projectName} ${reportTypeLabel(templateMode)}`,
       sections: reportSections,
     });
     showFeedback(`${format.toUpperCase()} report export started.`);
@@ -150,6 +280,31 @@ export default function ReportBuilder() {
     }
   };
 
+  const saveReportVersion = () => {
+    if (requiresApproval(runtimeContext)) {
+      openApprovalPreview(
+        'report_generation',
+        'Reproducible report generation',
+        'Versioned report memory local preview',
+        'medium',
+      );
+      return;
+    }
+
+    showFeedback(`Saved ${reportVersion}.`);
+  };
+
+  const openFutureExportPreview = (actionType: 'google_drive_export_future' | 'gmail_draft_future') => {
+    openApprovalPreview(
+      actionType,
+      actionType === 'google_drive_export_future' ? 'Google Drive export' : 'Gmail draft',
+      actionType === 'google_drive_export_future'
+        ? 'Future Google Drive export placeholder'
+        : 'Future Gmail draft placeholder',
+      'high',
+    );
+  };
+
   return (
     <DashboardLayout>
       <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
@@ -160,8 +315,11 @@ export default function ReportBuilder() {
                 <span>Evidence-to-Report Builder</span>
                 <span className={jobTypeBadgeClass(registryProject.jobType)}>{jobTypeLabel(registryProject.jobType)}</span>
                 <span className={claimStatusColorClass(registryProject.claimStatus)}>{claimStatusLabel(registryProject.claimStatus)}</span>
+                <span className={`rounded-full border px-2 py-0.5 ${getRuntimeBadgeClass(runtimeContext)}`}>
+                  {getRuntimeBadgeLabel(runtimeContext)}
+                </span>
               </div>
-              <h1 className="mt-1 truncate text-xl font-bold text-text-main">{project.name} Evidence Report</h1>
+              <h1 className="mt-1 truncate text-xl font-bold text-text-main">{evidenceSnapshot.projectName} Evidence Report</h1>
               <p className="mt-1 text-sm text-text-muted">
                 Formal report preview prepared from notebook entry {workflowNotebookEntry.id}.
               </p>
@@ -172,8 +330,18 @@ export default function ReportBuilder() {
               <Button variant="outline" size="sm" className="gap-1.5" onClick={() => exportReport('pdf')}><Download size={13} /> Export PDF</Button>
               <Button variant="outline" size="sm" className="gap-1.5" onClick={() => exportReport('docx')}><Download size={13} /> Export DOCX</Button>
               <Button variant="outline" size="sm" className="gap-1.5" onClick={copyReport}><Clipboard size={13} /> Copy report</Button>
-              <Button size="sm" className="gap-1.5" onClick={() => showFeedback(`Saved ${reportVersion}.`)}><Save size={13} /> Save version</Button>
+              <Button variant="outline" size="sm" className="gap-1.5" onClick={() => openFutureExportPreview('google_drive_export_future')}><Download size={13} /> Drive export</Button>
+              <Button variant="outline" size="sm" className="gap-1.5" onClick={() => openFutureExportPreview('gmail_draft_future')}><FileText size={13} /> Gmail draft</Button>
+              <Button size="sm" className="gap-1.5" onClick={saveReportVersion}><Save size={13} /> Save version</Button>
             </div>
+          </div>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <ConnectedAccountStatus
+              state={connectedAccountState}
+              capabilities={['drive_import', 'drive_export_future', 'gmail_draft_future']}
+              compact
+            />
+            <span className="text-[11px] font-semibold text-text-muted">Drive/Gmail destinations are connection-shell previews only.</span>
           </div>
           {requestedProjectId && !isKnownProjectId(requestedProjectId) && (
             <div className="mt-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
@@ -186,9 +354,17 @@ export default function ReportBuilder() {
           <aside className="min-h-0 overflow-y-auto rounded-lg border border-border bg-surface p-3">
             <div className="space-y-2">
               {[
-                ['Project', project.name],
+                ['Project', evidenceSnapshot.projectName],
+                ['Sample', evidenceSnapshot.sampleIdentity],
+                ['Evidence bundle', evidenceSnapshot.availableTechniques.join(', ') || 'Pending'],
+                ['Bundle source', getEvidenceBundleBadgeLabel(evidenceBundle)],
+                ['Bundle files', String(evidenceBundle.files.length)],
+                ['Completeness', `${evidenceBundle.evidenceCompletenessScore}%`],
+                ['Pending validation', evidenceSnapshot.pendingTechniques.join(', ') || 'None'],
                 ['Report type', reportTypeLabel(templateMode)],
                 ['Prepared from', workflowNotebookEntry.title],
+                ['Runtime source', getRuntimeBadgeLabel(runtimeContext, 'source')],
+                ['Permission', getRuntimeBadgeLabel(runtimeContext, 'permission')],
                 ['Date', preparedAt],
                 ['Version', reportVersion],
                 ['Status', reportStatus],
@@ -203,10 +379,12 @@ export default function ReportBuilder() {
               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-amber-800">
                 <ShieldCheck size={14} /> Claim Boundary Review
               </div>
-              <p className="mt-2 text-xs leading-relaxed text-amber-900">{registryProject.notebook.validationBoundary}</p>
+              <p className="mt-2 text-xs leading-relaxed text-amber-900">
+                {reportSections.find((section) => section.heading === 'Validation Boundary')?.lines[0] ?? registryProject.notebook.validationBoundary}
+              </p>
             </div>
             <div className="mt-3 flex flex-col gap-2">
-              <Link to={`/notebook?project=${project.id}&template=${templateMode}&entry=${workflowNotebookEntry.id}`} className="inline-flex h-8 items-center justify-center rounded-md border border-border bg-background px-3 text-xs font-bold text-text-main hover:border-primary/40 hover:text-primary">
+              <Link to={`/notebook?project=${project.id}&template=${templateMode}&entry=${workflowNotebookEntry.id}${uploadedRouteSuffix}`} className="inline-flex h-8 items-center justify-center rounded-md border border-border bg-background px-3 text-xs font-bold text-text-main hover:border-primary/40 hover:text-primary">
                 Open source notebook <ArrowRight size={13} className="ml-1" />
               </Link>
               <Link to={getWorkspaceRoute(project)} className="inline-flex h-8 items-center justify-center rounded-md border border-border bg-background px-3 text-xs font-bold text-text-main hover:border-primary/40 hover:text-primary">
@@ -221,7 +399,7 @@ export default function ReportBuilder() {
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <div className="text-xs font-bold uppercase tracking-[0.18em] text-primary">DIFARYX Evidence Report</div>
-                    <h2 className="mt-2 text-2xl font-bold text-text-main">{project.name}</h2>
+                    <h2 className="mt-2 text-2xl font-bold text-text-main">{evidenceSnapshot.projectName}</h2>
                     <p className="mt-1 text-sm text-text-muted">{registryProject.objective}</p>
                   </div>
                   <div className="shrink-0 rounded-md border border-border bg-background px-3 py-2 text-right text-xs text-text-muted">
@@ -259,6 +437,14 @@ export default function ReportBuilder() {
           </main>
         </div>
       </div>
+      <ApprovalActionDialog
+        action={approvalAction}
+        onClose={() => setApprovalAction(null)}
+        onContinueLocal={() => {
+          setApprovalAction(null);
+          showFeedback('Local report preview retained. No external action executed.');
+        }}
+      />
     </DashboardLayout>
   );
 }
