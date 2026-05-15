@@ -83,6 +83,8 @@ import {
   type ApprovalActionType,
   type ApprovalRiskLevel,
 } from '../runtime/actionApproval';
+import { appendApprovalLedgerEntry, createApprovalLedgerEntry, summarizeApprovalLedger } from '../runtime/approvalLedger';
+import { ApprovalLedgerPanel } from '../components/runtime/ApprovalLedgerPanel';
 import {
   getDefaultConnectedAccountState,
   getGoogleConnectedShellState,
@@ -786,14 +788,38 @@ export default function NotebookLab() {
     destinationLabel: string,
     riskLevel?: ApprovalRiskLevel,
   ) => {
-    setApprovalAction(createApprovalActionPreview({
+    const action = createApprovalActionPreview({
       actionId: `notebook-${actionType}-${Date.now()}`,
       actionType,
       actionLabel,
       destinationLabel,
       evidenceSnapshot,
       runtimeContext,
+      evidenceBundle,
       riskLevel,
+    });
+    appendApprovalLedgerEntry(createApprovalLedgerEntry(action, 'preview_opened'));
+    setApprovalAction(action);
+  };
+
+  const logLocalNotebookAction = (
+    actionType: ApprovalActionType,
+    actionLabel: string,
+    destinationLabel: string,
+    riskLevel?: ApprovalRiskLevel,
+  ) => {
+    const action = createApprovalActionPreview({
+      actionId: `notebook-${actionType}-${Date.now()}`,
+      actionType,
+      actionLabel,
+      destinationLabel,
+      evidenceSnapshot,
+      runtimeContext,
+      evidenceBundle,
+      riskLevel,
+    });
+    appendApprovalLedgerEntry(createApprovalLedgerEntry(action, 'local_preview_continued', {
+      notes: 'Notebook local/demo action completed in this browser. No external write executed.',
     }));
   };
 
@@ -826,6 +852,10 @@ export default function NotebookLab() {
     ].map((item) => `- ${item}`).join('\n');
     const traceMarkdown = technicalTrace.map((step, index) => `${index + 1}. ${sanitizeTraceStep(step)}`).join('\n');
     const sourceRunLines = projectNotebookContent.runLog.map(([label, value]) => `${label}: ${value}`).join('\n');
+    const ledgerSummary = summarizeApprovalLedger({ projectId: project.id, bundleId: evidenceBundle.bundleId, limit: 4 });
+    const approvalLedgerMarkdown = ledgerSummary.recentLines.length
+      ? ledgerSummary.recentLines.map((line) => `- ${line}`).join('\n')
+      : '- No approval preview history recorded for this project/bundle in this browser.';
     const claimBoundaryMarkdown = (
       getSnapshotClaimBoundaryLines(evidenceSnapshot).length
         ? getSnapshotClaimBoundaryLines(evidenceSnapshot)
@@ -896,6 +926,9 @@ ${traceMarkdown}
 
 ## Provenance
 ${sourceRunLines}
+
+## Local Approval Preview Ledger
+${approvalLedgerMarkdown}
 `;
     const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -929,6 +962,7 @@ ${sourceRunLines}
 
     if (format === 'md') {
       exportMarkdown();
+      logLocalNotebookAction('notebook_commit', 'Markdown notebook export', 'Notebook memory local export preview', 'low');
       setExportMenuOpen(false);
       return;
     }
@@ -947,6 +981,7 @@ ${sourceRunLines}
         ],
       });
       setExportMenuOpen(false);
+      logLocalNotebookAction('notebook_commit', 'PNG notebook export', 'Notebook snapshot local export preview', 'low');
       showFeedback('Notebook snapshot downloaded.');
       return;
     }
@@ -971,6 +1006,7 @@ ${sourceRunLines}
     if (kind === 'summary') {
       const rows = buildNotebookSummaryRows(project, registryProject, workflowNotebookEntry.id, exportedAt);
       downloadNotebookCsv(`difaryx_${projectSlug}_notebook-evidence-summary.csv`, rows);
+      logLocalNotebookAction('report_export', 'Evidence summary CSV export', 'Notebook evidence CSV local export preview', 'medium');
       showFeedback('Notebook evidence summary CSV exported.');
       return;
     }
@@ -987,6 +1023,7 @@ ${sourceRunLines}
           `difaryx_${projectSlug}_${selectedEvidenceDataset.technique.toLowerCase()}_raw-data.csv`,
           rawRows,
         );
+        logLocalNotebookAction('report_export', 'Raw signal CSV export', 'Notebook evidence CSV local export preview', 'medium');
         showFeedback('Raw signal CSV exported.');
         return;
       }
@@ -995,6 +1032,7 @@ ${sourceRunLines}
         `difaryx_${projectSlug}_${selectedEvidenceDataset.technique.toLowerCase()}_features.csv`,
         featureRows,
       );
+      logLocalNotebookAction('report_export', 'Feature CSV export', 'Notebook evidence CSV local export preview', 'medium');
       showFeedback('Raw signal unavailable; feature CSV exported.');
       return;
     }
@@ -1004,6 +1042,7 @@ ${sourceRunLines}
       `difaryx_${projectSlug}_${selectedEvidenceDataset.technique.toLowerCase()}_features.csv`,
       featureRows,
     );
+    logLocalNotebookAction('report_export', 'Feature CSV export', 'Notebook evidence CSV local export preview', 'medium');
     showFeedback('Extracted features CSV exported.');
   };
 
@@ -1048,11 +1087,20 @@ ${sourceRunLines}
     saveAgentDiscussionRefinement(refinement);
     const entry = createNotebookEntryFromRefinement(refinement, templateMode);
     saveNotebookEntry(entry);
+    logLocalNotebookAction('notebook_commit', 'Notebook commit', 'Notebook scientific memory preview', 'low');
     showFeedback(`${NOTEBOOK_TEMPLATES[templateMode].label} entry saved`);
   };
 
   const handleReportHandoffClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
-    if (!requiresApproval(runtimeContext)) return;
+    if (!requiresApproval(runtimeContext)) {
+      logLocalNotebookAction(
+        'report_generation',
+        'Report handoff',
+        'Evidence-to-report builder local preview',
+        'medium',
+      );
+      return;
+    }
     event.preventDefault();
     openApprovalPreview(
       'report_generation',
@@ -1412,6 +1460,10 @@ ${sourceRunLines}
                       )}
                     </div>
                   </div>
+                </div>
+
+                <div className="mt-2">
+                  <ApprovalLedgerPanel projectId={project.id} bundleId={evidenceBundle.bundleId} limit={3} compact />
                 </div>
 
                 <div className="mt-1.5 flex items-center gap-0.5 -mb-px overflow-x-auto">

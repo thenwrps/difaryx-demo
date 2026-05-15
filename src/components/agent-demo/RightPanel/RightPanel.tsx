@@ -7,6 +7,7 @@ import { getProvenanceLabel, getProvenanceStyle } from '../../../utils/projectEv
 import type { AgentEvidenceWorkspace } from '../../../utils/agentEvidenceModel';
 import type { RegistryProject } from '../../../data/demoProjectRegistry';
 import type { RuntimeMode } from '../../../runtime/difaryxRuntimeMode';
+import { ApprovalLedgerPanel } from '../../runtime/ApprovalLedgerPanel';
 
 // Mode configuration with tab IDs
 const AGENT_MODES = {
@@ -81,6 +82,8 @@ interface RightPanelProps {
   registryProject?: RegistryProject;
   toolTrace?: NormalizedToolTraceEntry[];
   runtimeMode?: RuntimeMode;
+  approvalLedgerProjectId?: string;
+  approvalLedgerBundleId?: string;
 }
 
 export function RightPanel({
@@ -99,6 +102,8 @@ export function RightPanel({
   registryProject,
   toolTrace,
   runtimeMode = 'demo',
+  approvalLedgerProjectId,
+  approvalLedgerBundleId,
 }: RightPanelProps) {
   const modeConfig = AGENT_MODES[mode];
   const [activeTab, setActiveTab] = useState<string>(modeConfig.tabs[0].id);
@@ -207,6 +212,12 @@ export function RightPanel({
             <BoundaryTabContent boundary={agentContext.boundaryContext} />
           </>
         )}
+        <ApprovalLedgerPanel
+          projectId={approvalLedgerProjectId}
+          bundleId={approvalLedgerBundleId}
+          limit={3}
+          compact
+        />
       </div>
     </aside>
   );

@@ -922,6 +922,7 @@ import {
   type ApprovalActionType,
   type ApprovalRiskLevel,
 } from '../runtime/actionApproval';
+import { appendApprovalLedgerEntry, createApprovalLedgerEntry } from '../runtime/approvalLedger';
 import {
   getDefaultConnectedAccountState,
   getGoogleConnectedShellState,
@@ -1375,15 +1376,18 @@ export default function AgentDemo() {
     riskLevel?: ApprovalRiskLevel,
   ) => {
     if (!requiresApproval(runtimeContext)) return false;
-    setApprovalAction(createApprovalActionPreview({
+    const action = createApprovalActionPreview({
       actionId: `agent-${actionType}-${Date.now()}`,
       actionType,
       actionLabel,
       destinationLabel,
       evidenceSnapshot,
       runtimeContext,
+      evidenceBundle,
       riskLevel,
-    }));
+    });
+    appendApprovalLedgerEntry(createApprovalLedgerEntry(action, 'preview_opened'));
+    setApprovalAction(action);
     appendLog({
       stamp: '[approval]',
       message: `${actionLabel} is approval-gated in ${getRuntimeBadgeLabel(runtimeContext, 'runtime')}. No external action was executed.`,
@@ -1399,6 +1403,27 @@ export default function AgentDemo() {
     }));
     showFeedback(`${getRuntimeBadgeLabel(runtimeContext, 'permission')}: no external action executed.`);
     return true;
+  };
+
+  const logLocalAction = (
+    actionLabel: string,
+    actionType: ApprovalActionType,
+    destinationLabel: string,
+    riskLevel?: ApprovalRiskLevel,
+  ) => {
+    const action = createApprovalActionPreview({
+      actionId: `agent-${actionType}-${Date.now()}`,
+      actionType,
+      actionLabel,
+      destinationLabel,
+      evidenceSnapshot,
+      runtimeContext,
+      evidenceBundle,
+      riskLevel,
+    });
+    appendApprovalLedgerEntry(createApprovalLedgerEntry(action, 'local_preview_continued', {
+      notes: 'Local deterministic action completed in the frontend demo. No external write executed.',
+    }));
   };
 
   const finalizeRun = (
@@ -1685,6 +1710,7 @@ export default function AgentDemo() {
 
   const handlePrimaryRun = () => {
     if (guardConnectedRuntime('Workflow execution', 'external_share', 'Connected workflow execution preview', 'high')) return;
+    logLocalAction('Workflow execution', 'external_share', 'Local deterministic workflow execution', 'medium');
     if (agentState.reasoningState.executionMode === 'auto') {
       void runAuto();
       return;
@@ -1700,6 +1726,7 @@ export default function AgentDemo() {
       message: 'Report package prepared with graph evidence, reasoning trace, claim boundary, and caveats.',
       type: 'success',
     });
+    logLocalAction('Report export', 'report_export', 'Local report export preview', 'medium');
     showFeedback('Export report preview prepared.');
   };
 
@@ -1713,6 +1740,7 @@ export default function AgentDemo() {
       message: `Refined discussion prepared from ${workflowProcessingResult.technique} processing output using ${templateMode} notebook template.`,
       type: 'success',
     });
+    logLocalAction('Interpretation refinement', 'interpretation_refinement', 'Local interpretation refinement preview', 'medium');
     showFeedback('Refined discussion prepared.');
   };
 
@@ -1734,6 +1762,7 @@ export default function AgentDemo() {
     saveAgentDiscussionRefinement(refinement);
     const notebookEntry = createNotebookEntryFromRefinement(refinement, templateMode);
     saveNotebookEntry(notebookEntry);
+    logLocalAction('Notebook handoff', 'notebook_commit', 'Notebook memory handoff preview', 'low');
     appendLog({
       stamp: '[notebook]',
       message: `Saved deterministic demo notebook entry from the current interpretation context as ${notebookEntry.templateLabel}.`,
@@ -1763,6 +1792,7 @@ export default function AgentDemo() {
       message: `Reproducible report generated from deterministic reasoning trace: ${stages.map((stage) => stage.displayName).join(' -> ')}.`,
       type: 'tool',
     });
+    logLocalAction('Reproducible report generation', 'report_generation', 'Deterministic reproducible report preview', 'medium');
     showFeedback('Reproducible report generated.');
   };
 
@@ -2272,6 +2302,8 @@ export default function AgentDemo() {
           registryProject={registryProject}
           toolTrace={agentState.toolTrace}
           runtimeMode={runtimeMode}
+          approvalLedgerProjectId={selectedProject.id}
+          approvalLedgerBundleId={evidenceBundle.bundleId}
         />
       </div>
       <ApprovalActionDialog

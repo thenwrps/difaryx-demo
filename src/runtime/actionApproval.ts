@@ -1,4 +1,5 @@
 import type { ProjectEvidenceSnapshot } from '../utils/evidenceSnapshot';
+import type { EvidenceBundle, EvidenceBundleSource } from './evidenceBundle';
 import {
   getRuntimeBadgeLabel,
   requiresApproval as runtimeRequiresApproval,
@@ -33,9 +34,12 @@ export interface ApprovalActionPreview {
   projectName: string;
   sampleIdentity: string;
   activeDataset: string;
+  bundleId?: string;
+  bundleSourceMode?: EvidenceBundleSource;
   evidenceSummary: string[];
   validationGaps: string[];
   claimBoundary: string[];
+  supportedAssignment: string;
   destinationLabel: string;
   riskLevel: ApprovalRiskLevel;
   requiresApproval: boolean;
@@ -49,6 +53,7 @@ interface CreateApprovalActionPreviewArgs {
   destinationLabel: string;
   evidenceSnapshot: ProjectEvidenceSnapshot;
   runtimeContext: DifaryxRuntimeContext;
+  evidenceBundle?: EvidenceBundle;
   riskLevel?: ApprovalRiskLevel;
   blockedReason?: string;
 }
@@ -109,6 +114,7 @@ export function createApprovalActionPreview({
   destinationLabel,
   evidenceSnapshot,
   runtimeContext,
+  evidenceBundle,
   riskLevel,
   blockedReason,
 }: CreateApprovalActionPreviewArgs): ApprovalActionPreview {
@@ -129,9 +135,12 @@ export function createApprovalActionPreview({
     activeDataset: evidenceSnapshot.activeDataset?.fileName ??
       evidenceSnapshot.evidenceEntries[0]?.datasetLabel ??
       'Pending evidence source',
+    bundleId: evidenceBundle?.bundleId,
+    bundleSourceMode: evidenceBundle?.sourceMode,
     evidenceSummary: collectEvidenceSummary(evidenceSnapshot),
     validationGaps: collectValidationGaps(evidenceSnapshot),
     claimBoundary: collectClaimBoundary(evidenceSnapshot),
+    supportedAssignment: evidenceBundle?.supportedAssignment ?? evidenceSnapshot.supportedAssignment,
     destinationLabel,
     riskLevel: riskLevel ?? defaultRiskLevel(actionType),
     requiresApproval,

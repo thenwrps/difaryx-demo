@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { ArrowRight, Bot, ClipboardList, FolderOpen, History, Target } from 'lucide-react';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
 import { Card } from '../components/ui/Card';
+import { ApprovalLedgerPanel } from '../components/runtime/ApprovalLedgerPanel';
 import { formatChemicalFormula } from '../utils';
 import {
   claimStatusColorClass,
@@ -151,6 +152,10 @@ export default function HistoryPage() {
             </div>
           </Card>
         )}
+
+        <div className="mb-5">
+          <ApprovalLedgerPanel projectId={projectFilter || undefined} limit={6} />
+        </div>
 
         <Card className="overflow-hidden">
           <div className="grid grid-cols-[1.3fr_1fr_0.7fr_0.8fr_0.8fr_1fr_0.9fr] gap-3 border-b border-border bg-surface-hover/40 px-5 py-3 text-xs font-semibold uppercase tracking-wider text-text-muted">

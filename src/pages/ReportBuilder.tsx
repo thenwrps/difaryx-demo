@@ -41,6 +41,8 @@ import {
   type ApprovalActionType,
   type ApprovalRiskLevel,
 } from '../runtime/actionApproval';
+import { appendApprovalLedgerEntry, createApprovalLedgerEntry, summarizeApprovalLedger } from '../runtime/approvalLedger';
+import { ApprovalLedgerPanel } from '../components/runtime/ApprovalLedgerPanel';
 import {
   getDefaultConnectedAccountState,
   getGoogleConnectedShellState,
@@ -80,6 +82,11 @@ function buildReportSections(
     ...(snapshot.claimBoundary.contextual ?? []).map((line) => `Contextual: ${line}`),
     ...(snapshot.claimBoundary.pending ?? []).map((line) => `Pending: ${line}`),
   ];
+  const ledgerSummary = summarizeApprovalLedger({
+    projectId: snapshot.projectId,
+    bundleId: bundle.bundleId,
+    limit: 4,
+  });
 
   return [
     {
@@ -150,6 +157,8 @@ function buildReportSections(
         `Runtime mode: ${snapshot.runtimeMode ?? 'demo'} / ${snapshot.permissionMode ?? 'read_only'}`,
         `Evidence snapshot: ${snapshot.projectId} / ${availableTechniques} / pending ${pendingTechniques}`,
         `Evidence bundle: ${bundle.bundleId} / ${bundle.sourceMode} / ${bundle.sourceLabel}`,
+        `Local approval preview ledger: ${ledgerSummary.total} browser-local entries for this project/bundle.`,
+        ...(ledgerSummary.recentLines.length ? ledgerSummary.recentLines : ['No approval preview history recorded in this browser.']),
         ...registryProject.experimentHistory.map((event) => `${event.timestampLabel}: ${event.title} - ${event.summary}`),
       ],
     },
@@ -238,14 +247,38 @@ export default function ReportBuilder() {
     destinationLabel: string,
     riskLevel?: ApprovalRiskLevel,
   ) => {
-    setApprovalAction(createApprovalActionPreview({
+    const action = createApprovalActionPreview({
       actionId: `report-${actionType}-${Date.now()}`,
       actionType,
       actionLabel,
       destinationLabel,
       evidenceSnapshot,
       runtimeContext,
+      evidenceBundle,
       riskLevel,
+    });
+    appendApprovalLedgerEntry(createApprovalLedgerEntry(action, 'preview_opened'));
+    setApprovalAction(action);
+  };
+
+  const logLocalReportAction = (
+    actionType: ApprovalActionType,
+    actionLabel: string,
+    destinationLabel: string,
+    riskLevel?: ApprovalRiskLevel,
+  ) => {
+    const action = createApprovalActionPreview({
+      actionId: `report-${actionType}-${Date.now()}`,
+      actionType,
+      actionLabel,
+      destinationLabel,
+      evidenceSnapshot,
+      runtimeContext,
+      evidenceBundle,
+      riskLevel,
+    });
+    appendApprovalLedgerEntry(createApprovalLedgerEntry(action, 'local_preview_continued', {
+      notes: 'Report local/demo action completed in this browser. No external write executed.',
     }));
   };
 
@@ -265,6 +298,7 @@ export default function ReportBuilder() {
       title: `${evidenceSnapshot.projectName} ${reportTypeLabel(templateMode)}`,
       sections: reportSections,
     });
+    logLocalReportAction('report_export', `${format.toUpperCase()} report export`, 'Formal report artifact local preview', 'medium');
     showFeedback(`${format.toUpperCase()} report export started.`);
   };
 
@@ -291,6 +325,7 @@ export default function ReportBuilder() {
       return;
     }
 
+    logLocalReportAction('report_generation', 'Reproducible report generation', 'Versioned report memory local preview', 'medium');
     showFeedback(`Saved ${reportVersion}.`);
   };
 
@@ -382,6 +417,9 @@ export default function ReportBuilder() {
               <p className="mt-2 text-xs leading-relaxed text-amber-900">
                 {reportSections.find((section) => section.heading === 'Validation Boundary')?.lines[0] ?? registryProject.notebook.validationBoundary}
               </p>
+            </div>
+            <div className="mt-3">
+              <ApprovalLedgerPanel projectId={project.id} bundleId={evidenceBundle.bundleId} limit={4} compact />
             </div>
             <div className="mt-3 flex flex-col gap-2">
               <Link to={`/notebook?project=${project.id}&template=${templateMode}&entry=${workflowNotebookEntry.id}${uploadedRouteSuffix}`} className="inline-flex h-8 items-center justify-center rounded-md border border-border bg-background px-3 text-xs font-bold text-text-main hover:border-primary/40 hover:text-primary">

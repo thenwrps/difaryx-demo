@@ -2,6 +2,7 @@ import { AlertTriangle, CheckCircle2, Database, ShieldCheck, X } from 'lucide-re
 import { Button } from '../ui/Button';
 import { getRuntimeBadgeLabel } from '../../runtime/difaryxRuntimeMode';
 import type { ApprovalActionPreview } from '../../runtime/actionApproval';
+import { appendApprovalLedgerEntry, createApprovalLedgerEntry } from '../../runtime/approvalLedger';
 
 interface ApprovalActionDialogProps {
   action: ApprovalActionPreview | null;
@@ -22,6 +23,17 @@ export function ApprovalActionDialog({
 
   const localPreviewLabel = action.runtimeMode === 'demo' ? 'Demo preview' : 'Continue local preview';
   const disabledLabel = action.requiresApproval ? 'Approval required' : 'No approval needed';
+  const handleCancel = () => {
+    appendApprovalLedgerEntry(createApprovalLedgerEntry(action, 'cancelled'));
+    onClose();
+  };
+  const handleContinueLocal = () => {
+    appendApprovalLedgerEntry(createApprovalLedgerEntry(action, 'local_preview_continued'));
+    onContinueLocal?.(action);
+  };
+  const handleBlockedConnectedWrite = () => {
+    appendApprovalLedgerEntry(createApprovalLedgerEntry(action, 'blocked_connected_write'));
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4">
@@ -36,7 +48,7 @@ export function ApprovalActionDialog({
             <h2 className="mt-1 truncate text-base font-bold">{action.actionLabel}</h2>
             <p className="mt-1 text-xs text-slate-300">{action.destinationLabel}</p>
           </div>
-          <button type="button" onClick={onClose} className="rounded p-1 text-slate-300 hover:bg-white/10 hover:text-white" aria-label="Close approval preview">
+          <button type="button" onClick={handleCancel} className="rounded p-1 text-slate-300 hover:bg-white/10 hover:text-white" aria-label="Close approval preview">
             <X size={16} />
           </button>
         </div>
@@ -92,11 +104,15 @@ export function ApprovalActionDialog({
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border bg-surface px-4 py-3">
-          <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
+          <Button variant="ghost" size="sm" onClick={handleCancel}>Cancel</Button>
           {onContinueLocal ? (
-            <Button variant="outline" size="sm" onClick={() => onContinueLocal(action)}>{localPreviewLabel}</Button>
+            <Button variant="outline" size="sm" onClick={handleContinueLocal}>{localPreviewLabel}</Button>
           ) : null}
-          <Button variant="outline" size="sm" disabled>{disabledLabel}</Button>
+          {action.requiresApproval ? (
+            <Button variant="outline" size="sm" onClick={handleBlockedConnectedWrite}>{disabledLabel}</Button>
+          ) : (
+            <Button variant="outline" size="sm" disabled>{disabledLabel}</Button>
+          )}
         </div>
       </div>
     </div>
