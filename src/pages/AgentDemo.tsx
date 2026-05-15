@@ -88,11 +88,14 @@ type TechniqueContext = Technique;
 type AgentMode = 'deterministic' | 'guided' | 'autonomous';
 type ModelMode = 'deterministic' | 'vertex-gemini' | 'gemma';
 type ExecutionMode = 'auto' | 'step';
+type RuntimeMode = 'demo' | 'connected';
 type ReasoningStepStatus = 'pending' | 'running' | 'complete';
 type RunStatus = 'idle' | 'running' | 'complete';
 type ToolStatus = ReasoningStepStatus | 'error';
 type GraphType = 'xrd' | 'xps' | 'ftir' | 'raman';
 type LogType = 'system' | 'tool' | 'success' | 'info';
+type ToolCallType = 'deterministic-tool' | 'approval-gate' | 'local-write';
+type ToolApprovalStatus = 'not-required' | 'approved' | 'gated' | 'pending';
 
 type ExecutionLogEntry = {
   stamp: string;
@@ -106,10 +109,13 @@ type ToolTraceEntry = {
   context: TechniqueContext;
   toolName: string;
   displayName: string;
+  callType: ToolCallType;
   provider?: ModelMode;
   status: ToolStatus;
-  inputSummary: string;
-  outputSummary: string;
+  argsSummary: string;
+  resultSummary: string;
+  evidenceImpact: string;
+  approvalStatus: ToolApprovalStatus;
   durationMs: number;
   canInsertLlmReasoningAfter?: boolean;
 };
@@ -213,6 +219,11 @@ const MODEL_MODE_LABELS: Record<ModelMode, string> = {
   deterministic: 'Deterministic Workflow',
   'vertex-gemini': 'Model Layer Pending',
   gemma: 'Open Model Pending',
+};
+
+const RUNTIME_MODE_LABELS: Record<RuntimeMode, string> = {
+  demo: 'Demo',
+  connected: 'Connected gated',
 };
 
 const CONTEXT_ORDER: TechniqueContext[] = ['XRD', 'XPS', 'FTIR', 'Raman'];
@@ -786,7 +797,7 @@ function mapToolTraceToExecutionSteps(
   return toolTrace.map((entry, index) => ({
     number: index + 1,
     title: stages[index]?.label || entry.displayName,
-    description: stages[index]?.detail || entry.inputSummary,
+    description: stages[index]?.detail || entry.argsSummary,
     tool: entry.displayName,
     time: `${(entry.durationMs / 1000).toFixed(1)}s`,
     status: entry.status,
@@ -801,10 +812,13 @@ function createToolTrace(context: TechniqueContext): ToolTraceEntry[] {
     context,
     toolName: stage.toolName,
     displayName: stage.displayName,
+    callType: 'deterministic-tool',
     provider: 'deterministic',
     status: 'pending',
-    inputSummary: stage.inputSummary,
-    outputSummary: stage.outputSummary,
+    argsSummary: stage.inputSummary,
+    resultSummary: stage.outputSummary,
+    evidenceImpact: stage.detail,
+    approvalStatus: 'not-required',
     durationMs: stage.durationMs,
     canInsertLlmReasoningAfter: stage.canInsertLlmReasoningAfter,
   }));
@@ -898,6 +912,12 @@ import {
   getProjectParameterGroups,
   type ParameterGroupId,
 } from '../utils/projectEvidence';
+import { getProjectEvidenceSnapshot } from '../utils/evidenceSnapshot';
+import {
+  clearProjectWorkspaceParameters,
+  readProjectWorkspaceParameters,
+  writeProjectWorkspaceParameters,
+} from '../utils/workspaceParameterOverrides';
 
 function FormulaText({
   children,
@@ -1149,6 +1169,7 @@ export default function AgentDemo() {
 
   const [missionText, setMissionText] = useState(DEFAULT_MISSION);
   const [feedback, setFeedback] = useState('');
+  const [runtimeMode, setRuntimeMode] = useState<RuntimeMode>('demo');
   const [agentState, setAgentState] = useState<AgentDemoState>(() =>
     makeInitialState(projectIdFromUrl, modeFromUrl),
   );
@@ -1195,6 +1216,10 @@ export default function AgentDemo() {
   }
 
   const registryProject = getRegistryProject(agentState.projectId);
+  const evidenceSnapshot = useMemo(
+    () => getProjectEvidenceSnapshot(agentState.projectId),
+    [agentState.projectId],
+  );
   const currentProject = registryProject._raw;
   const datasetOptions = useMemo(
     () => getDatasetOptions(agentState.context, agentState.projectId),
@@ -1260,10 +1285,11 @@ export default function AgentDemo() {
         requestedProcessingResult?.projectId === selectedProject.id ? requestedProcessingResult : null;
 
       return routeProcessingResult ??
+        evidenceSnapshot.reportContext ??
         getLatestProcessingResult(selectedProject.id) ??
         createProcessingResultFromXrdDemo(selectedProject.id);
     },
-    [searchParams, selectedProject.id],
+    [searchParams, selectedProject.id, evidenceSnapshot.reportContext],
   );
 
   const showFeedback = (message: string) => {
@@ -1286,6 +1312,25 @@ export default function AgentDemo() {
       ...current,
       toolTrace: updateTraceStatus(current.toolTrace, index, status),
     }));
+  };
+
+  const guardConnectedRuntime = (actionLabel: string) => {
+    if (runtimeMode === 'demo') return false;
+    appendLog({
+      stamp: '[approval]',
+      message: `${actionLabel} is gated in connected mode. No external action was executed.`,
+      type: 'system',
+    });
+    setAgentState((current) => ({
+      ...current,
+      toolTrace: current.toolTrace.map((entry) => ({
+        ...entry,
+        callType: 'approval-gate',
+        approvalStatus: 'gated',
+      })),
+    }));
+    showFeedback('Connected mode is approval-gated in this demo.');
+    return true;
   };
 
   const finalizeRun = (
@@ -1523,7 +1568,7 @@ export default function AgentDemo() {
       setIncludedTechniques(getProjectTechniques(newProject._raw));
       setEvidenceWorkspace(buildEvidenceWorkspaceFromRegistry(newProject));
       setMultiTechOpen(false);
-      setWorkspaceParameters({});
+      setWorkspaceParameters(readProjectWorkspaceParameters(newProject._raw.id, getProjectTechniques(newProject._raw)));
       setDraftParameters({});
     }
     const newParams = new URLSearchParams(searchParams);
@@ -1571,6 +1616,7 @@ export default function AgentDemo() {
   };
 
   const handlePrimaryRun = () => {
+    if (guardConnectedRuntime('Workflow execution')) return;
     if (agentState.reasoningState.executionMode === 'auto') {
       void runAuto();
       return;
@@ -1579,6 +1625,7 @@ export default function AgentDemo() {
   };
 
   const handleExportReport = () => {
+    if (guardConnectedRuntime('Report export')) return;
     if (!currentResult) return;
     appendLog({
       stamp: '[report]',
@@ -1589,6 +1636,7 @@ export default function AgentDemo() {
   };
 
   const handleRefineInterpretation = () => {
+    if (guardConnectedRuntime('Interpretation refinement')) return;
     saveProcessingResult(workflowProcessingResult);
     const refinement = refineDiscussionFromProcessing(workflowProcessingResult, templateMode);
     saveAgentDiscussionRefinement(refinement);
@@ -1601,6 +1649,7 @@ export default function AgentDemo() {
   };
 
   const handleSaveToNotebook = () => {
+    if (guardConnectedRuntime('Notebook handoff')) return;
     if (currentResult) {
       const runResult = toAgentRunResult(
         currentResult,
@@ -1640,6 +1689,7 @@ export default function AgentDemo() {
   };
 
   const handleGenerateReproducibleReport = () => {
+    if (guardConnectedRuntime('Reproducible report generation')) return;
     if (!currentResult) return;
     appendLog({
       stamp: '[repro]',
@@ -1662,7 +1712,9 @@ export default function AgentDemo() {
   const [multiTechOpen, setMultiTechOpen] = useState(false);
 
   // Workspace parameter state: committed overrides + draft edits
-  const [workspaceParameters, setWorkspaceParameters] = useState<WorkspaceParameters>({});
+  const [workspaceParameters, setWorkspaceParameters] = useState<WorkspaceParameters>(
+    () => readProjectWorkspaceParameters(currentProject.id, getProjectTechniques(currentProject)),
+  );
   const [draftParameters, setDraftParameters] = useState<WorkspaceParameters>({});
 
   // Condition lock drives read-only mode for parameter editor
@@ -1689,7 +1741,7 @@ export default function AgentDemo() {
   React.useEffect(() => {
     setEvidenceWorkspace(buildEvidenceWorkspaceFromRegistry(registryProject));
     setIncludedTechniques(getProjectTechniques(registryProject._raw));
-    setWorkspaceParameters({});
+    setWorkspaceParameters(readProjectWorkspaceParameters(registryProject._raw.id, getProjectTechniques(registryProject._raw)));
     setDraftParameters({});
   }, [registryProject.id]);
 
@@ -1775,6 +1827,7 @@ export default function AgentDemo() {
       }
     });
     setWorkspaceParameters(merged);
+    writeProjectWorkspaceParameters(currentProject.id, merged);
 
     // Apply parameter changes to evidence workspace
     let updatedWorkspace = evidenceWorkspace;
@@ -1797,6 +1850,7 @@ export default function AgentDemo() {
   const handleResetParameters = () => {
     setWorkspaceParameters({});
     setDraftParameters({});
+    clearProjectWorkspaceParameters(currentProject.id, getProjectTechniques(currentProject));
     showFeedback('Parameters reset to demo defaults.');
   };
 
@@ -1914,7 +1968,29 @@ export default function AgentDemo() {
             {/* Validation Status */}
             <div className="h-7 px-2.5 flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 rounded text-[10px] font-semibold text-emerald-700">
               <CheckCircle2 size={11} />
-              <span>Boundary Ready</span>
+              <span>{evidenceSnapshot.validationGaps.length > 0 ? 'Boundary Gated' : 'Boundary Ready'}</span>
+            </div>
+
+            {/* Runtime Governance */}
+            <div className="relative">
+              <select
+                value={runtimeMode}
+                disabled={runningGuardRef.current}
+                onChange={(e) => setRuntimeMode(e.target.value as RuntimeMode)}
+                className={`h-7 px-2 pr-6 text-[10px] font-semibold border rounded appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+                  runtimeMode === 'demo'
+                    ? 'bg-slate-50 border-slate-200 text-slate-700'
+                    : 'bg-amber-50 border-amber-200 text-amber-700'
+                }`}
+                title="Runtime governance mode"
+              >
+                {Object.entries(RUNTIME_MODE_LABELS).map(([key, label]) => (
+                  <option key={key} value={key}>
+                    Runtime: {label}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={12} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             </div>
           </div>
 
@@ -2067,6 +2143,8 @@ export default function AgentDemo() {
           onLockConditions={handleLockConditions}
           evidenceWorkspace={evidenceWorkspace}
           registryProject={registryProject}
+          toolTrace={agentState.toolTrace}
+          runtimeMode={runtimeMode}
         />
       </div>
     </div>

@@ -51,6 +51,19 @@ const AGENT_MODES = {
 } as const;
 
 type AgentMode = keyof typeof AGENT_MODES;
+type RuntimeMode = 'demo' | 'connected';
+
+interface NormalizedToolTraceEntry {
+  id: string;
+  toolName: string;
+  callType: string;
+  argsSummary: string;
+  resultSummary: string;
+  evidenceImpact: string;
+  approvalStatus: string;
+  timestamp: string;
+  status: 'pending' | 'running' | 'complete' | 'error';
+}
 
 interface RightPanelProps {
   agentContext: AgentContext;
@@ -66,6 +79,8 @@ interface RightPanelProps {
   onLockConditions?: () => void;
   evidenceWorkspace?: AgentEvidenceWorkspace;
   registryProject?: RegistryProject;
+  toolTrace?: NormalizedToolTraceEntry[];
+  runtimeMode?: RuntimeMode;
 }
 
 export function RightPanel({
@@ -82,6 +97,8 @@ export function RightPanel({
   onLockConditions,
   evidenceWorkspace,
   registryProject,
+  toolTrace,
+  runtimeMode = 'demo',
 }: RightPanelProps) {
   const modeConfig = AGENT_MODES[mode];
   const [activeTab, setActiveTab] = useState<string>(modeConfig.tabs[0].id);
@@ -145,7 +162,10 @@ export function RightPanel({
           evidenceWorkspace ? <EvidenceWorkspaceTabContent workspace={evidenceWorkspace} /> : <EvidenceByTechniqueCard context={agentContext} />
         )}
         {mode === 'deterministic' && activeTab === 'trace' && (
-          evidenceWorkspace ? <TraceWorkspaceTabContent workspace={evidenceWorkspace} /> : <TraceTabContent trace={agentContext.traceContext} />
+          <>
+            <ToolTraceCompact trace={toolTrace ?? []} runtimeMode={runtimeMode} />
+            {evidenceWorkspace ? <TraceWorkspaceTabContent workspace={evidenceWorkspace} /> : <TraceTabContent trace={agentContext.traceContext} />}
+          </>
         )}
         {mode === 'deterministic' && activeTab === 'boundary' && (
           evidenceWorkspace ? <BoundaryWorkspaceTabContent workspace={evidenceWorkspace} /> : <BoundaryTabContent boundary={agentContext.boundaryContext} />
@@ -510,6 +530,54 @@ function EvidenceWorkspaceTabContent({ workspace }: { workspace: AgentEvidenceWo
         </div>
       </div>
     </>
+  );
+}
+
+function ToolTraceCompact({
+  trace,
+  runtimeMode,
+}: {
+  trace: NormalizedToolTraceEntry[];
+  runtimeMode: RuntimeMode;
+}) {
+  if (trace.length === 0) return null;
+
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-3">
+      <h3 className="flex items-center gap-2 text-xs font-bold text-slate-900 mb-2">
+        <Database size={14} className="text-blue-600" />
+        Tool Calls
+      </h3>
+      <div className="mb-2 flex items-center justify-between text-[10px]">
+        <span className="font-semibold text-slate-500">Runtime</span>
+        <span className={`rounded border px-1.5 py-0.5 font-semibold ${
+          runtimeMode === 'demo'
+            ? 'border-slate-200 bg-slate-50 text-slate-600'
+            : 'border-amber-200 bg-amber-50 text-amber-700'
+        }`}>
+          {runtimeMode === 'demo' ? 'Demo deterministic' : 'Connected gated'}
+        </span>
+      </div>
+      <div className="space-y-2">
+        {trace.map((entry) => (
+          <div key={entry.id} className="rounded border border-slate-100 bg-slate-50 p-2 text-[10px]">
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-bold text-slate-900">{entry.toolName}</span>
+              <span className="font-mono text-slate-500">{entry.timestamp}</span>
+            </div>
+            <div className="mt-1 grid grid-cols-2 gap-1 text-slate-600">
+              <span>Call: {entry.callType}</span>
+              <span>Approval: {entry.approvalStatus}</span>
+              <span>Args: {entry.argsSummary}</span>
+              <span>Result: {entry.resultSummary}</span>
+            </div>
+            <p className="mt-1 border-t border-slate-200 pt-1 text-slate-500">
+              {entry.evidenceImpact}
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 

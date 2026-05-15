@@ -46,6 +46,13 @@ import {
   type AnalysisSession,
   type PipelineStepStatus,
 } from '../../data/analysisSessions';
+import type { Technique } from '../../data/demoProjects';
+import {
+  clearTechniqueParameterOverrides,
+  readTechniqueParameterOverrides,
+  writeTechniqueParameterOverrides,
+} from '../../utils/workspaceParameterOverrides';
+import { getProjectEvidenceSnapshot } from '../../utils/evidenceSnapshot';
 
 const RIGHT_TABS = ['Evidence', 'Parameters', 'Graph', 'Boundary', 'Trace'] as const;
 type RightTab = (typeof RIGHT_TABS)[number];
@@ -232,6 +239,34 @@ function getDefaultParameters(config: TechniqueWorkspaceConfig) {
     acc[control.id] = Array.isArray(control.defaultValue)
       ? [...control.defaultValue]
       : control.defaultValue;
+    return acc;
+  }, {});
+}
+
+function coerceSharedOverrideValue(control: TechniqueParameterControl, value: unknown): TechniqueParameterValue {
+  if (control.type === 'number' || control.type === 'range') {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : control.defaultValue;
+  }
+  if (control.type === 'toggle') {
+    return value === true || String(value).toLowerCase() === 'true';
+  }
+  if (control.type === 'checkbox-group') {
+    if (Array.isArray(value)) return value.map(String);
+    return String(value).split(',').map((item) => item.trim()).filter(Boolean);
+  }
+  return String(value);
+}
+
+function mapSharedOverridesToSessionParameters(
+  config: TechniqueWorkspaceConfig,
+  overrides: Record<string, unknown>,
+) {
+  return config.parameters.reduce<Record<string, TechniqueParameterValue>>((acc, control) => {
+    const value = overrides[control.label] ?? overrides[control.id];
+    if (value !== undefined) {
+      acc[control.id] = coerceSharedOverrideValue(control, value);
+    }
     return acc;
   }, {});
 }
@@ -505,6 +540,10 @@ export function TechniqueWorkspaceShell({ technique, mode = 'project', fileName,
   const requestedProjectId = searchParams.get('project');
   const project = useMemo(() => getProjectFromQuery(requestedProjectId), [requestedProjectId]);
   const projectId = project?.id ?? null;
+  const evidenceSnapshot = useMemo(
+    () => (projectId ? getProjectEvidenceSnapshot(projectId) : null),
+    [projectId],
+  );
   const focusedEvidence = useMemo(
     () => (project ? getFocusedEvidenceSource(project, technique) : null),
     [project, technique],
@@ -512,15 +551,22 @@ export function TechniqueWorkspaceShell({ technique, mode = 'project', fileName,
   const techniqueState = getTechniqueProjectState(project, technique);
   const comparisonRow = getComparisonRow(project, technique);
   const evidenceSource = getEvidenceSource(project, technique);
+  const snapshotDataset =
+    evidenceSnapshot?.activeDataset?.technique.toLowerCase() === technique
+      ? evidenceSnapshot.activeDataset
+      : null;
   const datasetLabel = isQuickMode
     ? quickAnalysisSession?.fileName || fileName || 'Uploaded dataset'
-    : getDatasetLabel(project, technique);
+    : snapshotDataset?.fileName || getDatasetLabel(project, technique);
   const datasetStatus = isQuickMode
     ? quickAnalysisSession ? getStatusLabel(quickAnalysisSession.status) : 'Processing'
     : focusedEvidence?.status || (project ? 'Required' : 'Standalone');
   const quickGraphData = useMemo(() => buildQuickGraphData(quickAnalysisSession), [quickAnalysisSession]);
   const graphData = quickGraphData ?? focusedEvidence?.graphData;
-  const hasProjectEvidence = Boolean(techniqueState?.available);
+  const hasProjectEvidence = Boolean(
+    evidenceSnapshot?.availableTechniques.includes(technique.toUpperCase() as Technique) ||
+    techniqueState?.available,
+  );
   const [quickSessionKey] = useState(() => isQuickMode ? (querySessionId ?? `quick-${Date.now()}`) : '');
   const sessionStorageKey = useMemo(() => isQuickMode
     ? `difaryx-technique-session:${technique}:quick:${quickSessionKey}`
@@ -540,6 +586,9 @@ export function TechniqueWorkspaceShell({ technique, mode = 'project', fileName,
     buildDefaultSession(sessionStorageKey, config, hasProjectEvidence, Boolean(project), quickAnalysisSession),
   );
   const [paneLayout, setPaneLayout] = useState(() => buildDefaultPaneLayout(paneLayoutStorageKey));
+  const sharedOverrideCount = projectId
+    ? Object.keys(readTechniqueParameterOverrides(projectId, technique)).length
+    : 0;
 
   useEffect(() => {
     setActiveCenterTab(config.centerTabs[0].id);
@@ -549,9 +598,18 @@ export function TechniqueWorkspaceShell({ technique, mode = 'project', fileName,
   }, [technique]);
 
   useEffect(() => {
-    setSessionState(loadSessionState(sessionStorageKey, config, hasProjectEvidence, Boolean(project), quickAnalysisSession));
+    const loaded = loadSessionState(sessionStorageKey, config, hasProjectEvidence, Boolean(project), quickAnalysisSession);
+    const sharedOverrides = projectId ? readTechniqueParameterOverrides(projectId, technique) : {};
+    const sharedParameters = mapSharedOverridesToSessionParameters(config, sharedOverrides);
+    setSessionState({
+      ...loaded,
+      parameters: {
+        ...loaded.parameters,
+        ...sharedParameters,
+      },
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionStorageKey, quickAnalysisSession?.analysisId]);
+  }, [sessionStorageKey, quickAnalysisSession?.analysisId, projectId, technique]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -594,6 +652,17 @@ export function TechniqueWorkspaceShell({ technique, mode = 'project', fileName,
 
   const updateParameter = (control: TechniqueParameterControl, value: TechniqueParameterValue) => {
     setSessionState((prev) => {
+      if (projectId) {
+        const overrides = readTechniqueParameterOverrides(projectId, technique);
+        const nextOverrides = { ...overrides };
+        if (value === control.defaultValue) {
+          delete nextOverrides[control.label];
+        } else {
+          nextOverrides[control.label] = value;
+        }
+        writeTechniqueParameterOverrides(projectId, technique, nextOverrides);
+      }
+
       const next = addLog(
         {
           ...prev,
@@ -674,6 +743,10 @@ export function TechniqueWorkspaceShell({ technique, mode = 'project', fileName,
   };
 
   const resetParameters = () => {
+    if (projectId) {
+      clearTechniqueParameterOverrides(projectId, technique);
+    }
+
     setSessionState((prev) =>
       addLog(
         {
@@ -1285,6 +1358,7 @@ export function TechniqueWorkspaceShell({ technique, mode = 'project', fileName,
                 onReset={resetParameters}
                 onSavePreset={savePreset}
                 processingStateLabel={processingStateLabel}
+                sharedOverrideCount={sharedOverrideCount}
               />
             )}
 
@@ -1390,6 +1464,7 @@ function ParametersPanel({
   onReset,
   onSavePreset,
   processingStateLabel,
+  sharedOverrideCount,
 }: {
   config: TechniqueWorkspaceConfig;
   sessionState: WorkspaceSessionState;
@@ -1401,6 +1476,7 @@ function ParametersPanel({
   onReset: () => void;
   onSavePreset: () => void;
   processingStateLabel: string;
+  sharedOverrideCount: number;
 }) {
   return (
     <div className="space-y-2">
@@ -1422,6 +1498,7 @@ function ParametersPanel({
         <div className="space-y-1.5 text-[11px]">
           <Metric label="Affected step" value={affectedStepLabels.join(', ')} />
           <Metric label="Status" value={processingStateLabel} />
+          <Metric label="Shared overrides" value={sharedOverrideCount > 0 ? `${sharedOverrideCount} active` : 'None'} />
           <Metric
             label="Recalculated"
             value={sessionState.pendingRecalculation || sessionState.dirty
