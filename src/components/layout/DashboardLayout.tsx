@@ -1,14 +1,35 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Bot, LayoutDashboard, FolderKanban, BookOpen, History, Settings, Search, User, PanelLeftClose, PanelLeftOpen, ChevronDown, LogOut } from 'lucide-react';
+import {
+  Bot,
+  BookOpen,
+  FileText,
+  FlaskConical,
+  History,
+  LayoutDashboard,
+  Settings,
+  Search,
+  User,
+  PanelLeftClose,
+  PanelLeftOpen,
+  ChevronDown,
+  LogOut,
+} from 'lucide-react';
 import { cn } from '../ui/Button';
 import { DEFAULT_PROJECT_ID } from '../../data/demoProjects';
+
+interface NavItem {
+  label: string;
+  icon: React.ElementType;
+  path: string;
+  match: string[];
+}
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [isTopbarCompact, setIsTopbarCompact] = React.useState(false);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(true);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
   const [isProfileOpen, setIsProfileOpen] = React.useState(false);
   const [isDemoAuthenticated, setIsDemoAuthenticated] = React.useState(() => {
     try {
@@ -51,15 +72,55 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     return () => document.removeEventListener('scroll', handleScroll, { capture: true });
   }, []);
 
-  const navItems = [
-    { label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
-    { label: 'Workspace', icon: FolderKanban, path: '/workspace' },
-    { label: 'Multi-Tech', icon: FolderKanban, path: '/workspace/multi?project=cufe2o4-sba15' },
-    { label: 'Notebook Lab', icon: BookOpen, path: `/notebook?project=${DEFAULT_PROJECT_ID}` },
-    { label: 'Agent Mode', icon: Bot, path: `/demo/agent?project=${DEFAULT_PROJECT_ID}` },
-    { label: 'Analysis History', icon: History, path: '/history' },
-    { label: 'Settings', icon: Settings, path: '/settings' },
+  const mainNavItems: NavItem[] = [
+    { label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard', match: ['/', '/dashboard'] },
+    {
+      label: 'Workspace',
+      icon: FlaskConical,
+      path: `/workspace?project=${DEFAULT_PROJECT_ID}`,
+      match: ['/workspace', '/analysis'],
+    },
+    { label: 'Agent Workspace', icon: Bot, path: `/demo/agent?project=${DEFAULT_PROJECT_ID}`, match: ['/demo/agent'] },
+    { label: 'Notebook Lab', icon: BookOpen, path: `/notebook?project=${DEFAULT_PROJECT_ID}`, match: ['/notebook'] },
+    { label: 'Reports', icon: FileText, path: `/reports?project=${DEFAULT_PROJECT_ID}`, match: ['/reports'] },
+    { label: 'History', icon: History, path: '/history', match: ['/history'] },
+    { label: 'Settings', icon: Settings, path: '/settings', match: ['/settings'] },
   ];
+
+  const isActiveItem = (item: NavItem) => {
+    const pathname = location.pathname;
+    return item.match.some((prefix) => {
+      if (prefix === '/') return pathname === '/';
+      return pathname === prefix || pathname.startsWith(`${prefix}/`);
+    });
+  };
+
+  const renderNavItems = (
+    items: NavItem[],
+  ) => (
+    <div className="space-y-1">
+      {items.map((item, i) => {
+        const active = isActiveItem(item);
+        return (
+          <Link
+            key={`${item.label}-${i}`}
+            to={item.path}
+            title={isSidebarCollapsed ? item.label : undefined}
+            className={cn(
+              "flex items-center rounded-md text-sm font-semibold transition-colors",
+              isSidebarCollapsed ? "h-11 justify-center px-0" : "justify-start gap-3 px-3 py-2.5",
+              active
+                ? "bg-blue-600 text-white shadow-sm shadow-blue-950/20"
+                : "text-slate-700 hover:bg-slate-100 hover:text-slate-950"
+            )}
+          >
+            <item.icon size={isSidebarCollapsed ? 20 : 18} />
+            <span className={cn(isSidebarCollapsed ? "sr-only" : "inline")}>{item.label}</span>
+          </Link>
+        );
+      })}
+    </div>
+  );
 
   const handleSignOut = () => {
     localStorage.removeItem('demoAuth');
@@ -74,23 +135,30 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       {/* Sidebar */}
       <aside
         className={cn(
-          "border-r border-border bg-surface flex flex-col transition-[width] duration-200 shrink-0",
+          "border-r border-slate-200 bg-white text-slate-950 flex flex-col transition-[width] duration-200 shrink-0",
           isSidebarCollapsed ? "w-16 md:w-[72px]" : "w-64"
         )}
       >
         <div
           className={cn(
-            "h-14 flex items-center border-b border-border shrink-0 px-2",
+            "h-14 flex items-center border-b border-slate-200 shrink-0 px-2",
             isSidebarCollapsed ? "justify-center" : "justify-between"
           )}
         >
-          <Link to="/" className={cn("rounded flex items-center", !isSidebarCollapsed && "bg-white px-3 py-1.5")}>
+          <Link
+            to="/"
+            className={cn(
+              "rounded-md flex items-center transition-colors hover:bg-slate-100",
+              isSidebarCollapsed ? "h-11 w-11 justify-center" : "px-3 py-1.5"
+            )}
+            title={isSidebarCollapsed ? "DIFARYX" : undefined}
+          >
             <img 
-              src="/logo/difaryx.png" 
+              src={isSidebarCollapsed ? "/favicon.ico" : "/logo/difaryx.png"}
               alt="DIFARYX" 
               className={cn(
                 "object-contain hover:opacity-90 cursor-pointer transition-none",
-                isSidebarCollapsed ? "h-7 w-9 object-cover object-left" : "h-8"
+                isSidebarCollapsed ? "h-9 w-9" : "h-8"
               )}
             />
           </Link>
@@ -98,38 +166,22 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             <button
               type="button"
               onClick={() => setIsSidebarCollapsed(true)}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-text-muted hover:bg-surface-hover hover:text-text-main"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-600 hover:bg-slate-100 hover:text-slate-950"
               aria-label="Collapse sidebar"
             >
               <PanelLeftClose size={17} />
             </button>
           )}
         </div>
-        <nav className={cn("flex-1 overflow-y-auto py-4 space-y-2", isSidebarCollapsed ? "px-2" : "px-3")}>
-          {navItems.map((item, i) => (
-            <Link
-              key={i}
-              to={item.path}
-              title={isSidebarCollapsed ? item.label : undefined}
-              className={cn(
-                "flex items-center rounded-md text-sm font-medium transition-colors",
-                isSidebarCollapsed ? "h-11 justify-center px-0" : "justify-start gap-3 px-3 py-2.5",
-                location.pathname === item.path.split('?')[0]
-                  ? "bg-primary/10 text-primary" 
-                  : "text-text-muted hover:bg-surface-hover hover:text-text-main"
-              )}
-            >
-              <item.icon size={isSidebarCollapsed ? 20 : 18} />
-              <span className={cn(isSidebarCollapsed ? "sr-only" : "inline")}>{item.label}</span>
-            </Link>
-          ))}
+        <nav className={cn("flex-1 overflow-y-auto py-3", isSidebarCollapsed ? "px-2" : "px-3")}>
+          {renderNavItems(mainNavItems)}
         </nav>
         {isSidebarCollapsed && (
-          <div className="border-t border-border p-2">
+          <div className="border-t border-slate-200 p-2">
             <button
               type="button"
               onClick={() => setIsSidebarCollapsed(false)}
-              className="flex h-10 w-full items-center justify-center rounded-md text-text-muted hover:bg-surface-hover hover:text-text-main"
+              className="flex h-10 w-full items-center justify-center rounded-md text-slate-600 hover:bg-slate-100 hover:text-slate-950"
               aria-label="Expand sidebar"
               title="Expand sidebar"
             >

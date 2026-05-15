@@ -30,7 +30,6 @@ import {
   Technique,
   DemoProject,
   demoProjects,
-  getAgentPath,
   getDefaultTechnique,
   getTechniqueLabels,
   getLocalExperiments,
@@ -49,6 +48,15 @@ import {
   getConditionLockStatusLabel,
 } from '../data/experimentConditionLock';
 import { formatChemicalFormula } from '../utils';
+import {
+  claimStatusColorClass,
+  claimStatusLabel,
+  demoProjectRegistry,
+  jobTypeBadgeClass,
+  jobTypeLabel,
+  type RegistryProject,
+} from '../data/demoProjectRegistry';
+import { DemoProjectGraph } from '../components/graphs/DemoProjectGraph';
 
 /* ─── workflow chain (top of dashboard) ─── */
 const WORKFLOW_STEPS = [
@@ -93,19 +101,8 @@ function readinessLabelColor(percent: number) {
   return 'text-red-500';
 }
 
-function getProjectTypeBadge(projectId: string): string {
-  if (projectId === 'cu-fe2o4-spinel') return 'RESEARCH PROJECT';
-  if (projectId === 'cufe2o4-sba15') return 'R&D PROJECT';
-  if (projectId === 'nife2o4') return 'ANALYTICAL JOB';
-  if (projectId === 'cofe2o4') return 'RESEARCH PROJECT';
-  if (projectId === 'fe3o4-nanoparticles') return 'R&D PROJECT';
-  return 'RESEARCH PROJECT';
-}
-
-function getProjectTypeBadgeColor(projectId: string) {
-  if (projectId === 'cufe2o4-sba15' || projectId === 'fe3o4-nanoparticles') return 'border-cyan/40 bg-cyan/10 text-cyan';
-  return 'border-primary/40 bg-primary/10 text-primary';
-}
+// Project type labels come from `getProjectJobTypeLabel` / `getProjectJobTypeBadgeColor`
+// in `utils/projectEvidence.ts` so the Dashboard and Agent stay aligned.
 
 /* ─── evidence coverage bar ─── */
 function EvidenceCoverageBar({ project }: { project: DemoProject }) {
@@ -130,93 +127,64 @@ function EvidenceCoverageBar({ project }: { project: DemoProject }) {
 }
 
 /* ─── project card — graph-first layout ─── */
-function ProjectCard({ project }: { project: DemoProject }) {
+function ProjectCard({ project }: { project: RegistryProject }) {
   const navigate = useNavigate();
-  const graphData = makeTechniquePattern(project, getDefaultTechnique(project));
-  const graphLabels = getTechniqueLabels(getDefaultTechnique(project));
 
-  const hasXrdDemoData = project.techniques.includes('XRD');
-  const statusLabel = project.claimStatus === 'strongly_supported'
-    ? 'Supported assignment'
-    : project.claimStatus === 'supported'
-    ? 'Requires validation'
-    : project.claimStatus === 'partial'
-    ? 'Validation-limited'
-    : 'In progress';
-  const statusColor = project.claimStatus === 'strongly_supported'
-    ? 'text-emerald-600'
-    : project.claimStatus === 'supported'
-    ? 'text-cyan'
-    : 'text-amber-500';
-
-  const readinessLabel = project.reportReadiness.readinessPercent >= 80
+  // Canonical registry project — single source of truth shared across app
+  const projectJobLabel = `${jobTypeLabel(project.jobType)} PROJECT`;
+  const exportReady = project.reportReadiness >= 80;
+  const readinessLabel = project.reportReadiness >= 80
     ? 'Report-ready'
-    : project.reportReadiness.readinessPercent >= 50
+    : project.reportReadiness >= 50
     ? 'Discussion-ready'
     : 'Requires processing';
-  const readinessColor = project.reportReadiness.readinessPercent >= 80
+  const readinessColor = project.reportReadiness >= 80
     ? 'text-primary'
-    : project.reportReadiness.readinessPercent >= 50
+    : project.reportReadiness >= 50
     ? 'text-cyan'
     : 'text-amber-600';
 
   return (
     <Card
       className="cursor-pointer hover:border-primary/50 transition-colors group flex flex-col h-full"
-      onClick={() => navigate(`/project/${project.id}`)}
+      onClick={() => navigate(`/workspace/analysis?project=${project.id}`)}
     >
       {/* header */}
       <div className="p-4 border-b border-border bg-surface-hover/30 flex justify-between items-start">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${getProjectTypeBadgeColor(project.id)}`}>
-              {getProjectTypeBadge(project.id)}
+            <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${jobTypeBadgeClass(project.jobType)}`}>
+              {projectJobLabel}
             </span>
           </div>
           <h3 className="font-bold text-sm text-text-main group-hover:text-primary transition-colors">
-            {formatChemicalFormula(project.name)}
+            {formatChemicalFormula(project.title)}
           </h3>
           <div className="flex items-center gap-1.5 text-[11px] text-text-muted mt-1">
-            <Clock size={11} /> {project.lastUpdated}
+            <Clock size={11} /> {project.createdLabel}
           </div>
         </div>
         <div className="text-right">
-          <div className={`text-xs font-bold ${statusColor}`}>{statusLabel}</div>
+          <div className={`text-xs font-bold ${claimStatusColorClass(project.claimStatus)}`}>{claimStatusLabel(project.claimStatus)}</div>
           <div className="text-[9px] text-text-muted uppercase tracking-wider">Status</div>
         </div>
       </div>
 
-      {/* graph */}
+      {/* graph — shared registry source so Dashboard/Workspace/Agent/History match */}
       <div className="h-[180px] px-2 py-2 border-b border-border/50">
-        {graphData ? (
-          <Graph
-            type={getDefaultTechnique(project).toLowerCase() as any}
-            height="100%"
-            showBackground={false}
-            showCalculated={false}
-            showResidual={false}
-            showLegend={false}
-            externalData={graphData}
-            xAxisLabel={graphLabels.xLabel}
-            yAxisLabel={graphLabels.yLabel}
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center rounded border border-dashed border-amber-500/30 bg-amber-500/5">
-            <p className="text-xs text-text-muted">No dataset</p>
-          </div>
-        )}
+        <DemoProjectGraph source={project.graphPreview} compact height="100%" />
       </div>
 
       {/* body */}
       <div className="flex-1 p-4 flex flex-col gap-2">
-        <p className="text-[11px] text-text-muted leading-relaxed line-clamp-2">{project.summary}</p>
+        <p className="text-[11px] text-text-muted leading-relaxed line-clamp-2">{project.evidenceSummary}</p>
 
         {/* technique pills + readiness */}
         <div className="flex items-center justify-between">
           <div className="flex flex-wrap gap-1">
-            {project.techniques.map((tech) => (
+            {project.selectedTechniques.map((tech) => (
               <span key={tech} className="rounded-full border border-primary/30 bg-primary/5 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary">
-                {tech}
+                {tech.toUpperCase()}
               </span>
             ))}
           </div>
@@ -229,13 +197,13 @@ function ProjectCard({ project }: { project: DemoProject }) {
         {/* mode / status / validation chips */}
         <div className="flex flex-wrap gap-1">
           <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[9px] font-medium text-text-muted">
-            {getProjectTypeBadge(project.id).split(' · ')[1] ?? 'Research'} Mode
+            {jobTypeLabel(project.jobType)} Mode
           </span>
           <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[9px] font-medium text-text-muted">
-            {statusLabel}
+            {project.statusLabel}
           </span>
           <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[9px] font-medium text-text-muted">
-            Validation required
+            {project.validationGapCount} validation gap{project.validationGapCount === 1 ? '' : 's'}
           </span>
         </div>
 
@@ -247,34 +215,50 @@ function ProjectCard({ project }: { project: DemoProject }) {
 
       {/* footer actions */}
       <div className="mt-auto p-3 pt-0 border-t border-border">
-        <div className="grid grid-cols-4 gap-1.5 pt-3">
+        <div className="grid grid-cols-5 gap-1.5 pt-3">
           <Link
-            to={`/workspace/${getDefaultTechnique(project).toLowerCase()}?project=${project.id}`}
+            to={`/workspace/analysis?project=${project.id}`}
             onClick={(e) => e.stopPropagation()}
             className="inline-flex h-8 items-center justify-center rounded-md border border-primary bg-primary/10 px-2 text-[10px] font-semibold text-primary hover:bg-primary/20 transition-colors whitespace-nowrap"
           >
             Analyze
           </Link>
           <Link
-            to={getAgentPath(project)}
+            to={`/workspace/multi?project=${project.id}`}
             onClick={(e) => e.stopPropagation()}
             className="inline-flex h-8 items-center justify-center rounded-md border border-border px-2 text-[10px] font-medium text-text-muted hover:bg-surface-hover hover:text-text-main transition-colors whitespace-nowrap"
+            title="Review cross-technique comparison"
           >
             Review
           </Link>
           <Link
-            to={getNotebookPath(project)}
+            to={`/notebook?project=${project.id}`}
             onClick={(e) => e.stopPropagation()}
             className="inline-flex h-8 items-center justify-center rounded-md border border-border px-2 text-[10px] font-medium text-text-muted hover:bg-surface-hover hover:text-text-main transition-colors whitespace-nowrap"
           >
             Notebook
           </Link>
+          <Link
+            to={`/history?project=${project.id}`}
+            onClick={(e) => e.stopPropagation()}
+            className="inline-flex h-8 items-center justify-center rounded-md border border-border px-2 text-[10px] font-medium text-text-muted hover:bg-surface-hover hover:text-text-main transition-colors whitespace-nowrap"
+          >
+            History
+          </Link>
           <button
             type="button"
-            disabled
+            disabled={!exportReady}
             onClick={(e) => e.stopPropagation()}
-            title="Report route is not enabled in this demo."
-            className="inline-flex h-8 items-center justify-center rounded-md border border-border px-2 text-[10px] font-medium text-text-muted opacity-50 whitespace-nowrap"
+            title={
+              !exportReady
+                ? 'Report readiness too low for export.'
+                : 'Report export is not enabled in this demo.'
+            }
+            className={`inline-flex h-8 items-center justify-center rounded-md border border-border px-2 text-[10px] font-medium text-text-muted whitespace-nowrap ${
+              !exportReady
+                ? 'opacity-50'
+                : 'opacity-70'
+            }`}
           >
             Export
           </button>
@@ -308,9 +292,9 @@ export default function Dashboard() {
   }, []);
 
   /* aggregate stats */
-  const totalGaps = demoProjects.reduce((sum, p) => sum + p.validationGaps.length, 0);
-  const criticalGaps = demoProjects.reduce((sum, p) => sum + p.validationGaps.filter((g) => g.severity === 'critical').length, 0);
-  const avgReadiness = Math.round(demoProjects.reduce((sum, p) => sum + p.reportReadiness.readinessPercent, 0) / demoProjects.length);
+  const totalGaps = demoProjectRegistry.reduce((sum, p) => sum + p.validationGapCount, 0);
+  const criticalGaps = demoProjectRegistry.reduce((sum, p) => sum + p._raw.validationGaps.filter((g) => g.severity === 'critical').length, 0);
+  const avgReadiness = Math.round(demoProjectRegistry.reduce((sum, p) => sum + p.reportReadiness, 0) / demoProjectRegistry.length);
 
   return (
     <>
@@ -359,7 +343,7 @@ export default function Dashboard() {
         <div className="mb-4 grid grid-cols-4 gap-3">
           <div className="rounded-md border border-border bg-surface px-3 py-2">
             <div className="text-[10px] font-bold uppercase tracking-wider text-text-muted">Projects</div>
-            <div className="text-lg font-bold text-text-main">{demoProjects.length}</div>
+            <div className="text-lg font-bold text-text-main">{demoProjectRegistry.length}</div>
             <div className="text-[10px] text-text-dim">Active research</div>
           </div>
           <div className="rounded-md border border-border bg-surface px-3 py-2">
@@ -370,7 +354,7 @@ export default function Dashboard() {
           <div className="rounded-md border border-border bg-surface px-3 py-2">
             <div className="text-[10px] font-bold uppercase tracking-wider text-text-muted">Decisions Pending</div>
             <div className="text-lg font-bold text-cyan">
-              {demoProjects.reduce((sum, p) => sum + p.nextDecisions.length, 0)}
+              {demoProjectRegistry.reduce((sum, p) => sum + p.decisionPendingCount, 0)}
             </div>
             <div className="text-[10px] text-text-dim">Next experiments</div>
           </div>
@@ -388,7 +372,7 @@ export default function Dashboard() {
             <h2 className="text-xs font-bold uppercase tracking-wider text-text-muted">Active Research Projects</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {demoProjects.map((project) => (
+            {demoProjectRegistry.map((project) => (
               <ProjectCard key={project.id} project={project} />
             ))}
             {/* local experiments */}

@@ -26,7 +26,7 @@
         <aside className="cockpit-scroll w-[280px] shrink-0 overflow-y-auto border-r border-slate-800/50 bg-[#080E19] p-3 space-y-3">
           <div className="rounded-lg border border-slate-800 bg-[#0A0F1A] p-3">
             <div className="flex items-center gap-2 mb-2"><Target size={14} className="text-cyan-300" /><span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Mission</span></div>
-            <p className="text-xs leading-5 text-slate-300">Determine whether the uploaded sample is consistent with <span className="font-semibold text-white">{formatChemicalFormula('CuFe2O4')} spinel ferrite</span> phase from multi-technique evidence.</p>
+            <p className="text-xs leading-5 text-slate-300">Determine whether the uploaded sample is consistent with the selected registry phase assignment from multi-technique evidence.</p>
           </div>
 
           <div className="rounded-lg border border-slate-800 bg-[#0A0F1A] p-3">
@@ -78,7 +78,7 @@
               <div className="flex justify-between"><span className="text-slate-500">Model</span><span className="text-amber-300 font-semibold">Gemma</span></div>
               <div className="flex justify-between"><span className="text-slate-500">Mode</span><span className="text-slate-300">Phase identification</span></div>
               <div className="flex justify-between"><span className="text-slate-500">Orchestration</span><span className="text-slate-300">Deterministic</span></div>
-              <div className="flex justify-between"><span className="text-slate-500">Material</span><span className="text-white font-semibold">CuFe₂O₄</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">Material</span><span className="text-white font-semibold">Registry sample</span></div>
             </div>
           </div>
         </aside>
@@ -124,7 +124,7 @@
                 <Graph type="xrd" height="100%" externalData={dataset.dataPoints} baselineData={xrdAgentResult.baselineData} peakMarkers={showPeakMarkers ? detectedPeaks.slice(0, CANONICAL_PEAK_COUNT) : undefined} showBackground showCalculated={false} showResidual={false} />
               </div>
               <div className="mt-2 grid grid-cols-3 gap-1.5">
-                {[{ l: 'Peaks', v: '12' }, { l: 'Match', v: '0.92' }, { l: 'Phase', v: 'CuFe₂O₄' }].map(s => (
+                {[{ l: 'Peaks', v: '12' }, { l: 'Match', v: '0.92' }, { l: 'Phase', v: 'Registry phase' }].map(s => (
                   <div key={s.l} className="rounded border border-slate-800 bg-[#070B12] px-2 py-1.5 text-center">
                     <p className="text-[8px] font-bold uppercase text-slate-600">{s.l}</p>
                     <p className="text-xs font-bold text-white">{s.v}</p>
