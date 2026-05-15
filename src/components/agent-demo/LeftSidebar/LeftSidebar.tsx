@@ -31,11 +31,11 @@ export function LeftSidebar({
   const notebookRoute = `/notebook?project=${currentProject.id}`;
 
   return (
-    <aside className="flex w-[72px] shrink-0 flex-col border-r border-white/[0.08] bg-[#080E19]">
+    <aside className="flex w-[72px] shrink-0 flex-col border-r border-slate-200 bg-white">
       <nav className="flex-1 space-y-1 p-4">
         <NavItem
           icon={Activity}
-          label="Agent Demo"
+          label="Agent Workspace"
           to="/demo/agent"
           active
         />
@@ -66,12 +66,13 @@ export function LeftSidebar({
         />
       </nav>
 
-      <div className="border-t border-white/[0.08] p-3">
-        <div className="flex items-center justify-center">
+      <div className="border-t border-slate-200 p-3">
+        <div className="flex flex-col items-center gap-1">
           <div
-            className="h-2 w-2 rounded-full bg-emerald-400"
-            title={currentDataset.fileName}
+            className="h-2 w-2 rounded-full bg-emerald-500"
+            title="System Online"
           />
+          <span className="text-[9px] font-semibold text-slate-500">Online</span>
         </div>
       </div>
     </aside>
@@ -88,8 +89,8 @@ interface NavItemProps {
 function NavItem({ icon: Icon, label, active, to }: NavItemProps) {
   const className = `flex items-center justify-center rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
     active
-      ? 'border border-cyan-400/30 bg-cyan-400/10 text-cyan-300'
-      : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
+      ? 'bg-blue-600 text-white'
+      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
   }`;
 
   return (

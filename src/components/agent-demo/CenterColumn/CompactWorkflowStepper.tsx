@@ -25,29 +25,29 @@ const STEP_LABELS = [
 const STATUS_STYLES = {
   complete: {
     icon: CheckCircle2,
-    container: 'border-emerald-400/25 bg-emerald-400/5 text-emerald-200',
-    dot: 'bg-emerald-300',
+    container: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    dot: 'bg-emerald-500',
   },
   running: {
     icon: Loader2,
-    container: 'border-cyan-400/35 bg-cyan-400/10 text-cyan-200',
-    dot: 'bg-cyan-300',
+    container: 'border-blue-300 bg-blue-50 text-blue-700',
+    dot: 'bg-blue-500',
   },
   error: {
     icon: AlertTriangle,
-    container: 'border-amber-400/35 bg-amber-400/10 text-amber-200',
-    dot: 'bg-amber-300',
+    container: 'border-amber-300 bg-amber-50 text-amber-700',
+    dot: 'bg-amber-500',
   },
   pending: {
     icon: CircleDot,
-    container: 'border-slate-800 bg-[#070B12] text-slate-500',
-    dot: 'bg-slate-600',
+    container: 'border-slate-200 bg-white text-slate-500',
+    dot: 'bg-slate-400',
   },
 };
 
 export function CompactWorkflowStepper({ steps, progressPercent }: CompactWorkflowStepperProps) {
   return (
-    <div className="relative rounded-lg border border-slate-800 bg-[#070B12] px-1.5 py-1">
+    <div className="relative rounded-lg border border-slate-200 bg-slate-50 px-1.5 py-1">
       <div className="flex flex-wrap gap-1 min-[1180px]:flex-nowrap">
         {steps.map((step, index) => {
           const style = STATUS_STYLES[step.status];
@@ -76,9 +76,9 @@ export function CompactWorkflowStepper({ steps, progressPercent }: CompactWorkfl
         })}
       </div>
 
-      <div className="absolute inset-x-2 bottom-0 h-px overflow-hidden rounded-full bg-slate-800">
+      <div className="absolute inset-x-2 bottom-0 h-px overflow-hidden rounded-full bg-slate-200">
         <div
-          className="h-full bg-gradient-to-r from-cyan-400 to-blue-500 transition-all duration-300"
+          className="h-full bg-gradient-to-r from-blue-500 to-blue-600 transition-all duration-300"
           style={{ width: `${progressPercent}%` }}
         />
       </div>

@@ -7,6 +7,11 @@
 import type { XpsProcessingResult } from '../xpsAgent/runner';
 import type { FtirProcessingResult } from '../ftirAgent/types';
 import type { RamanProcessingResult } from '../ramanAgent/types';
+import {
+  TECHNIQUE_AUTHORITY_WEIGHTS,
+  HIERARCHY_MULTIPLIERS,
+  CONTRADICTION_SEVERITY_MULTIPLIERS,
+} from './types';
 import type {
   EvidenceItem,
   Claim,
@@ -19,9 +24,6 @@ import type {
   TechniqueType,
   SupportType,
   ClaimHierarchy,
-  TECHNIQUE_AUTHORITY_WEIGHTS,
-  HIERARCHY_MULTIPLIERS,
-  CONTRADICTION_SEVERITY_MULTIPLIERS,
 } from './types';
 
 // ============================================================================

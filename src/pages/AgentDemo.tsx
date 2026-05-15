@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   Brain,
   CheckCircle2,
+  ChevronDown,
   CircleDot,
   ClipboardList,
   Database,
@@ -14,6 +15,7 @@ import {
   Grid3X3,
   Layers,
   Loader2,
+  Lock,
   Microscope,
   Play,
   Target,
@@ -26,6 +28,7 @@ import {
   getProject,
   getProjectDatasets,
   saveAgentRunResult,
+  DEFAULT_PROJECT_ID,
 } from '../data/demoProjects';
 import type {
   AgentRunResult,
@@ -54,12 +57,35 @@ import { LeftSidebar } from '../components/agent-demo/LeftSidebar';
 import { MainHeader } from '../components/agent-demo/MainHeader';
 import { CenterColumn } from '../components/agent-demo/CenterColumn';
 import { RightPanel } from '../components/agent-demo/RightPanel';
+import { MultiTechPopover } from '../components/agent-demo/MultiTechPopover';
 import { evaluate as evaluateFusionEngine, createEvidenceNodes, type EvidenceNode, type FusionResult, type PeakInput } from '../engines/fusionEngine';
 import {
   getLatestExperimentConditionLock,
+  unlockExperimentConditions,
+  lockExperimentConditions,
+  type ExperimentConditionLock,
 } from '../data/experimentConditionLock';
+import {
+  type AgentEvidenceWorkspace,
+  type TechniqueId,
+  type SelectedTechniqueState,
+  type EvidenceReference,
+  applyParameterChange,
+  toggleTechnique,
+  changeFocusedTechnique,
+} from '../utils/agentEvidenceModel';
+import {
+  demoProjectRegistry,
+  getFocusedEvidenceSource,
+  getRegistryProject,
+  isKnownProjectId,
+  normalizeRegistryProjectId,
+  type RegistryProject,
+  type DemoReferencePlaceholder,
+} from '../data/demoProjectRegistry';
 
-type AgentContext = Technique;
+type TechniqueContext = Technique;
+type AgentMode = 'deterministic' | 'guided' | 'autonomous';
 type ModelMode = 'deterministic' | 'vertex-gemini' | 'gemma';
 type ExecutionMode = 'auto' | 'step';
 type ReasoningStepStatus = 'pending' | 'running' | 'complete';
@@ -77,7 +103,7 @@ type ExecutionLogEntry = {
 type ToolTraceEntry = {
   id: string;
   timestamp: string;
-  context: AgentContext;
+  context: TechniqueContext;
   toolName: string;
   displayName: string;
   provider?: ModelMode;
@@ -117,8 +143,11 @@ type DecisionResult = {
 };
 
 type AgentDemoState = {
-  context: AgentContext;
+  projectId: string;
+  mode: AgentMode;
+  context: TechniqueContext;
   datasetId: string;
+  selectedTechnique?: Technique;
   modelMode: ModelMode;
   graphState: {
     showMarkers: boolean;
@@ -146,16 +175,50 @@ type DatasetOption = {
 const DEFAULT_MISSION =
   'Investigate the selected scientific dataset and produce an evidence-linked material characterization interpretation.';
 
+const AGENT_MODES: Record<AgentMode, {
+  label: string;
+  purpose: string;
+  tabs: string[];
+  primaryAction: string;
+  inputLabel: string;
+  inputPlaceholder: string;
+}> = {
+  deterministic: {
+    label: 'Deterministic',
+    purpose: 'Controlled reproducible workflow',
+    tabs: ['Goal', 'Parameters', 'Evidence', 'Trace', 'Boundary'],
+    primaryAction: 'Run Workflow',
+    inputLabel: 'Goal',
+    inputPlaceholder: 'Set a controlled goal for this project, such as checking secondary phases, reviewing peak evidence, or validating the claim boundary.',
+  },
+  guided: {
+    label: 'Guided',
+    purpose: 'Researcher-agent interpretation',
+    tabs: ['Question', 'Evidence', 'Discussion', 'Boundary', 'Notebook'],
+    primaryAction: 'Review Evidence',
+    inputLabel: 'Researcher Question',
+    inputPlaceholder: 'Ask the agent to interpret the selected evidence, compare techniques, or refine the scientific claim.',
+  },
+  autonomous: {
+    label: 'Autonomous',
+    purpose: 'Agent-led evidence review',
+    tabs: ['Objective', 'Plan', 'Findings', 'Gaps', 'Decision'],
+    primaryAction: 'Start Review',
+    inputLabel: 'Review Objective',
+    inputPlaceholder: 'Define the review objective. The agent will inspect evidence, identify validation gaps, and recommend the next scientific action.',
+  },
+};
+
 const MODEL_MODE_LABELS: Record<ModelMode, string> = {
   deterministic: 'Deterministic Workflow',
   'vertex-gemini': 'Model Layer Pending',
   gemma: 'Open Model Pending',
 };
 
-const CONTEXT_ORDER: AgentContext[] = ['XRD', 'XPS', 'FTIR', 'Raman'];
+const CONTEXT_ORDER: TechniqueContext[] = ['XRD', 'XPS', 'FTIR', 'Raman'];
 
 const CONTEXT_CONFIG: Record<
-  AgentContext,
+  TechniqueContext,
   {
     label: string;
     graphType: GraphType;
@@ -553,7 +616,7 @@ function convertDatasetFeaturesToPeakInput(
   }));
 }
 
-const TECHNIQUE_DISPLAY: Record<AgentContext, {
+const TECHNIQUE_DISPLAY: Record<TechniqueContext, {
   featureLabel: string;
   rangeLabel: string;
   dominantLabel: string;
@@ -564,30 +627,30 @@ const TECHNIQUE_DISPLAY: Record<AgentContext, {
 }> = {
   XRD: {
     featureLabel: 'Detected peaks',
-    rangeLabel: '2θ range',
+    rangeLabel: '2Î¸ range',
     dominantLabel: 'Dominant reflections',
     qualityLabel: 'Signal quality',
-    observedLabel: 'Observed peaks (2θ)',
-    formatRange: (min, max) => `${min.toFixed(1)}° – ${max.toFixed(1)}°`,
-    formatPosition: (value) => `${value.toFixed(1)}°`,
+    observedLabel: 'Observed peaks (2Î¸)',
+    formatRange: (min, max) => `${min.toFixed(1)} deg - ${max.toFixed(1)} deg`,
+    formatPosition: (value) => `${value.toFixed(1)} deg`,
   },
   Raman: {
     featureLabel: 'Detected bands',
     rangeLabel: 'Raman shift range',
     dominantLabel: 'Dominant bands',
     qualityLabel: 'Spectral quality',
-    observedLabel: 'Observed bands (cm⁻¹)',
-    formatRange: (min, max) => `${Math.round(min)} – ${Math.round(max)} cm⁻¹`,
-    formatPosition: (value) => `${Math.round(value)} cm⁻¹`,
+    observedLabel: 'Observed bands (cm-1)',
+    formatRange: (min, max) => `${Math.round(min)} - ${Math.round(max)} cm-1`,
+    formatPosition: (value) => `${Math.round(value)} cm-1`,
   },
   FTIR: {
     featureLabel: 'Detected bands',
     rangeLabel: 'Wavenumber range',
     dominantLabel: 'Dominant absorption bands',
     qualityLabel: 'Baseline quality',
-    observedLabel: 'Observed bands (cm⁻¹)',
-    formatRange: (min, max) => `${Math.round(min)} – ${Math.round(max)} cm⁻¹`,
-    formatPosition: (value) => `${Math.round(value)} cm⁻¹`,
+    observedLabel: 'Observed bands (cm-1)',
+    formatRange: (min, max) => `${Math.round(min)} - ${Math.round(max)} cm-1`,
+    formatPosition: (value) => `${Math.round(value)} cm-1`,
   },
   XPS: {
     featureLabel: 'Detected components',
@@ -595,54 +658,94 @@ const TECHNIQUE_DISPLAY: Record<AgentContext, {
     dominantLabel: 'Dominant core levels',
     qualityLabel: 'Fit quality',
     observedLabel: 'Observed core levels (eV)',
-    formatRange: (min, max) => `${Math.round(min)} – ${Math.round(max)} eV`,
-    formatPosition: (value) => `${value.toFixed(1)} eV`,
+    formatRange: (min, max) => `${Math.round(min)} - ${Math.round(max)} cm-1`,
+    formatPosition: (value) => `${value.toFixed(1)} deg`,
   },
 };
 
 function getUnitForTechnique(technique: Technique): string {
   switch (technique) {
-    case 'XRD': return '2θ';
-    case 'Raman': return 'cm⁻¹';
-    case 'FTIR': return 'cm⁻¹';
+    case 'XRD': return '2Î¸';
+    case 'Raman': return 'cm-1';
+    case 'FTIR': return 'cm-1';
     case 'XPS': return 'eV';
     default: return '';
   }
 }
 
-function contextToGraphType(context: AgentContext): GraphType {
+function contextToGraphType(context: TechniqueContext): GraphType {
   return CONTEXT_CONFIG[context].graphType;
 }
 
-function getDatasetOptions(context: AgentContext): DatasetOption[] {
-  return demoProjects.flatMap((project) =>
+function makePendingDatasetOption(project: DemoProject, context: TechniqueContext): DatasetOption {
+  return {
+    project,
+    dataset: {
+      id: `${project.id}-${context.toLowerCase()}-pending`,
+      projectId: project.id,
+      technique: context,
+      fileName: `${project.name} ${context} evidence pending`,
+      sampleName: project.name,
+      xLabel: CONTEXT_CONFIG[context].graphLabel,
+      yLabel: 'Signal',
+      dataPoints: [],
+      metadata: {
+        experimentTitle: `${project.name} ${context} evidence pending`,
+        sampleName: project.name,
+        materialSystem: project.material,
+        operator: 'DIFARYX demo',
+        date: project.lastUpdated,
+        notes: `No project-linked ${context} dataset is available yet.`,
+      },
+      processingState: {
+        imported: false,
+        baseline: false,
+        smoothing: false,
+        normalize: false,
+      },
+      detectedFeatures: [],
+      evidence: [],
+      savedRuns: [],
+    },
+  };
+}
+
+function getDatasetOptions(context: TechniqueContext, projectId?: string): DatasetOption[] {
+  const projects = projectId
+    ? demoProjects.filter((project) => project.id === projectId)
+    : demoProjects;
+
+  return projects.flatMap((project) =>
     getProjectDatasets(project.id)
       .filter((dataset) => dataset.technique === context)
       .map((dataset) => ({ project, dataset })),
   );
 }
 
-function getDefaultContext(projectId?: string | null): AgentContext {
-  const project = getProject(projectId);
+function getDefaultContext(project: DemoProject): TechniqueContext {
   return project.techniques.find((technique) => CONTEXT_ORDER.includes(technique)) ?? 'XRD';
 }
 
-function getDefaultDatasetId(context: AgentContext, projectId?: string | null) {
-  const options = getDatasetOptions(context);
-  const projectMatch = options.find((option) => option.project.id === projectId);
-  return projectMatch?.dataset.id ?? options[0]?.dataset.id ?? '';
+function getDefaultDatasetId(context: TechniqueContext, projectId: string) {
+  const options = getDatasetOptions(context, projectId);
+  return options[0]?.dataset.id ?? `${projectId}-${context.toLowerCase()}-pending`;
 }
 
-function getDatasetOption(context: AgentContext, datasetId: string): DatasetOption {
-  const options = getDatasetOptions(context);
-  return options.find((option) => option.dataset.id === datasetId) ?? options[0];
+function getDatasetOption(context: TechniqueContext, datasetId: string, projectId: string): DatasetOption {
+  const project = getProject(projectId) ?? getProject(DEFAULT_PROJECT_ID)!;
+  const options = getDatasetOptions(context, project.id);
+  return options.find((option) => option.dataset.id === datasetId) ?? options[0] ?? makePendingDatasetOption(project, context);
 }
 
-function makeInitialState(projectId?: string | null): AgentDemoState {
-  const context = getDefaultContext(projectId);
-  const datasetId = getDefaultDatasetId(context, projectId);
+function makeInitialState(projectId: string, mode: AgentMode): AgentDemoState {
+  const normalizedProjectId = normalizeRegistryProjectId(projectId) || DEFAULT_PROJECT_ID;
+  const project = getProject(normalizedProjectId) ?? getProject(DEFAULT_PROJECT_ID)!;
+  const context = getDefaultContext(project);
+  const datasetId = getDefaultDatasetId(context, project.id);
 
   return {
+    projectId: project.id,
+    mode,
     context,
     datasetId,
     modelMode: 'deterministic',
@@ -691,7 +794,7 @@ function mapToolTraceToExecutionSteps(
 }
 
 
-function createToolTrace(context: AgentContext): ToolTraceEntry[] {
+function createToolTrace(context: TechniqueContext): ToolTraceEntry[] {
   return CONTEXT_CONFIG[context].stages.map((stage, index) => ({
     id: `${context.toLowerCase()}-${stage.id}`,
     timestamp: formatStamp(index),
@@ -789,6 +892,12 @@ function formatReviewStatus(status: string) {
 }
 
 import { formatChemicalFormula } from '../utils';
+import { buildAgentContext, type WorkspaceParameters } from '../utils/agentContext';
+import {
+  getProjectTechniques,
+  getProjectParameterGroups,
+  type ParameterGroupId,
+} from '../utils/projectEvidence';
 
 function FormulaText({
   children,
@@ -808,12 +917,123 @@ function asDemoPeaks(peaks: Array<{ position: number; intensity: number; label?:
   }));
 }
 
+function registryJobTypeForAgent(project: RegistryProject): AgentEvidenceWorkspace['jobType'] {
+  if (project.jobType === 'rd') return 'rnd';
+  return project.jobType;
+}
+
+function roleForTechnique(techniqueId: TechniqueId): SelectedTechniqueState['evidenceRole'] {
+  if (techniqueId === 'xps') return 'surface-state';
+  if (techniqueId === 'raman') return 'vibrational-support';
+  if (techniqueId === 'ftir') return 'bonding-context';
+  return 'primary-structural';
+}
+
+function mapReference(ref: DemoReferencePlaceholder): EvidenceReference {
+  return {
+    type: ref.type === 'google_scholar' ? 'google-scholar' : ref.type,
+    label: ref.label,
+    status: ref.status === 'not_connected' ? 'not-connected' : ref.status,
+    whyItMatters: ref.note,
+    boundaryImpact: ref.note,
+  };
+}
+
+function buildEvidenceWorkspaceFromRegistry(project: RegistryProject): AgentEvidenceWorkspace {
+  const selectedIds = Array.from(
+    new Set([
+      ...project.selectedTechniques,
+      ...project.crossTechniqueComparison.matrix.map((row) => row.techniqueId),
+    ]),
+  ).filter((id): id is Exclude<TechniqueId, 'multi'> =>
+    ['xrd', 'xps', 'ftir', 'raman'].includes(id),
+  );
+  const defaultFocus =
+    project.primaryTechnique && selectedIds.includes(project.primaryTechnique as Exclude<TechniqueId, 'multi'>)
+      ? project.primaryTechnique
+      : selectedIds[0] || 'xrd';
+  const references = project.crossTechniqueComparison.references.map(mapReference);
+
+  const techniques: SelectedTechniqueState[] = selectedIds.map((techniqueId) => {
+    const technique = project.techniques.find((item) => item.id === techniqueId);
+    const evidence = project.evidenceResults.find((item) => item.techniqueId === techniqueId);
+    const row = project.crossTechniqueComparison.matrix.find((item) => item.techniqueId === techniqueId);
+    const source = project.workspaceGraphs[techniqueId];
+    const requiredReferences = references.filter((ref) =>
+      ['required', 'missing', 'not-connected'].includes(ref.status),
+    );
+
+    return {
+      techniqueId,
+      displayName: technique?.label || evidence?.displayName || techniqueId.toUpperCase(),
+      evidenceRole: roleForTechnique(techniqueId),
+      availability: source ? 'available' : 'missing',
+      selected: true,
+      parameters: (technique?.parameters || []).map((parameter) => ({
+        key: parameter.key,
+        value: parameter.value,
+        editable: parameter.editable,
+        provenance: parameter.provenance,
+        effectSummary: parameter.effectSummary,
+      })),
+      graphSource: {
+        techniqueId,
+        hasRealGraph: source?.kind === 'graph',
+        graphDatasetId: technique?.datasetLabel,
+        structuredEvidenceAvailable: source?.kind === 'structured',
+      },
+      evidenceResult: {
+        techniqueId,
+        displayName: technique?.label || evidence?.displayName || techniqueId.toUpperCase(),
+        summary: evidence?.summary || row?.keyFinding || technique?.description || project.evidenceSummary,
+        extractedFindings: evidence?.findings?.length ? evidence.findings : row ? [row.keyFinding] : [project.evidenceSummary],
+        validationLimits: [row?.limitation || evidence?.limitation || project.notebook.validationBoundary],
+        requiredReferences,
+        missingReferences: references.filter((ref) => ['missing', 'not-connected'].includes(ref.status)),
+        nextAction: row?.nextAction || project.crossTechniqueComparison.recommendedNextAction,
+      },
+      validationLimits: [row?.limitation || evidence?.limitation || project.notebook.validationBoundary],
+      requiredReferences,
+      missingReferences: references.filter((ref) => ['missing', 'not-connected'].includes(ref.status)),
+      nextAction: row?.nextAction || project.crossTechniqueComparison.recommendedNextAction,
+    };
+  });
+
+  return {
+    projectId: project.id,
+    jobType: registryJobTypeForAgent(project),
+    objective: project.objective,
+    techniques,
+    focusedTechnique: defaultFocus,
+    trace: project.agentWorkflow.trace.map((event) => ({
+      stepNumber: event.stepNumber,
+      timestamp: `step-${event.stepNumber}`,
+      eventType: event.eventType === 'project_loaded' ? 'evidence_selected' : event.eventType,
+      eventLabel: event.label,
+      input: event.input,
+      reasoning: event.reasoning,
+      output: event.output,
+      boundaryImpact: event.boundaryImpact,
+    })),
+    claimBoundary: project.agentWorkflow.claimBoundary,
+    hasParameterOverrides: false,
+  };
+}
+
+function techniqueIdToContext(techniqueId: TechniqueId): TechniqueContext | null {
+  if (techniqueId === 'xrd') return 'XRD';
+  if (techniqueId === 'xps') return 'XPS';
+  if (techniqueId === 'ftir') return 'FTIR';
+  if (techniqueId === 'raman') return 'Raman';
+  return null;
+}
+
 /**
  * Create decision result using fusionEngine as the single reasoning authority
  * No local numeric review math - fusionEngine controls interpretation output
  */
 function createDecisionResult(
-  context: AgentContext,
+  context: TechniqueContext,
   option: DatasetOption,
   xrdAnalysis: ReturnType<typeof runXrdPhaseIdentificationAgent> | null,
 ): DecisionResult {
@@ -822,7 +1042,7 @@ function createDecisionResult(
 
   // Convert detected features to PeakInput format and create EvidenceNodes using central function
   let peakInputs: PeakInput[];
-  
+
   if (context === 'XRD' && xrdAnalysis) {
     // Use XRD analysis peaks
     const demoPeaks = asDemoPeaks(xrdAnalysis.detectedPeaks);
@@ -831,7 +1051,7 @@ function createDecisionResult(
     // Use dataset features
     peakInputs = convertDatasetFeaturesToPeakInput(dataset);
   }
-  
+
   // Create evidence nodes using central fusionEngine function
   const evidenceNodes = peakInputs.length > 0
     ? createEvidenceNodes({ technique: context, peaks: peakInputs })
@@ -842,15 +1062,15 @@ function createDecisionResult(
         unit: getUnitForTechnique(context),
         label: 'Preliminary observation',
       }];
-  
+
   // Call fusionEngine as the single reasoning authority
   const fusionResult: FusionResult = evaluateFusionEngine({ evidence: evidenceNodes });
-  
+
   // Extract feature count for metrics
-  const featureCount = context === 'XRD' && xrdAnalysis 
-    ? xrdAnalysis.detectedPeaks.length 
+  const featureCount = context === 'XRD' && xrdAnalysis
+    ? xrdAnalysis.detectedPeaks.length
     : dataset.detectedFeatures.length;
-  
+
   // Build technique-specific metric cards
   const dominantClaim = fusionResult.reasoningTrace.find(t => t.isDominant);
   const display = TECHNIQUE_DISPLAY[context];
@@ -870,7 +1090,7 @@ function createDecisionResult(
     { label: display.dominantLabel, value: dominantValue, tone: 'violet' },
     { label: display.qualityLabel, value: formatReviewStatus(dominantClaim?.status ?? 'unsupported'), tone: 'amber' },
   ];
-  
+
   // Build detail rows from reasoning trace
   const detailRows = fusionResult.reasoningTrace.map((trace, index) => ({
     Claim: trace.claimId,
@@ -878,7 +1098,7 @@ function createDecisionResult(
     Evidence: `${trace.evidenceIds.length} nodes`,
     Conflicts: trace.contradictingEvidenceIds.length > 0 ? 'Yes' : 'No',
   }));
-  
+
   return {
     runId: generateRunId(),
     primaryResult: fusionResult.conclusion,
@@ -897,7 +1117,7 @@ function createDecisionResult(
 
 function toAgentRunResult(
   result: DecisionResult,
-  context: AgentContext,
+  context: TechniqueContext,
   option: DatasetOption,
   pipeline: string[],
   detectedPeaks: DemoPeak[],
@@ -921,19 +1141,24 @@ function toAgentRunResult(
 }
 
 export default function AgentDemo() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+
+  const projectIdFromUrl = normalizeRegistryProjectId(searchParams.get('project')) || DEFAULT_PROJECT_ID;
+  const modeFromUrl = (searchParams.get('mode') as AgentMode) || 'deterministic';
+
   const [missionText, setMissionText] = useState(DEFAULT_MISSION);
   const [feedback, setFeedback] = useState('');
   const [agentState, setAgentState] = useState<AgentDemoState>(() =>
-    makeInitialState(searchParams.get('project')),
+    makeInitialState(projectIdFromUrl, modeFromUrl),
   );
+  const [actionsDropdownOpen, setActionsDropdownOpen] = useState(false);
   const runningGuardRef = useRef(false);
   const runTokenRef = useRef(0);
 
   // Add error boundary
   const [hasError, setHasError] = useState(false);
-  
+
   React.useEffect(() => {
     const errorHandler = (error: ErrorEvent) => {
       console.error('AgentDemo Error:', error);
@@ -942,6 +1167,15 @@ export default function AgentDemo() {
     window.addEventListener('error', errorHandler);
     return () => window.removeEventListener('error', errorHandler);
   }, []);
+
+  React.useEffect(() => {
+    const newProjectId = normalizeRegistryProjectId(searchParams.get('project')) || DEFAULT_PROJECT_ID;
+    const newMode = (searchParams.get('mode') as AgentMode) || 'deterministic';
+
+    if (newProjectId !== agentState.projectId || newMode !== agentState.mode) {
+      setAgentState(makeInitialState(newProjectId, newMode));
+    }
+  }, [searchParams]);
 
   if (hasError) {
     return (
@@ -960,20 +1194,28 @@ export default function AgentDemo() {
     );
   }
 
+  const registryProject = getRegistryProject(agentState.projectId);
+  const currentProject = registryProject._raw;
   const datasetOptions = useMemo(
-    () => getDatasetOptions(agentState.context),
-    [agentState.context],
+    () => getDatasetOptions(agentState.context, agentState.projectId),
+    [agentState.context, agentState.projectId],
   );
   const selectedOption = useMemo(
-    () => getDatasetOption(agentState.context, agentState.datasetId),
-    [agentState.context, agentState.datasetId],
+    () => getDatasetOption(agentState.context, agentState.datasetId, agentState.projectId),
+    [agentState.context, agentState.datasetId, agentState.projectId],
   );
   const selectedDataset = selectedOption.dataset;
-  const selectedProject = selectedOption.project;
-  const experimentConditionLock = getLatestExperimentConditionLock(selectedProject.id);
+  const selectedProject = currentProject;
+  
+  // Condition lock state - now controllable
+  const [experimentConditionLock, setExperimentConditionLock] = useState<ExperimentConditionLock | null>(
+    () => getLatestExperimentConditionLock(currentProject.id)
+  );
+  
   const experimentConditionTopBarLabel = experimentConditionLock?.userConfirmed ? 'Locked' : 'Not locked';
   const contextConfig = CONTEXT_CONFIG[agentState.context];
   const stages = contextConfig.stages;
+  const modeConfig = AGENT_MODES[agentState.mode];
   const xrdAnalysis = useMemo(
     () =>
       agentState.context === 'XRD'
@@ -1047,7 +1289,7 @@ export default function AgentDemo() {
   };
 
   const finalizeRun = (
-    context: AgentContext,
+    context: TechniqueContext,
     option: DatasetOption,
     xrdResult: ReturnType<typeof runXrdPhaseIdentificationAgent> | null,
   ) => {
@@ -1060,7 +1302,7 @@ export default function AgentDemo() {
     const runResult = toAgentRunResult(decision, context, option, pipeline, detectedPeaks);
 
     saveAgentRunResult(runResult);
-    
+
     const agentRun: AgentRun = {
       id: decision.runId,
       projectId: option.project.id,
@@ -1109,7 +1351,7 @@ export default function AgentDemo() {
     runningGuardRef.current = true;
     const token = runTokenRef.current + 1;
     runTokenRef.current = token;
-    const option = getDatasetOption(context, datasetId);
+    const option = getDatasetOption(context, datasetId, agentState.projectId);
     const config = CONTEXT_CONFIG[context];
     const xrdResult =
       context === 'XRD'
@@ -1172,7 +1414,7 @@ export default function AgentDemo() {
 
       await wait(300);
       if (runTokenRef.current !== token) return;
-      
+
       finalizeRun(context, option, xrdResult);
     } finally {
       if (runTokenRef.current === token) {
@@ -1274,9 +1516,31 @@ export default function AgentDemo() {
     setAgentState((current) => resetRunState(current));
   };
 
-  const handleContextChange = (nextContext: AgentContext) => {
+  const handleProjectChange = (newProjectId: string) => {
     if (runningGuardRef.current) return;
-    const datasetId = getDefaultDatasetId(nextContext);
+    const newProject = getRegistryProject(newProjectId);
+    if (newProject) {
+      setIncludedTechniques(getProjectTechniques(newProject._raw));
+      setEvidenceWorkspace(buildEvidenceWorkspaceFromRegistry(newProject));
+      setMultiTechOpen(false);
+      setWorkspaceParameters({});
+      setDraftParameters({});
+    }
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('project', newProjectId);
+    setSearchParams(newParams);
+  };
+
+  const handleModeChange = (newMode: AgentMode) => {
+    if (runningGuardRef.current) return;
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('mode', newMode);
+    setSearchParams(newParams);
+  };
+
+  const handleContextChange = (nextContext: TechniqueContext) => {
+    if (runningGuardRef.current) return;
+    const datasetId = getDefaultDatasetId(nextContext, agentState.projectId);
     runTokenRef.current += 1;
     setFeedback('');
     setAgentState((current) => resetRunState(current, nextContext, datasetId));
@@ -1391,8 +1655,165 @@ export default function AgentDemo() {
     [agentState.toolTrace, stages],
   );
 
+  // Multi-tech popover state
+  const [includedTechniques, setIncludedTechniques] = useState<Technique[]>(
+    () => getProjectTechniques(currentProject),
+  );
+  const [multiTechOpen, setMultiTechOpen] = useState(false);
+
+  // Workspace parameter state: committed overrides + draft edits
+  const [workspaceParameters, setWorkspaceParameters] = useState<WorkspaceParameters>({});
+  const [draftParameters, setDraftParameters] = useState<WorkspaceParameters>({});
+
+  // Condition lock drives read-only mode for parameter editor
+  const isConditionLocked = !!experimentConditionLock?.userConfirmed;
+
+  // Handlers for unlock/lock conditions
+  const handleUnlockConditions = () => {
+    if (!experimentConditionLock) return;
+    const unlocked = unlockExperimentConditions(experimentConditionLock);
+    setExperimentConditionLock(unlocked);
+  };
+
+  const handleLockConditions = () => {
+    if (!experimentConditionLock) return;
+    const locked = lockExperimentConditions(experimentConditionLock);
+    setExperimentConditionLock(locked);
+  };
+
+  // Evidence workspace: single source of truth for technique state, trace, and claim boundary
+  const [evidenceWorkspace, setEvidenceWorkspace] = useState<AgentEvidenceWorkspace>(() => {
+    return buildEvidenceWorkspaceFromRegistry(registryProject);
+  });
+
+  React.useEffect(() => {
+    setEvidenceWorkspace(buildEvidenceWorkspaceFromRegistry(registryProject));
+    setIncludedTechniques(getProjectTechniques(registryProject._raw));
+    setWorkspaceParameters({});
+    setDraftParameters({});
+  }, [registryProject.id]);
+
+  // Build agent context from current project, mode, and applied parameter overrides
+  const agentContext = useMemo(
+    () =>
+      buildAgentContext(currentProject, agentState.mode, {
+        selectedTechnique: agentState.selectedTechnique,
+        includedTechniques,
+        workspaceParameters,
+        isLocked: isConditionLocked,
+      }),
+    [
+      currentProject,
+      agentState.mode,
+      agentState.selectedTechnique,
+      includedTechniques,
+      workspaceParameters,
+      isConditionLocked,
+    ],
+  );
+  const focusedEvidenceSource = useMemo(
+    () => getFocusedEvidenceSource(registryProject, evidenceWorkspace.focusedTechnique),
+    [registryProject, evidenceWorkspace.focusedTechnique],
+  );
+
+  const handleTechniqueSelect = (technique: Technique) => {
+    if (runningGuardRef.current) return;
+    const techniqueId = technique.toLowerCase() as TechniqueId;
+    if (['xrd', 'xps', 'ftir', 'raman'].includes(techniqueId)) {
+      setEvidenceWorkspace((prev) => changeFocusedTechnique(prev, techniqueId));
+    }
+    setAgentState((current) => ({
+      ...current,
+      selectedTechnique: technique,
+    }));
+  };
+
+  const handleToggleIncluded = (technique: Technique) => {
+    const techniqueId = technique.toLowerCase() as TechniqueId;
+    if (!['xrd', 'xps', 'raman', 'ftir'].includes(techniqueId)) return;
+
+    setEvidenceWorkspace((prev) => toggleTechnique(prev, techniqueId));
+
+    setIncludedTechniques((prev) => {
+      if (prev.includes(technique)) {
+        return prev.length > 1 ? prev.filter((t) => t !== technique) : prev;
+      }
+      return [...prev, technique];
+    });
+  };
+
+  // Parameter editor handlers
+  const handleDraftParameterChange = (groupId: ParameterGroupId, key: string, value: string) => {
+    setDraftParameters((prev) => {
+      const groupDraft = { ...(prev[groupId] || {}) };
+      groupDraft[key] = value;
+      return { ...prev, [groupId]: groupDraft };
+    });
+  };
+
+  const handleApplyParameters = () => {
+    // Merge draft into committed overrides (drop entries matching baseline values)
+    const baselineGroups = getProjectParameterGroups(currentProject);
+    const merged: WorkspaceParameters = { ...workspaceParameters };
+    (Object.keys(draftParameters) as ParameterGroupId[]).forEach((groupId) => {
+      const baseline = baselineGroups.find((g) => g.id === groupId);
+      if (!baseline) return;
+      const committed = { ...(merged[groupId] || {}) };
+      const draft = draftParameters[groupId] || {};
+      Object.entries(draft).forEach(([k, v]) => {
+        const baseParam = baseline.params.find((p) => p.key === k);
+        if (baseParam && baseParam.value === v) {
+          delete committed[k];
+        } else {
+          committed[k] = v;
+        }
+      });
+      if (Object.keys(committed).length === 0) {
+        delete merged[groupId];
+      } else {
+        merged[groupId] = committed;
+      }
+    });
+    setWorkspaceParameters(merged);
+
+    // Apply parameter changes to evidence workspace
+    let updatedWorkspace = evidenceWorkspace;
+    (Object.keys(draftParameters) as ParameterGroupId[]).forEach((groupId) => {
+      const draft = draftParameters[groupId] || {};
+      Object.entries(draft).forEach(([key, value]) => {
+        // Map groupId to techniqueId (xrd, xps, raman, ftir)
+        const techniqueId = groupId as TechniqueId;
+        if (['xrd', 'xps', 'raman', 'ftir'].includes(techniqueId)) {
+          updatedWorkspace = applyParameterChange(updatedWorkspace, techniqueId, key, value);
+        }
+      });
+    });
+    setEvidenceWorkspace(updatedWorkspace);
+
+    setDraftParameters({});
+    showFeedback('Parameters applied to workspace context.');
+  };
+
+  const handleResetParameters = () => {
+    setWorkspaceParameters({});
+    setDraftParameters({});
+    showFeedback('Parameters reset to demo defaults.');
+  };
+
+  const handleFocusedTechniqueChange = (techniqueId: TechniqueId) => {
+    setEvidenceWorkspace((prev) => changeFocusedTechnique(prev, techniqueId));
+    const nextContext = techniqueIdToContext(techniqueId);
+    if (nextContext) {
+      const datasetId = getDefaultDatasetId(nextContext, agentState.projectId);
+      setAgentState((current) => ({
+        ...resetRunState(current, nextContext, datasetId),
+        selectedTechnique: nextContext,
+      }));
+    }
+  };
+
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-[#070B12] text-slate-300 font-sans">
+    <div className="flex h-screen flex-col overflow-hidden bg-[#F7F9FC] text-slate-700 font-sans">
       <style>{`
         @keyframes agentInsightIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
         .agent-insight-in { animation: agentInsightIn 380ms ease-out both; }
@@ -1400,208 +1821,215 @@ export default function AgentDemo() {
         .cockpit-scroll::-webkit-scrollbar{width:4px} .cockpit-scroll::-webkit-scrollbar-thumb{background:#1e293b;border-radius:2px}
       `}</style>
 
-      {/* First Row: Main Header */}
-      <MainHeader
-        agentVersion="v0.1"
-        executionStatus={agentState.reasoningState.status}
-        modelMode={agentState.modelMode}
-        onNewAnalysis={handlePrimaryRun}
-        onExportReport={handleExportReport}
-        isRunning={runningGuardRef.current}
-        showActions={false}
-      />
+      {/* Invalid project fallback banner */}
+      {(() => {
+        const requested = searchParams.get('project');
+        if (requested && !isKnownProjectId(requested)) {
+          return (
+            <div className="shrink-0 border-b border-amber-300 bg-amber-50 px-4 py-2 text-[11px] text-amber-900">
+              <span className="font-semibold">Project not found.</span>{' '}
+              Showing the default project context.
+            </div>
+          );
+        }
+        return null;
+      })()}
 
-      {/* Second Row: Control Bar */}
-      <div className="shrink-0 border-b border-white/[0.08] bg-[#0A0F1A] px-4 py-2">
-        <div className="grid gap-2 min-[780px]:grid-cols-2 min-[1180px]:grid-cols-[170px_minmax(250px,1fr)_160px_220px_185px_170px]">
-          <label className="relative flex h-[32px] w-full min-w-0 items-center overflow-hidden rounded-lg border border-slate-800 bg-[#070B12] px-2.5 transition-colors focus-within:border-cyan-400/50">
-            <select
-              value={agentState.context}
-              disabled={agentState.reasoningState.status === 'running'}
-              onChange={(event) => handleContextChange(event.target.value as AgentContext)}
-              className="absolute inset-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
-              aria-label="Context"
-            >
-              {CONTEXT_ORDER.map((context) => (
-                <option key={context} value={context}>
-                  {CONTEXT_CONFIG[context].label}
-                </option>
-              ))}
-            </select>
-            <span className="pointer-events-none flex min-w-0 items-baseline gap-1.5 whitespace-nowrap">
-              <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-slate-500">Context:</span>
-              <span className="truncate text-xs font-semibold text-slate-100">{contextConfig.label}</span>
-            </span>
-          </label>
-
-          <label className="relative flex h-[32px] w-full min-w-0 items-center overflow-hidden rounded-lg border border-slate-800 bg-[#070B12] px-2.5 transition-colors focus-within:border-cyan-400/50">
-            <select
-              value={selectedDataset.id}
-              disabled={agentState.reasoningState.status === 'running'}
-              onChange={(event) => handleDatasetChange(event.target.value)}
-              className="absolute inset-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
-              aria-label="Dataset"
-            >
-              {datasetOptions.map((option) => (
-                <option key={option.dataset.id} value={option.dataset.id}>
-                  {option.project.name} - {option.dataset.fileName}
-                </option>
-              ))}
-            </select>
-            <span className="pointer-events-none flex min-w-0 items-baseline gap-1.5 whitespace-nowrap">
-              <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-slate-500">Dataset:</span>
-              <FormulaText className="block min-w-0 truncate text-xs font-semibold text-slate-100">
-                {`${selectedProject.name} - ${selectedDataset.sampleName}`}
-              </FormulaText>
-            </span>
-          </label>
-
-          <label className="relative flex h-[32px] w-full min-w-0 items-center overflow-hidden rounded-lg border border-slate-800 bg-[#070B12] px-2.5 transition-colors focus-within:border-cyan-400/50">
-            <select
-              value={agentState.modelMode}
-              disabled={agentState.reasoningState.status === 'running'}
-              onChange={(event) => {
-                const newMode = event.target.value as ModelMode;
-                setAgentState((current) => ({
-                  ...resetRunState(current, current.context, current.datasetId),
-                  modelMode: newMode,
-                }));
-              }}
-              className="absolute inset-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
-              aria-label="Reasoning mode"
-            >
-              <option value="deterministic">Deterministic Workflow</option>
-              <option value="vertex-gemini">Model Layer Pending</option>
-              <option value="gemma">Open Model Pending</option>
-            </select>
-            <span className="pointer-events-none flex min-w-0 items-baseline gap-1.5 whitespace-nowrap">
-              <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-slate-500">Mode:</span>
-              <span className="truncate text-xs font-semibold text-slate-100">
-                {MODEL_MODE_LABELS[agentState.modelMode]}
-              </span>
-            </span>
-          </label>
-
-          <div className="flex h-[32px] w-full min-w-0 items-center gap-2 rounded-lg border border-amber-400/25 bg-amber-400/5 px-2.5 text-[10px] font-semibold uppercase tracking-wider text-amber-200">
-            <span className="shrink-0 text-amber-300">Conditions:</span>
-            <span className="truncate text-amber-100">{experimentConditionTopBarLabel}</span>
-          </div>
-
-          <div className="flex h-[32px] w-full min-w-0 items-center gap-2 rounded-lg border border-slate-800 bg-[#070B12] px-2">
-            <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-slate-500">Run:</span>
-            <div className="grid h-6 min-w-0 flex-1 grid-cols-2 rounded-lg bg-[#050812] p-0.5">
-              {(['auto', 'step'] as ExecutionMode[]).map((mode) => (
-                <button
-                  key={mode}
-                  type="button"
-                  disabled={agentState.reasoningState.status === 'running'}
-                  title={agentState.reasoningState.status === 'running' ? 'Controls are locked while the deterministic run is active.' : undefined}
-                  onClick={() => handleExecutionModeChange(mode)}
-                  className={`rounded-md text-[10px] font-bold transition-colors disabled:opacity-60 ${agentState.reasoningState.executionMode === mode ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-slate-200'}`}
-                >
-                  {mode === 'auto' ? 'Auto' : 'Step'}
-                </button>
-              ))}
+      {/* COMPACT ONE-ROW HEADER */}
+      <div className="shrink-0 border-b border-slate-200 bg-white px-4 py-2.5">
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* Left: Branding */}
+          <div className="flex items-center gap-2">
+            <Brain size={18} className="text-blue-600" />
+            <div className="flex flex-col">
+              <span className="text-sm font-bold text-slate-900">DIFARYX Agent v0.1</span>
+              <span className="text-[9px] uppercase tracking-wider text-slate-500">Scientific Workflow Agent</span>
             </div>
           </div>
 
-          <div className="flex h-[32px] w-full min-w-0 items-center gap-2 rounded-lg border border-slate-800 bg-[#070B12] px-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 min-[780px]:col-span-2 min-[1180px]:col-span-1">
-            <span className="shrink-0">Status:</span>
-            <span className="truncate text-slate-300">
-              {agentState.reasoningState.status === 'running'
-                ? 'Reasoning trace active'
-                : currentResult
-                  ? 'Discussion ready with validation requirements'
-                  : 'Ready with validation requirements'}
-            </span>
+          <div className="h-6 w-px bg-slate-300" />
+
+          {/* Center: Project, Task, Mode, Conditions, Validation */}
+          <div className="flex items-center gap-2 flex-1 min-w-0 flex-wrap">
+            {/* Project Selector */}
+            <div className="relative">
+              <select
+                value={agentState.projectId}
+                disabled={runningGuardRef.current}
+                onChange={(e) => handleProjectChange(e.target.value)}
+                className="h-7 px-2 pr-6 text-xs font-semibold bg-white border border-slate-300 rounded text-slate-700 appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed hover:border-slate-400"
+                title={currentProject.name}
+              >
+                {demoProjectRegistry.map((proj) => (
+                  <option key={proj.id} value={proj.id}>
+                    {proj.title}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={12} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            </div>
+
+            {/* Task Pill: Multi-tech popover or single-tech static */}
+            {agentContext.evidenceMode === 'multi-tech' ? (
+              <MultiTechPopover
+                evidenceLayers={agentContext.evidenceLayers}
+                includedTechniques={includedTechniques}
+                selectedTechnique={agentContext.selectedTechnique}
+                onToggleIncluded={handleToggleIncluded}
+                onSelectTechnique={handleTechniqueSelect}
+                isOpen={multiTechOpen}
+                onToggleOpen={() => setMultiTechOpen((o) => !o)}
+                disabled={runningGuardRef.current}
+              />
+            ) : (
+              <div className="h-7 px-2.5 flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded text-[10px] font-semibold text-blue-700">
+                <Microscope size={11} />
+                <span className="truncate max-w-[140px]" title={agentContext.workspaceTitle}>{agentContext.workspaceTitle}</span>
+              </div>
+            )}
+
+            {/* Mode Selector */}
+            <div className="relative">
+              <select
+                value={agentState.mode}
+                disabled={runningGuardRef.current}
+                onChange={(e) => handleModeChange(e.target.value as AgentMode)}
+                className="h-7 px-2 pr-6 text-xs font-semibold bg-white border border-slate-300 rounded text-slate-700 appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed hover:border-slate-400"
+              >
+                {Object.entries(AGENT_MODES).map(([key, config]) => (
+                  <option key={key} value={key}>
+                    {config.label}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={12} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            </div>
+
+            {/* Conditions Lock */}
+            <div className="h-7 px-2.5 flex items-center gap-1.5 bg-amber-50 border border-amber-200 rounded text-[10px] font-semibold text-amber-700">
+              <Lock size={11} />
+              <span>{experimentConditionTopBarLabel}</span>
+            </div>
+
+            {/* Validation Status */}
+            <div className="h-7 px-2.5 flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 rounded text-[10px] font-semibold text-emerald-700">
+              <CheckCircle2 size={11} />
+              <span>Boundary Ready</span>
+            </div>
+          </div>
+
+          {/* Right: Auto/Step Toggle, Run Button, Actions Dropdown */}
+          <div className="flex items-center gap-2">
+            {/* Auto/Step Toggle */}
+            <div className="flex h-7 items-center gap-1.5 bg-white border border-slate-300 rounded px-1">
+              <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500 pl-1">Run:</span>
+              <div className="flex gap-0.5">
+                {(['auto', 'step'] as ExecutionMode[]).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    disabled={runningGuardRef.current}
+                    onClick={() => handleExecutionModeChange(mode)}
+                    className={`px-2 py-0.5 rounded text-[10px] font-bold transition-colors disabled:opacity-60 ${
+                      agentState.reasoningState.executionMode === mode
+                        ? 'bg-blue-600 text-white'
+                        : 'text-slate-600 hover:text-slate-800 hover:bg-slate-50'
+                    }`}
+                  >
+                    {mode === 'auto' ? 'Auto' : 'Step'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Run Button */}
+            <button
+              type="button"
+              onClick={handlePrimaryRun}
+              disabled={runningGuardRef.current}
+              className="h-7 px-3 flex items-center gap-1.5 bg-gradient-to-r from-blue-600 to-blue-700 rounded text-[11px] font-bold text-white shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {agentState.reasoningState.status === 'running' ? (
+                <Loader2 size={12} className="animate-spin" />
+              ) : (
+                <Play size={12} fill="currentColor" />
+              )}
+              <span>Run Workflow</span>
+            </button>
+
+            {/* Actions Dropdown */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setActionsDropdownOpen(!actionsDropdownOpen)}
+                disabled={runningGuardRef.current}
+                className="h-7 px-2.5 flex items-center gap-1 bg-white border border-slate-300 rounded text-[11px] font-semibold text-slate-700 hover:border-blue-400 hover:text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span>Actions</span>
+                <ChevronDown size={12} />
+              </button>
+
+              {actionsDropdownOpen && (
+                <div className="absolute right-0 top-full mt-1 w-56 bg-white border border-slate-200 rounded-lg shadow-lg z-50">
+                  <button
+                    type="button"
+                    onClick={() => { resetExecution(); setActionsDropdownOpen(false); }}
+                    disabled={runningGuardRef.current}
+                    className="w-full px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    <Terminal size={12} />
+                    <span>Reset workflow</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { handleRefineInterpretation(); setActionsDropdownOpen(false); }}
+                    disabled={runningGuardRef.current}
+                    className="w-full px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    <Brain size={12} />
+                    <span>Refine interpretation</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { handleSaveToNotebook(); setActionsDropdownOpen(false); }}
+                    disabled={runningGuardRef.current}
+                    className="w-full px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    <FileText size={12} />
+                    <span>Save to Notebook</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { handleOpenSourceProcessing(); setActionsDropdownOpen(false); }}
+                    disabled={runningGuardRef.current}
+                    className="w-full px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    <Database size={12} />
+                    <span>View source evidence</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { handleViewClaimBoundary(); setActionsDropdownOpen(false); }}
+                    disabled={runningGuardRef.current}
+                    className="w-full px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    <ClipboardList size={12} />
+                    <span>View claim boundary</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { handleExportReport(); setActionsDropdownOpen(false); }}
+                    disabled={runningGuardRef.current}
+                    className="w-full px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 border-t border-slate-200"
+                  >
+                    <Download size={12} />
+                    <span>Export report section</span>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
-
-        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          <button
-            type="button"
-            onClick={handlePrimaryRun}
-            disabled={runningGuardRef.current}
-            title={runningGuardRef.current ? 'Controls are locked while the deterministic run is active.' : undefined}
-            className="inline-flex h-[31px] w-full items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-2.5 text-[10px] font-bold text-white shadow-md shadow-blue-600/20 transition-all hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60 min-[560px]:w-auto"
-          >
-            {agentState.reasoningState.status === 'running' ? (
-              <Loader2 size={12} className="animate-spin" />
-            ) : (
-              <Play size={12} fill="currentColor" />
-            )}
-            Run
-          </button>
-
-          <button
-            type="button"
-            onClick={resetExecution}
-            disabled={runningGuardRef.current}
-            title={runningGuardRef.current ? 'Controls are locked while the deterministic run is active.' : undefined}
-            className="inline-flex h-[31px] w-full items-center justify-center gap-1.5 rounded-lg border border-slate-700 px-2.5 text-[10px] font-semibold text-slate-300 transition-colors hover:border-cyan-400/40 hover:text-cyan-200 disabled:cursor-not-allowed disabled:opacity-50 min-[560px]:w-auto"
-          >
-            Reset
-          </button>
-
-          <button
-            type="button"
-            onClick={handleRefineInterpretation}
-            disabled={runningGuardRef.current}
-            title={runningGuardRef.current ? 'Controls are locked while the deterministic run is active.' : undefined}
-            className="inline-flex h-[31px] w-full items-center justify-center gap-1.5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-2.5 text-[10px] font-semibold text-cyan-100 transition-colors hover:border-cyan-300/50 hover:bg-cyan-500/15 disabled:cursor-not-allowed disabled:opacity-50 min-[560px]:w-auto"
-          >
-            <Brain size={12} />
-            Refine
-          </button>
-
-          <button
-            type="button"
-            onClick={handleSaveToNotebook}
-            disabled={runningGuardRef.current}
-            title={runningGuardRef.current ? 'Controls are locked while the deterministic run is active.' : undefined}
-            className="inline-flex h-[31px] w-full items-center justify-center gap-1.5 rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-2.5 text-[10px] font-semibold text-emerald-100 transition-colors hover:border-emerald-300/50 hover:bg-emerald-400/15 disabled:cursor-not-allowed disabled:opacity-50 min-[560px]:w-auto"
-          >
-            <FileText size={12} />
-            Save to Notebook
-          </button>
-
-          <button
-            type="button"
-            onClick={handleOpenSourceProcessing}
-            disabled={runningGuardRef.current}
-            title={runningGuardRef.current ? 'Controls are locked while the deterministic run is active.' : 'Open source processing'}
-            className="inline-flex h-[31px] w-full items-center justify-center gap-1.5 rounded-lg border border-slate-700 px-2.5 text-[10px] font-semibold text-slate-300 transition-colors hover:border-cyan-400/40 hover:text-cyan-200 disabled:cursor-not-allowed disabled:opacity-50 min-[560px]:w-auto"
-          >
-            <Database size={12} />
-            Source
-          </button>
-
-          <button
-            type="button"
-            onClick={handleViewClaimBoundary}
-            disabled={runningGuardRef.current}
-            title={runningGuardRef.current ? 'Controls are locked while the deterministic run is active.' : undefined}
-            className="inline-flex h-[31px] w-full items-center justify-center gap-1.5 rounded-lg border border-slate-700 px-2.5 text-[10px] font-semibold text-slate-300 transition-colors hover:border-cyan-400/40 hover:text-cyan-200 disabled:cursor-not-allowed disabled:opacity-50 min-[560px]:w-auto"
-          >
-            <ClipboardList size={12} />
-            Claim Boundary
-          </button>
-
-          <button
-            type="button"
-            onClick={handleExportReport}
-            disabled={runningGuardRef.current}
-            title={runningGuardRef.current ? 'Controls are locked while the deterministic run is active.' : undefined}
-            className="inline-flex h-[31px] w-full items-center justify-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800/50 px-2.5 text-[10px] font-semibold text-slate-300 transition-colors hover:border-slate-600 hover:bg-slate-800 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 min-[560px]:w-auto"
-          >
-            <Download size={12} />
-            Export
-          </button>
-        </div>
-      </div>
-
-      <div className="shrink-0 border-b border-white/[0.08] bg-[#070B12] px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-        Demo dataset · Deterministic scientific workflow
       </div>
 
       {/* Three-Column Layout */}
@@ -1616,38 +2044,29 @@ export default function AgentDemo() {
 
         {/* Center Column */}
         <CenterColumn
-          context={agentState.context}
-          dataset={selectedDataset}
-          project={selectedProject}
-          graphData={selectedDataset.dataPoints}
-          peakMarkers={peakMarkers}
-          baselineData={baselineData}
+          agentContext={agentContext}
           executionSteps={executionSteps}
           progressPercent={progressPercent}
-          metrics={currentResult?.metrics ?? []}
+          evidenceWorkspace={evidenceWorkspace}
+          focusedEvidenceSource={focusedEvidenceSource}
+          onFocusedTechniqueChange={handleFocusedTechniqueChange}
         />
 
         {/* Right Panel */}
         <RightPanel
-          technique={agentState.context}
-          projectName={selectedProject.name}
-          projectId={selectedProject.id}
-          currentStep={agentState.reasoningState.currentStepIndex}
-          totalSteps={stages.length}
-          executionSteps={executionSteps}
-          progressPercent={progressPercent}
-          processingResultId={workflowProcessingResult.id}
-          candidates={
-            xrdAnalysis?.candidates.slice(0, 3).map((candidate, index) => ({
-              phase: candidate.phase.name,
-              peakAlignment: index === 0 ? '0.12° ≤ 0.20°' : index === 1 ? '0.28° > 0.20°' : '0.31° > 0.20°',
-              structuralFit: index === 0 ? 'supported' : 'partial',
-              completeness: (candidate.matches.length / candidate.phase.peaks.length).toFixed(2),
-              evaluation: index === 0 ? 'Requires validation' : 'In Progress',
-              result: index === 0 ? 'Match' : 'Rejected',
-              reason: index === 1 ? 'missing peak 35.7°' : index === 2 ? 'intensity mismatch' : undefined,
-            }))
-          }
+          agentContext={agentContext}
+          mode={agentState.mode}
+          onSaveToNotebook={handleSaveToNotebook}
+          onExportReport={handleExportReport}
+          draftParameters={draftParameters}
+          onDraftParameterChange={handleDraftParameterChange}
+          onApplyParameters={handleApplyParameters}
+          onResetParameters={handleResetParameters}
+          isConditionLocked={isConditionLocked}
+          onUnlockConditions={handleUnlockConditions}
+          onLockConditions={handleLockConditions}
+          evidenceWorkspace={evidenceWorkspace}
+          registryProject={registryProject}
         />
       </div>
     </div>
