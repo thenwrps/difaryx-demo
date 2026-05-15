@@ -67,10 +67,10 @@ export function getWorkspaceEntryMode(
  */
 export function getSampleDatasetName(technique: string): string {
   const names: Record<string, string> = {
-    xrd: 'CuFe2O4_spinel_sample.xy',
-    xps: 'CuFe2O4_survey_sample.xy',
-    ftir: 'CuFe2O4_ftir_sample.csv',
-    raman: 'CuFe2O4_raman_sample.txt',
+    xrd: 'registry_xrd_reference_sample.xy',
+    xps: 'registry_xps_reference_sample.xy',
+    ftir: 'registry_ftir_reference_sample.csv',
+    raman: 'registry_raman_reference_sample.txt',
   };
   return names[technique.toLowerCase()] || `${technique}_sample_data`;
 }

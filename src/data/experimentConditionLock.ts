@@ -188,6 +188,16 @@ export const lockExperimentConditions = (
   };
 };
 
+export const unlockExperimentConditions = (
+  lock: ExperimentConditionLock,
+): ExperimentConditionLock => {
+  return {
+    ...lock,
+    userConfirmed: false,
+    completenessStatus: 'draft',
+  };
+};
+
 export const getConditionLockStatusLabel = (
   lock?: ExperimentConditionLock | null,
 ) => {

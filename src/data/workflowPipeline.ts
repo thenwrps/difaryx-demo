@@ -1,6 +1,7 @@
 import {
   DEFAULT_PROJECT_ID,
   getProject,
+  type DemoProject,
   type DemoPeak,
   type Technique,
 } from './demoProjects';
@@ -177,11 +178,41 @@ export const VALIDATION_NOTES = [
   'Use ICP-OES if bulk Cu/Fe composition is required.',
 ];
 
+function getWorkflowProject(projectId?: string | null) {
+  return getProject(projectId) ?? getProject(DEFAULT_PROJECT_ID)!;
+}
+
+function getPrimaryTechnique(project: DemoProject): Technique {
+  return project.techniques.find((technique) => technique === 'XRD') ?? project.techniques[0] ?? 'XRD';
+}
+
 function isSba15Project(projectId: string) {
   return projectId === 'cufe2o4-sba15';
 }
 
 function getProjectClaimBoundary(projectId: string): typeof CLAIM_BOUNDARY {
+  const project = getWorkflowProject(projectId);
+  const validationGaps = project.validationGaps.map((gap) => gap.description);
+  const evidenceLines = project.evidence.slice(0, 3);
+  const pendingDecisions = project.nextDecisions.map((decision) => decision.label);
+  const contextual = project.evidenceSources.map(
+    (source) => `${source.technique}: ${source.datasetLabel}`,
+  );
+
+  return {
+    supported: evidenceLines.length
+      ? evidenceLines
+      : [`${project.phase} evidence is available for ${project.name}.`],
+    requiresValidation: validationGaps.length
+      ? validationGaps
+      : [`No open validation gaps are recorded for ${project.name}.`],
+    notSupportedYet: validationGaps.length
+      ? [`Claims beyond ${project.phase} remain gated by project validation state.`]
+      : ['No stronger unsupported claim is currently proposed.'],
+    contextual,
+    pending: pendingDecisions,
+  };
+
   if (!isSba15Project(projectId)) return CLAIM_BOUNDARY;
 
   return {
@@ -209,6 +240,12 @@ function getProjectClaimBoundary(projectId: string): typeof CLAIM_BOUNDARY {
 }
 
 function getProjectValidationNotes(projectId: string) {
+  const project = getWorkflowProject(projectId);
+  const gapResolutions = project.validationGaps.map((gap) => gap.suggestedResolution);
+  if (gapResolutions.length) return gapResolutions;
+  if (project.recommendations.length) return project.recommendations;
+  return [`Preserve current evidence boundary for ${project.name} before report export.`];
+
   if (!isSba15Project(projectId)) return VALIDATION_NOTES;
 
   return [
@@ -220,6 +257,29 @@ function getProjectValidationNotes(projectId: string) {
 }
 
 function getProcessingResultCopy(projectId: string) {
+  const project = getWorkflowProject(projectId);
+  const primaryTechnique = getPrimaryTechnique(project);
+  const evidenceReview = project.evidence.length
+    ? project.evidence
+    : project.evidenceSources.map((source) => source.description);
+  const limitations = project.validationGaps.length
+    ? project.validationGaps.map((gap) => gap.description)
+    : [project.reportReadiness.label];
+  const processedSource = project.evidenceSources.find((source) => source.technique === primaryTechnique);
+
+  return {
+    processedResult: `${project.name} ${primaryTechnique} evidence review`,
+    summary: project.summary,
+    evidenceReview: evidenceReview.length
+      ? evidenceReview
+      : [`No processed ${primaryTechnique} evidence is available for ${project.name}.`],
+    limitations: limitations.length
+      ? limitations
+      : [`${project.name} has no active limitations recorded for the selected evidence bundle.`],
+    materialSystem: project.material,
+    datasetLabel: processedSource?.datasetLabel ?? `${project.name} ${primaryTechnique}`,
+  };
+
   if (!isSba15Project(projectId)) {
     return {
       processedResult: 'CuFe₂O₄ spinel ferrite assignment from XRD-centered processing',
@@ -237,6 +297,7 @@ function getProcessingResultCopy(projectId: string) {
         'Crystallite size and strain separation require additional refinement.',
       ],
       materialSystem: canonicalDemoScenario.materialSystem,
+      datasetLabel: 'XRD reference dataset',
     };
   }
 
@@ -256,10 +317,27 @@ function getProcessingResultCopy(projectId: string) {
       'Support interaction and surface oxidation state require additional validation.',
     ],
     materialSystem: 'CuFe₂O₄ on mesoporous SBA-15',
+    datasetLabel: 'XRD reference dataset',
   };
 }
 
 function getDiscussionDraft(projectId: string, templateMode: NotebookTemplateMode) {
+  const project = getWorkflowProject(projectId);
+  const validationLine = project.validationGaps.length
+    ? project.validationGaps.map((gap) => gap.description).join(' ')
+    : 'No open validation gap is recorded in the selected project context.';
+  const nextDecision = project.nextDecisions[0]?.label ?? 'Preserve the current evidence boundary';
+
+  if (templateMode === 'research') {
+    return `${project.notebook.phaseIdentification} ${project.notebook.keyEvidence} ${validationLine}`;
+  }
+
+  if (templateMode === 'rd') {
+    return `The selected ${project.name} evidence supports continued R&D review within the current ${project.validationState.replace(/_/g, ' ')} state. The next workflow decision is: ${nextDecision}. ${validationLine}`;
+  }
+
+  return `The selected ${project.name} result is valid within the recorded project evidence scope: ${project.summary} ${validationLine}`;
+
   if (templateMode === 'research') {
     return isSba15Project(projectId) ? SBA15_RESEARCH_DISCUSSION_DRAFT : RESEARCH_DISCUSSION_DRAFT;
   }
@@ -282,30 +360,34 @@ export function normalizeNotebookTemplateMode(value?: string | null): NotebookTe
 }
 
 export function createProcessingResultFromXrdDemo(projectId = DEFAULT_PROJECT_ID): ProcessingResult {
-  const project = getProject(projectId);
-  const sourceRoute = `/workspace/xrd?project=${project.id}`;
+  const project = getWorkflowProject(projectId);
+  const primaryTechnique = getPrimaryTechnique(project);
+  const sourceRoute = `/workspace/${primaryTechnique.toLowerCase()}?project=${project.id}`;
   const copy = getProcessingResultCopy(project.id);
+  const detectedFeatures = primaryTechnique === 'XRD' && project.techniques.includes('XRD')
+    ? project.xrdPeaks
+    : [];
 
   return {
-    id: `processing-${project.id}-xrd-demo`,
+    id: `processing-${project.id}-${primaryTechnique.toLowerCase()}-demo`,
     projectId: project.id,
-    technique: 'XRD',
+    technique: primaryTechnique,
     sourceRoute,
     processedAt: DEMO_TIMESTAMP,
-    title: `${project.name} XRD processing result`,
-    sampleId: canonicalDemoScenario.sampleId,
+    title: `${project.name} ${primaryTechnique} processing result`,
+    sampleId: project.id,
     materialSystem: copy.materialSystem,
     processedResult: copy.processedResult,
     summary: copy.summary,
-    detectedFeatures: project.xrdPeaks,
+    detectedFeatures,
     evidenceReview: copy.evidenceReview,
     limitations: copy.limitations,
     followUpValidation: getProjectValidationNotes(project.id),
     metrics: [
-      { label: 'Primary Technique', value: canonicalDemoScenario.primaryTechnique },
-      { label: 'Supporting Context', value: canonicalDemoScenario.supportingTechniques.join(', ') },
-      { label: 'Detected Reflections', value: String(project.xrdPeaks.length) },
-      { label: 'Evidence State', value: 'Ready with validation requirements' },
+      { label: 'Primary Technique', value: primaryTechnique },
+      { label: 'Evidence Bundle', value: `${project.evidenceSources.length} project sources` },
+      { label: 'Detected Features', value: detectedFeatures.length ? String(detectedFeatures.length) : copy.datasetLabel },
+      { label: 'Evidence State', value: project.reportReadiness.label },
     ],
   };
 }
@@ -340,7 +422,7 @@ export function refineDiscussionFromProcessing(
     templateMode,
     sourceRoute: `/demo/agent?project=${processingResult.projectId}&processing=${processingResult.id}&template=${templateMode}`,
     title: 'Refined Discussion',
-    subtitle: 'Refined from XRD processing result and evidence review',
+    subtitle: `Refined from ${processingResult.technique} processing result and evidence review`,
     microFlow: TEMPLATE_MICRO_FLOWS[templateMode],
     discussionDraft,
     claimBoundary,

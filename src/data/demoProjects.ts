@@ -61,11 +61,14 @@ export interface EvidenceSource {
   available: boolean;
 }
 
+export type JobType = 'research' | 'rnd' | 'analytical';
+
 export interface DemoProject {
   id: string;
   name: string;
   material: string;
   objective: string;
+  jobType?: JobType;
   techniques: Technique[];
   techniqueMetadata: TechniqueMetadata[];
   evidenceSources: EvidenceSource[];
@@ -256,6 +259,7 @@ export const demoProjects: DemoProject[] = [
     name: 'CuFe₂O₄ Spinel',
     material: 'Copper ferrite spinel',
     objective: 'Confirm CuFe₂O₄ spinel phase identity and assess phase purity for publication readiness.',
+    jobType: 'research',
     techniques: ['XRD', 'Raman'],
     techniqueMetadata: [
       { key: 'XRD', label: 'XRD', role: 'Bulk phase', status: 'ready', dataAvailable: true },
@@ -377,6 +381,7 @@ export const demoProjects: DemoProject[] = [
     name: 'CuFe₂O₄/SBA-15',
     material: 'Copper ferrite on mesoporous silica',
     objective: 'Correlate multi-technique evidence to confirm CuFe₂O₄ dispersion on mesoporous SBA-15 support.',
+    jobType: 'rnd',
     techniques: ['XRD', 'XPS', 'FTIR', 'Raman'],
     techniqueMetadata: [
       { key: 'XRD', label: 'XRD', role: 'Bulk phase', status: 'ready', dataAvailable: true },
@@ -487,6 +492,7 @@ export const demoProjects: DemoProject[] = [
     name: 'NiFe₂O₄',
     material: 'Nickel ferrite spinel',
     objective: 'Establish NiFe₂O₄ spinel phase identity as a control sample for the ferrite research program.',
+    jobType: 'analytical',
     techniques: ['XRD'],
     techniqueMetadata: [
       { key: 'XRD', label: 'XRD', role: 'Bulk phase', status: 'ready', dataAvailable: true },
@@ -571,6 +577,7 @@ export const demoProjects: DemoProject[] = [
     name: 'CoFe₂O₄',
     material: 'Cobalt ferrite spinel',
     objective: 'Verify cobalt ferrite spinel phase and surface chemistry for catalyst precursor characterization.',
+    jobType: 'research',
     techniques: ['XRD', 'XPS'],
     techniqueMetadata: [
       { key: 'XRD', label: 'XRD', role: 'Bulk phase', status: 'ready', dataAvailable: true },
@@ -657,6 +664,7 @@ export const demoProjects: DemoProject[] = [
     name: 'Fe₃O₄ Nanoparticles',
     material: 'Iron oxide nanoparticles',
     objective: 'Identify iron oxide nanoparticle phase and distinguish Fe₃O₄ from gamma-Fe₂O₃.',
+    jobType: 'rnd',
     techniques: ['FTIR', 'Raman'],
     techniqueMetadata: [
       { key: 'FTIR', label: 'FTIR', role: 'Bonding context', status: 'ready', dataAvailable: true },
