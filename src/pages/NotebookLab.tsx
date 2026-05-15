@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowRight, BarChart3, ChevronDown, ChevronLeft, ChevronRight, Download, FileText, FlaskConical, MoreHorizontal, Plus, Printer, Save, Share2, Target, X } from 'lucide-react';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
@@ -20,11 +20,24 @@ import {
   getProcessingRun,
   getProcessingRuns,
   getProject,
+  getProjectDatasets,
   getProjectInsight,
   getWorkspaceRoute,
   loadAgentRunResult,
+  type DemoDataset,
+  type DemoProject,
   type ProjectNotebook,
+  type Technique,
 } from '../data/demoProjects';
+import {
+  getRegistryProject,
+  isKnownProjectId,
+  claimStatusLabel,
+  claimStatusColorClass,
+  jobTypeLabel,
+  jobTypeBadgeClass,
+  type RegistryProject,
+} from '../data/demoProjectRegistry';
 import { DemoExportFormat, exportDemoArtifact } from '../utils/demoExport';
 import { getRun, type AgentRun } from '../data/runModel';
 import {
@@ -58,7 +71,7 @@ import {
 } from '../data/experimentConditionLock';
 
 const NOTEBOOK_TEMPLATE_MODES: NotebookTemplateMode[] = ['research', 'rd', 'analytical'];
-const NOTEBOOK_TABS = ['Objective', 'Evidence', 'Interpretation', 'Validation Gap', 'Decision', 'Report Draft'] as const;
+const NOTEBOOK_TABS = ['Objective / Context', 'Evidence', 'Interpretation', 'Validation Gap', 'Decision'] as const;
 type ActiveNotebookTab = typeof NOTEBOOK_TABS[number];
 
 function formatClaimStatus(status: string): string {
@@ -94,7 +107,7 @@ function resolveConfidenceLabel(
     if (label && label.trim()) return label;
   }
   if (!hasEvidenceLinked) return 'Pending';
-  if (openValidationGaps > 0) return 'Medium-high · validation-limited';
+  if (openValidationGaps > 0) return 'Medium-high - validation-limited';
   return 'High';
 }
 
@@ -213,276 +226,40 @@ function hasMatchedXrdDemoData(projectId: string): boolean {
 }
 
 function getProjectNotebookContent(projectId: string) {
-  /* ── CuFe₂O₄/SBA-15 ──────────────────────────────────────── */
-  if (projectId === 'cufe2o4-sba15') {
+  const registryProject = getRegistryProject(projectId);
+  const notebook = registryProject.notebook;
+  const supportingData: SupportingDataItem[] = registryProject.evidenceResults.map((item) => {
+    const technique = registryProject.techniques.find((tech) => tech.id === item.techniqueId);
     return {
-      experimentTitle: 'Exp-044: CuFe₂O₄/SBA-15 Multi-Tech Correlation',
-      summary:
-        'XRD Phase Identification: CuFe₂O₄-related reflections observed in a CuFe₂O₄/SBA-15 supported sample. XRD supports structural assignment, while dispersion, loading uniformity, phase purity, and surface oxidation state remain validation-limited.',
-      discussion:
-        'The processed evidence supports CuFe₂O₄ spinel ferrite reflections in the CuFe₂O₄/SBA-15 sample, consistent with dispersed copper ferrite on mesoporous SBA-15. Phase distribution, loading uniformity, surface oxidation state, and support interaction remain validation-limited.',
-      reportPreview:
-        'The processed evidence supports CuFe₂O₄ spinel ferrite reflections in the CuFe₂O₄/SBA-15 sample. Supporting Raman evidence is consistent with ferrite-like local symmetry, while FTIR contextualizes the silica support environment. The interpretation should remain framed as validation-limited because phase distribution, support interaction, loading uniformity, and surface oxidation-state assignment require additional validation.',
-      keyEvidence: [
-        'XRD reflections assigned to CuFe₂O₄ remain visible in the supported CuFe₂O₄/SBA-15 sample.',
-        'Raman vibrational modes provide supporting evidence for ferrite-like local structure.',
-        'FTIR silica/support features contextualize the SBA-15 matrix but do not independently establish ferrite phase purity.',
-      ],
-      supportingData: [
-        {
-          technique: 'XRD',
-          evidence: 'CuFe₂O₄-assigned reflections remain visible in the supported sample',
-          strength: 'Ready' as const,
-          dataset: 'xrd-cufe2o4-sba15-demo',
-          caveat: 'Reflection visibility supports assignment but not loading uniformity across SBA-15.',
-        },
-        {
-          technique: 'Raman',
-          evidence: 'Ferrite-like vibrational modes support local spinel symmetry',
-          strength: 'Ready' as const,
-          dataset: 'cu-fe2o4-sba15_raman.txt',
-          caveat: 'Raman support remains contextual and does not establish phase purity alone.',
-        },
-        {
-          technique: 'FTIR',
-          evidence: 'Silica/support bands contextualize the SBA-15 matrix',
-          strength: 'In Progress' as const,
-          dataset: 'cu-fe2o4-sba15_ftir.csv',
-          caveat: 'FTIR support features do not independently establish ferrite phase purity.',
-        },
-        {
-          technique: 'XPS',
-          evidence: 'Surface oxidation-state assignment remains under review',
-          strength: 'Review' as const,
-          dataset: 'cu-fe2o4-sba15_surface_xps.spe',
-          caveat: 'Run Cu 2p / Fe 2p review before surface-state claims.',
-        },
-      ] satisfies SupportingDataItem[],
-      validationNotes: [
-        'Quantify CuFe₂O₄ loading and distribution across SBA-15.',
-        'Review XPS Cu/Fe oxidation state and surface enrichment.',
-        'Compare FTIR silica bands and metal-oxygen bands under the support matrix.',
-        'Use microscopy or mapping evidence to validate dispersion and support interaction.',
-      ],
-      runLog: [
-        ['Processing run', 'xrd-run-044'],
-        ['Refinement', 'refine-044'],
-        ['Dataset', 'xrd-cufe2o4-sba15-demo'],
-        ['Workflow version', 'difaryx-analysis-v0.1'],
-      ],
-      phaseLabel: 'CuFe₂O₄ dispersed on mesoporous SBA-15',
-      peakDetection: '5 ferrite-related reflections detected with broad SBA-15 support contribution.',
+      technique: item.displayName,
+      evidence: item.summary,
+      strength: item.supportsClaim ? 'Ready' : 'Review',
+      dataset: technique?.datasetLabel || `${item.displayName} dataset`,
+      caveat: item.limitation,
     };
-  }
+  });
 
-  /* ── CuFe₂O₄ Spinel ─────────────────────────────────────── */
-  if (projectId === 'cu-fe2o4-spinel') {
-    return {
-      experimentTitle: 'Exp-042: CuFe₂O₄ Spinel Phase Confirmation',
-      summary:
-        'XRD Phase Identification: Supported CuFe₂O₄ spinel ferrite phase assignment with validation boundaries.',
-      discussion:
-        'The processed XRD pattern supports CuFe₂O₄ spinel ferrite phase assignment, with validation still required before publication-level phase-purity claims.',
-      reportPreview:
-        'The processed XRD pattern supports CuFe₂O₄ spinel ferrite phase assignment. Publication-level phase-purity claims remain validation-limited until supporting cross-technique and replicate evidence are reviewed.',
-      keyEvidence: [
-        'XRD reflections near 30.1 deg, 35.5 deg, and 43.2 deg 2theta align with spinel ferrite reference peaks.',
-        'Raman A1g/T2g vibrational features support local spinel symmetry.',
-        'Peak width and unresolved weak reflections indicate validation is still required before phase-purity claims.',
-      ],
-      supportingData: [
-        {
-          technique: 'XRD',
-          evidence: 'Spinel diffraction peaks align with reference positions',
-          strength: 'Ready' as const,
-          dataset: 'cufe2o4_clean_demo.xy',
-          caveat: 'Reference comparison supports assignment but not publication-level phase purity.',
-        },
-        {
-          technique: 'Raman',
-          evidence: 'A1g/T2g vibrational features support local spinel symmetry',
-          strength: 'Ready' as const,
-          dataset: 'cu-fe2o4-spinel_raman.txt',
-          caveat: 'Mode assignment supports phase but does not replace XRD.',
-        },
-      ] satisfies SupportingDataItem[],
-      validationNotes: [
-        'Run Rietveld refinement for quantitative phase assessment.',
-        'Review XPS Cu 2p, Fe 2p, and O 1s core-level spectra.',
-        'Use TEM to validate morphology and crystallite-size assumptions.',
-        'Review replicate evidence before publication-level phase-purity claims.',
-      ],
-      runLog: [
-        ['Processing run', 'xrd-run-042'],
-        ['Refinement', 'refine-042'],
-        ['Dataset', 'xrd-cufe2o4-clean'],
-        ['Workflow version', 'difaryx-analysis-v0.1'],
-      ],
-      phaseLabel: 'CuFe₂O₄ copper ferrite phase',
-      peakDetection: '9 diffraction peaks detected across 17.1-61.6 degrees 2theta after baseline correction.',
-    };
-  }
-
-  /* ── NiFe₂O₄ ────────────────────────────────────────────── */
-  if (projectId === 'nife2o4') {
-    return {
-      experimentTitle: 'Exp-041: NiFe₂O₄ Control Sample',
-      summary:
-        'XRD Phase Identification: Pattern is consistent with spinel nickel ferrite. Major reflections align with NiFe₂O₄ reference, supported by evidence.',
-      discussion:
-        'The processed XRD pattern is consistent with spinel nickel ferrite. Six major reflections were detected after background subtraction and matched against nickel ferrite reference. No dominant secondary oxide peak was detected in the working window, supporting phase assignment as a control sample.',
-      reportPreview:
-        'The processed XRD pattern is consistent with spinel nickel ferrite. Six major reflections were detected after background subtraction and matched against nickel ferrite reference. This control sample supports the ferrite research program baseline. Raman confirmation of vibrational fingerprint remains a validation opportunity.',
-      keyEvidence: [
-        'Major XRD reflections at 30.3, 35.7, 43.4, 57.4, and 63.0 deg 2theta align with nickel ferrite spinel.',
-        'No dominant secondary oxide peak detected in the working window.',
-        'Pattern serves as reference control for the ferrite research program.',
-      ],
-      supportingData: [
-        {
-          technique: 'XRD',
-          evidence: 'Major XRD reflections align with nickel ferrite spinel',
-          strength: 'Ready' as const,
-          dataset: 'xrd-nife2o4-control',
-          caveat: 'Pattern supports assignment as control; Raman confirmation is optional.',
-        },
-      ] satisfies SupportingDataItem[],
-      validationNotes: [
-        'Optional: run Raman measurement to confirm lattice mode assignment.',
-        'Export as reference control for the ferrite research program.',
-        'Review replicate evidence before extending to publication claims.',
-      ],
-      runLog: [
-        ['Processing run', 'xrd-run-041'],
-        ['Refinement', 'refine-041'],
-        ['Dataset', 'xrd-nife2o4-control'],
-        ['Workflow version', 'difaryx-analysis-v0.1'],
-      ],
-      phaseLabel: 'Spinel nickel ferrite',
-      peakDetection: '6 major reflections detected after background subtraction.',
-    };
-  }
-
-  /* ── CoFe₂O₄ ────────────────────────────────────────────── */
-  if (projectId === 'cofe2o4') {
-    return {
-      experimentTitle: 'Exp-039: CoFe₂O₄ Spinel Verification',
-      summary:
-        'XRD + XPS Evidence: Evidence supports cobalt ferrite spinel phase with expected cobalt and iron oxidation-state envelope.',
-      discussion:
-        'The processed evidence supports cobalt ferrite spinel phase assignment. XRD confirms cobalt ferrite spinel reflections, and XPS supports the expected cobalt and iron oxidation-state envelope. XPS peak fitting for Co 2p and Fe 2p regions requires refinement before archival-level claims.',
-      reportPreview:
-        'The processed evidence supports cobalt ferrite spinel phase. XRD confirms spinel reflections and XPS supports the expected oxidation-state envelope. XPS peak fitting for Co 2p and Fe 2p regions requires refinement before archival-level claims. The phase and surface evidence are strong; export with fit review notes.',
-      keyEvidence: [
-        'XRD confirms cobalt ferrite spinel reflections at 30.0, 35.4, 43.1, 57.0, and 62.6 deg 2theta.',
-        'XPS supports expected cobalt and iron oxidation-state envelope.',
-        'XPS peak fitting for Co 2p and Fe 2p regions requires refinement.',
-      ],
-      supportingData: [
-        {
-          technique: 'XRD',
-          evidence: 'Cobalt ferrite spinel reflections confirmed in XRD pattern',
-          strength: 'Ready' as const,
-          dataset: 'xrd-cofe2o4-control',
-          caveat: 'XRD supports phase assignment but surface fitting is pending.',
-        },
-        {
-          technique: 'XPS',
-          evidence: 'XPS supports expected cobalt and iron oxidation-state envelope',
-          strength: 'In Progress' as const,
-          dataset: 'xps-cofe2o4-demo',
-          caveat: 'Co 2p and Fe 2p peak fitting requires refinement.',
-        },
-      ] satisfies SupportingDataItem[],
-      validationNotes: [
-        'Review and refine XPS peak fitting for Co 2p and Fe 2p regions.',
-        'Compare fitted oxidation states against reference cobalt ferrite spectra.',
-        'Export notebook report with fit review notes before archival.',
-      ],
-      runLog: [
-        ['Processing run', 'xrd-run-039'],
-        ['Refinement', 'refine-039'],
-        ['Dataset', 'xrd-cofe2o4-control'],
-        ['Workflow version', 'difaryx-analysis-v0.1'],
-      ],
-      phaseLabel: 'Cobalt ferrite spinel phase',
-      peakDetection: '6 ferrite reflections detected in the XRD pattern.',
-    };
-  }
-
-  /* ── Fe₃O₄ Nanoparticles ────────────────────────────────── */
-  if (projectId === 'fe3o4-nanoparticles') {
-    return {
-      experimentTitle: 'Exp-040: Fe₃O₄ Nanoparticle Surface Signature',
-      summary:
-        'FTIR/Raman Evidence: Iron oxide nanoparticle signatures suggested by metal-oxygen band and Raman band pattern, with surface hydroxyl contribution visible.',
-      discussion:
-        'FTIR and Raman evidence suggests iron oxide nanoparticle signatures with surface hydroxyl contribution. The FTIR metal-oxygen band indicates iron oxide lattice vibration, while the Raman band pattern suggests magnetite-like nanoparticle signatures. XRD data is needed to distinguish Fe₃O₄ from gamma-Fe₂O₃.',
-      reportPreview:
-        'FTIR and Raman evidence suggests iron oxide nanoparticle signatures with surface hydroxyl contribution. The assignment remains in progress because XRD data is needed to distinguish Fe₃O₄ from gamma-Fe₂O₃. Particle size distribution also requires characterization via TEM or DLS.',
-      keyEvidence: [
-        'FTIR metal-oxygen band indicates iron oxide lattice vibration.',
-        'Raman band pattern suggests magnetite-like nanoparticle signatures.',
-        'Surface hydroxyl contribution remains visible in FTIR.',
-      ],
-      supportingData: [
-        {
-          technique: 'FTIR',
-          evidence: 'Metal-oxygen band indicates iron oxide lattice vibration',
-          strength: 'Ready' as const,
-          dataset: 'ftir-fe3o4-nanoparticles-demo',
-          caveat: 'FTIR supports iron oxide assignment but cannot distinguish Fe₃O₄ from gamma-Fe₂O₃.',
-        },
-        {
-          technique: 'Raman',
-          evidence: 'Raman band pattern suggests magnetite-like nanoparticle signatures',
-          strength: 'In Progress' as const,
-          dataset: 'raman-fe3o4-nanoparticles-demo',
-          caveat: 'Raman supports nanoparticle signature but XRD confirmation is needed.',
-        },
-      ] satisfies SupportingDataItem[],
-      validationNotes: [
-        'Run XRD measurement to distinguish Fe₃O₄ from gamma-Fe₂O₃.',
-        'Characterize particle size distribution via TEM or DLS.',
-        'Review surface hydroxyl contribution in context of nanoparticle synthesis.',
-      ],
-      runLog: [
-        ['Processing run', 'ftir-run-040'],
-        ['Refinement', 'refine-040'],
-        ['Dataset', 'ftir-fe3o4-nanoparticles-demo'],
-        ['Workflow version', 'difaryx-analysis-v0.1'],
-      ],
-      phaseLabel: 'Iron oxide nanoparticle signatures',
-      peakDetection: 'Raman and FTIR bands suggest iron oxide nanoparticle signatures.',
-    };
-  }
-
-  /* ── Fallback for unknown projects ───────────────────────── */
   return {
-    experimentTitle: 'No matched experiment',
-    summary:
-      'No matched processing result is linked to this project. Load compatible data before generating notebook evidence.',
-    discussion:
-      'No matched processing result is linked to this project. Load compatible data before generating notebook evidence.',
-    reportPreview:
-      'No matched processing result is linked to this project. Load compatible data before generating report-ready discussion.',
-    keyEvidence: [
-      'No matched processing result linked to this project.',
-    ],
-    supportingData: [] satisfies SupportingDataItem[],
+    experimentTitle: notebook.title,
+    summary: registryProject.evidenceSummary,
+    discussion: notebook.interpretation,
+    reportPreview: notebook.reportDraft,
+    keyEvidence: notebook.evidenceBasis,
+    supportingData,
     validationNotes: [
-      'Load a matched processing result before notebook export.',
-      'Evidence review is not generated for this project yet.',
+      notebook.validationBoundary,
+      registryProject.crossTechniqueComparison.validationGap,
+      registryProject.crossTechniqueComparison.recommendedNextAction,
+      ...registryProject.crossTechniqueComparison.missingEvidence,
     ],
-    runLog: [
-      ['Processing run', 'No matched processing result'],
-      ['Refinement', 'N/A'],
-      ['Dataset', 'No matched dataset'],
-      ['Workflow version', 'difaryx-analysis-v0.1'],
-    ],
-    phaseLabel: 'No matched phase',
-    peakDetection: 'No peak detection display is available until compatible evidence is processed.',
+    runLog: registryProject.experimentHistory.map((event) => [
+      event.eventType.replace(/_/g, ' '),
+      `${event.timestampLabel} - ${event.summary}`,
+    ]),
+    phaseLabel: registryProject._raw.phase,
+    peakDetection: registryProject._raw.notebook.peakDetection,
   };
+
 }
 
 function sanitizeTraceStep(step: string) {
@@ -493,10 +270,204 @@ function sanitizeTraceStep(step: string) {
     .replaceAll(legacyModelLabel, 'interpretation refinement');
 }
 
+type NotebookCsvValue = string | number | boolean | null | undefined;
+type NotebookCsvRow = Record<string, NotebookCsvValue>;
+
+const NOTEBOOK_CSV_COLUMNS = [
+  'project_id',
+  'project_name',
+  'sample_id',
+  'technique',
+  'dataset_id',
+  'x_value',
+  'y_value',
+  'x_unit',
+  'y_unit',
+  'processed_signal',
+  'peak_position',
+  'peak_intensity',
+  'assignment',
+  'quality_flag',
+  'validation_status',
+  'claim_boundary',
+  'source_file',
+  'processing_method',
+  'notebook_entry_id',
+  'exported_at',
+];
+
+function toCsvSlug(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 80);
+}
+
+function csvEscape(value: NotebookCsvValue) {
+  return `"${String(value ?? '').replace(/"/g, '""')}"`;
+}
+
+function downloadNotebookCsv(filename: string, rows: NotebookCsvRow[]) {
+  const extraColumns = rows.flatMap((row) => Object.keys(row)).filter((key) => !NOTEBOOK_CSV_COLUMNS.includes(key));
+  const headers = [...NOTEBOOK_CSV_COLUMNS, ...Array.from(new Set(extraColumns))];
+  const content = [headers.join(','), ...rows.map((row) => headers.map((header) => csvEscape(row[header])).join(','))].join('\n');
+  const blob = new Blob([content], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
+function axisUnit(label: string) {
+  const match = label.match(/\(([^)]+)\)/);
+  return match?.[1] ?? label;
+}
+
+function processingMethodLabel(dataset: DemoDataset) {
+  const activeSteps = Object.entries(dataset.processingState)
+    .filter(([, value]) => value === true)
+    .map(([key]) => key.replace(/([a-z])([A-Z])/g, '$1 $2'));
+  return activeSteps.length > 0 ? activeSteps.join(' + ') : 'preloaded raw signal';
+}
+
+function validationStatusForProject(registryProject: RegistryProject) {
+  if (registryProject.claimStatus === 'supported_assignment' || registryProject.claimStatus === 'report_ready') {
+    return 'supported_assignment';
+  }
+  if (registryProject.claimStatus === 'processing_required') return 'insufficient_evidence';
+  if (registryProject.claimStatus === 'validation_limited') return 'validation_limited';
+  return 'tentative_assignment';
+}
+
+function qualityFlagForEvidence(registryProject: RegistryProject, supportsClaim?: boolean) {
+  if (!supportsClaim) return registryProject.claimStatus === 'processing_required' ? 'insufficient_evidence' : 'tentative_assignment';
+  return registryProject.validationGapCount > 0 ? 'validation_limited' : 'supported_assignment';
+}
+
+function evidenceForDataset(registryProject: RegistryProject, dataset: DemoDataset) {
+  const techniqueId = dataset.technique.toLowerCase();
+  return registryProject.evidenceResults.find((item) => item.techniqueId === techniqueId);
+}
+
+function baseCsvFields(
+  project: DemoProject,
+  registryProject: RegistryProject,
+  dataset: DemoDataset | null,
+  notebookEntryId: string,
+  exportedAt: string,
+): NotebookCsvRow {
+  const evidence = dataset ? evidenceForDataset(registryProject, dataset) : null;
+  return {
+    project_id: project.id,
+    project_name: project.name,
+    sample_id: dataset?.sampleName ?? registryProject.context.sampleDescription,
+    technique: dataset?.technique ?? 'multi',
+    dataset_id: dataset?.id ?? `${project.id}-notebook-summary`,
+    x_value: '',
+    y_value: '',
+    x_unit: dataset ? axisUnit(dataset.xLabel) : '',
+    y_unit: dataset ? axisUnit(dataset.yLabel) : '',
+    processed_signal: '',
+    peak_position: '',
+    peak_intensity: '',
+    assignment: evidence?.supportsClaim ? 'supported_assignment' : validationStatusForProject(registryProject),
+    quality_flag: qualityFlagForEvidence(registryProject, evidence?.supportsClaim),
+    validation_status: validationStatusForProject(registryProject),
+    claim_boundary: evidence?.limitation ?? registryProject.notebook.validationBoundary,
+    source_file: dataset?.fileName ?? 'project evidence registry',
+    processing_method: dataset ? processingMethodLabel(dataset) : 'registry evidence summary',
+    notebook_entry_id: notebookEntryId,
+    exported_at: exportedAt,
+  };
+}
+
+function buildRawSignalRows(
+  project: DemoProject,
+  registryProject: RegistryProject,
+  dataset: DemoDataset,
+  notebookEntryId: string,
+  exportedAt: string,
+) {
+  const base = baseCsvFields(project, registryProject, dataset, notebookEntryId, exportedAt);
+  return dataset.dataPoints.map((point) => ({
+    ...base,
+    x_value: point.x,
+    y_value: point.y,
+    processed_signal: point.y,
+  }));
+}
+
+function buildFeatureRows(
+  project: DemoProject,
+  registryProject: RegistryProject,
+  dataset: DemoDataset,
+  notebookEntryId: string,
+  exportedAt: string,
+) {
+  const base = baseCsvFields(project, registryProject, dataset, notebookEntryId, exportedAt);
+  const evidence = evidenceForDataset(registryProject, dataset);
+  if (dataset.detectedFeatures.length > 0) {
+    return dataset.detectedFeatures.map((feature) => ({
+      ...base,
+      peak_position: feature.position,
+      peak_intensity: feature.intensity,
+      assignment: feature.label || base.assignment,
+    }));
+  }
+  const findings = evidence?.findings.length ? evidence.findings : [evidence?.summary ?? 'No extracted features recorded for this technique.'];
+  return findings.map((finding, index) => ({
+    ...base,
+    peak_position: '',
+    peak_intensity: '',
+    assignment: evidence?.supportsClaim ? `supported_assignment: ${finding}` : `tentative_assignment: ${finding}`,
+    feature_index: index + 1,
+  }));
+}
+
+function buildNotebookSummaryRows(
+  project: DemoProject,
+  registryProject: RegistryProject,
+  notebookEntryId: string,
+  exportedAt: string,
+) {
+  const toTechnique = (value: string): Technique | null => {
+    if (value === 'xrd') return 'XRD';
+    if (value === 'xps') return 'XPS';
+    if (value === 'ftir') return 'FTIR';
+    if (value === 'raman') return 'Raman';
+    return null;
+  };
+  return registryProject.evidenceResults.map((item, index) => {
+    const rawTechnique = toTechnique(item.techniqueId);
+    const dataset = rawTechnique
+      ? getProjectDatasets(project.id).find((candidate) => candidate.technique === rawTechnique) ?? null
+      : null;
+    return {
+      ...baseCsvFields(project, registryProject, dataset, notebookEntryId, exportedAt),
+      technique: item.displayName,
+      dataset_id: dataset?.id ?? `${project.id}-${item.techniqueId}-registry`,
+      assignment: item.supportsClaim ? 'supported_assignment' : 'tentative_assignment',
+      quality_flag: qualityFlagForEvidence(registryProject, item.supportsClaim),
+      validation_status: validationStatusForProject(registryProject),
+      claim_boundary: item.limitation,
+      processing_method: dataset ? processingMethodLabel(dataset) : 'registry evidence summary',
+      evidence_summary: item.summary,
+      limitation: item.limitation,
+      feature_index: index + 1,
+    };
+  });
+}
+
 export default function NotebookLab() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const project = (getProject(searchParams.get('project')) ?? getProject(null))!;
+  const registryProject = getRegistryProject(project.id);
   const runId = searchParams.get('run');
   const entryId = searchParams.get('entry');
   const experimentId = searchParams.get('experiment');
@@ -510,14 +481,15 @@ export default function NotebookLab() {
   const [expandedProjectIds, setExpandedProjectIds] = useState<string[]>(() => [searchParams.get('project') ?? 'cu-fe2o4-spinel']);
   const [selectedProjectId, setSelectedProjectId] = useState<string>(() => searchParams.get('project') ?? project.id);
   const [selectedExperimentId, setSelectedExperimentId] = useState<string | null>(() => searchParams.get('experiment'));
-  const [activeNotebookTab, setActiveNotebookTab] = useState<ActiveNotebookTab>('Objective');
+  const [activeNotebookTab, setActiveNotebookTab] = useState<ActiveNotebookTab>('Objective / Context');
+  const [selectedEvidenceTechnique, setSelectedEvidenceTechnique] = useState<Technique>(() => project.techniques[0] ?? 'XRD');
   const [isEvidenceDrawerOpen, setIsEvidenceDrawerOpen] = useState(false);
   const [localExperiments, setLocalExperiments] = useState(() => getLocalExperiments());
   const [wizardNotebooks, setWizardNotebooks] = useState<ProjectNotebook[]>(() => getLocalProjectNotebooks());
   const activeWizardNotebook = useMemo(() => {
     const projectParam = searchParams.get('project');
     if (!projectParam) return null;
-    // Demo project IDs always use the demo notebook branch — never treat them as wizard notebooks
+    // Demo project IDs always use the demo notebook branch - never treat them as wizard notebooks
     if (demoProjects.some((p) => p.id === projectParam)) return null;
     // Re-read from localStorage so navigation to a newly-created notebook always resolves
     const freshNotebooks = getLocalProjectNotebooks();
@@ -535,6 +507,12 @@ export default function NotebookLab() {
   const [observationOpen, setObservationOpen] = useState(false);
   const [observationDraft, setObservationDraft] = useState('');
   const [attachRunOpen, setAttachRunOpen] = useState(false);
+
+  useEffect(() => {
+    if (!project.techniques.includes(selectedEvidenceTechnique)) {
+      setSelectedEvidenceTechnique(project.techniques[0] ?? 'XRD');
+    }
+  }, [project.id, project.techniques, selectedEvidenceTechnique]);
   const runResult = useMemo(() => loadAgentRunResult(project.id), [project.id]);
   const workspaceRun = useMemo(() => getProcessingRun(runId), [runId]);
   const workspaceDataset = useMemo(
@@ -558,6 +536,13 @@ export default function NotebookLab() {
   const experimentConditionBoundaryNotes = getConditionBoundaryNotes(experimentConditionLock, project.techniques);
   const experimentConditionStatus = getConditionLockStatusLabel(experimentConditionLock);
   const attachedRunRecord = useMemo(() => getProcessingRun(attachedRun), [attachedRun]);
+  const selectedTechniqueForExport = project.techniques.includes(selectedEvidenceTechnique)
+    ? selectedEvidenceTechnique
+    : project.techniques[0] ?? 'XRD';
+  const selectedEvidenceDataset = useMemo(
+    () => getProjectDatasets(project.id).find((dataset) => dataset.technique === selectedTechniqueForExport) ?? null,
+    [project.id, selectedTechniqueForExport],
+  );
   const hasMatchedNotebookData = hasMatchedXrdDemoData(project.id);
   const projectNotebookContent = getProjectNotebookContent(project.id);
   const notebookTemplate = NOTEBOOK_TEMPLATES[templateMode];
@@ -584,7 +569,10 @@ export default function NotebookLab() {
     [workflowNotebookEntry],
   );
   const notebookTemplateDetails = NOTEBOOK_TEMPLATE_DETAILS[templateMode];
-  const displayNotebookStatus = hasMatchedNotebookData ? notebookTemplateDetails.status : 'Requires dataset';
+  const displayNotebookStatus = hasMatchedNotebookData
+    ? claimStatusLabel(registryProject.claimStatus)
+    : 'Requires dataset';
+  const canExportNotebook = hasMatchedNotebookData && registryProject.reportReadiness >= 80;
   const primaryNotebookSection = workflowNotebookEntry.sections[0];
   const supportingNotebookSections = workflowNotebookEntry.sections.slice(1);
   const notebook = useMemo(() => {
@@ -609,7 +597,7 @@ export default function NotebookLab() {
         phaseInterpretation: `${agentRun.outputs.phase} - ${agentRun.outputs.confidenceLabel}`,
       };
     }
-    
+
     const base = generateNotebookSections(project, runResult);
     if (!workspaceRun) return base;
 
@@ -644,14 +632,10 @@ export default function NotebookLab() {
     : [
         'No matched processing result is linked to this notebook entry.',
         'Evidence has not been generated for this project in the deterministic XRD demo workflow.',
-        'Load a compatible dataset before creating report-ready discussion.',
+        'Load a compatible dataset before saving notebook interpretation.',
       ];
   const technicalTrace = hasMatchedNotebookData
-    ? (project.id === 'cufe2o4-sba15' ? SBA15_DETERMINISTIC_TRACE
-      : project.id === 'nife2o4' ? NIFE2O4_DETERMINISTIC_TRACE
-      : project.id === 'cofe2o4' ? COFE2O4_DETERMINISTIC_TRACE
-      : project.id === 'fe3o4-nanoparticles' ? FE3O4_DETERMINISTIC_TRACE
-      : DETERMINISTIC_TRACE)
+    ? registryProject.agentWorkflow.trace.map((event) => event.label)
     : ['No matched processing result', 'Requires compatible dataset', 'Evidence not generated'];
 
   const toggleProjectExpansion = (projectId: string) => {
@@ -673,11 +657,7 @@ export default function NotebookLab() {
     navigate(`/notebook?project=${nextProjectId}&experiment=${nextExperimentId}`);
   };
 
-  const confidenceLabel = resolveConfidenceLabel(
-    notebook.claimStatus,
-    hasMatchedNotebookData,
-    project.validationGaps.length,
-  );
+  const confidenceLabel = claimStatusLabel(registryProject.claimStatus);
 
   const evidenceTraceItems = [
     ...project.techniqueMetadata.map((item) => ({
@@ -703,12 +683,12 @@ export default function NotebookLab() {
 
   const exportFeedbackMessage = (format: DemoExportFormat) => {
     if (format === 'md') {
-      return 'Markdown report downloaded.';
+      return 'Markdown notebook memory downloaded.';
     }
     if (format === 'png') {
-      return 'PNG snapshot downloaded.';
+      return 'Notebook snapshot downloaded.';
     }
-    return 'Available in the connected beta workflow.';
+    return 'Use Report for formal document exports.';
   };
 
   const copyShareLink = async () => {
@@ -748,16 +728,16 @@ Claim Boundary: ${lockedContext.claimBoundary}
 
 `
       : '';
-    const markdown = `# DIFARYX Notebook Report
+    const markdown = `# DIFARYX Notebook Memory
 
 ## Experiment
 ${projectNotebookContent.experimentTitle}
 
 ${lockedContextMarkdown}## Source Workflow
-XRD processing + interpretation refinement
+Evidence processing + interpretation refinement
 
 ## Pipeline
-Processing Result → Interpretation Refinement → Notebook Entry → Report Section
+Processing Result -> Interpretation Refinement -> Notebook Memory -> Report Handoff
 
 ## Mode
 ${notebookTemplate.label}
@@ -770,9 +750,6 @@ ${projectNotebookContent.summary}
 
 ## Refined Discussion
 ${projectNotebookContent.discussion}
-
-## Report-ready Discussion
-${projectNotebookContent.reportPreview}
 
 ## Key Evidence
 ${evidenceMarkdown}
@@ -796,12 +773,12 @@ ${sourceRunLines}
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `DIFARYX_${project.id}_Notebook_Report.md`;
+    a.download = `DIFARYX_${project.id}_Notebook_Memory.md`;
     document.body.appendChild(a);
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
-    showFeedback('Markdown report downloaded.');
+    showFeedback('Markdown notebook memory downloaded.');
   };
 
   const exportNotebook = (format: DemoExportFormat) => {
@@ -818,12 +795,12 @@ ${sourceRunLines}
     }
     if (format === 'png') {
       exportDemoArtifact('png', {
-        filenameBase: `DIFARYX_${project.id}_Notebook_Report`,
-        title: 'DIFARYX Notebook Report',
+        filenameBase: `DIFARYX_${project.id}_Notebook_Memory`,
+        title: 'DIFARYX Notebook Memory',
         sections: [
           { heading: 'Experiment', lines: [projectNotebookContent.experimentTitle] },
           { heading: 'Summary', lines: [projectNotebookContent.summary] },
-          { heading: 'Report-ready Discussion', lines: [projectNotebookContent.reportPreview] },
+          { heading: 'Interpretation', lines: [projectNotebookContent.discussion] },
           { heading: 'Key Evidence', lines: keyEvidenceItems },
           { heading: 'Experiment Conditions', lines: experimentConditionLines },
           { heading: 'Status', lines: [displayNotebookStatus] },
@@ -831,11 +808,54 @@ ${sourceRunLines}
         ],
       });
       setExportMenuOpen(false);
-      showFeedback('PNG snapshot downloaded.');
+      showFeedback('Notebook snapshot downloaded.');
       return;
     }
     setExportMenuOpen(false);
     showFeedback(exportFeedbackMessage(format));
+  };
+
+  const exportNotebookCsv = (kind: 'raw' | 'features' | 'summary') => {
+    const exportedAt = new Date().toISOString();
+    const projectSlug = toCsvSlug(project.id);
+
+    if (kind === 'summary') {
+      const rows = buildNotebookSummaryRows(project, registryProject, workflowNotebookEntry.id, exportedAt);
+      downloadNotebookCsv(`difaryx_${projectSlug}_notebook-evidence-summary.csv`, rows);
+      showFeedback('Notebook evidence summary CSV exported.');
+      return;
+    }
+
+    if (!selectedEvidenceDataset) {
+      showFeedback('No dataset is linked for the selected technique.');
+      return;
+    }
+
+    if (kind === 'raw') {
+      const rawRows = buildRawSignalRows(project, registryProject, selectedEvidenceDataset, workflowNotebookEntry.id, exportedAt);
+      if (rawRows.length > 0) {
+        downloadNotebookCsv(
+          `difaryx_${projectSlug}_${selectedEvidenceDataset.technique.toLowerCase()}_raw-data.csv`,
+          rawRows,
+        );
+        showFeedback('Raw signal CSV exported.');
+        return;
+      }
+      const featureRows = buildFeatureRows(project, registryProject, selectedEvidenceDataset, workflowNotebookEntry.id, exportedAt);
+      downloadNotebookCsv(
+        `difaryx_${projectSlug}_${selectedEvidenceDataset.technique.toLowerCase()}_features.csv`,
+        featureRows,
+      );
+      showFeedback('Raw signal unavailable; feature CSV exported.');
+      return;
+    }
+
+    const featureRows = buildFeatureRows(project, registryProject, selectedEvidenceDataset, workflowNotebookEntry.id, exportedAt);
+    downloadNotebookCsv(
+      `difaryx_${projectSlug}_${selectedEvidenceDataset.technique.toLowerCase()}_features.csv`,
+      featureRows,
+    );
+    showFeedback('Extracted features CSV exported.');
   };
 
   const printReport = () => {
@@ -874,8 +894,8 @@ ${sourceRunLines}
 
   const copyAgentSummary = async () => {
     const summary = hasMatchedNotebookData
-      ? projectNotebookContent.reportPreview
-      : 'No matched processing result is linked to this project. Evidence and report discussion are not generated.';
+      ? projectNotebookContent.discussion
+      : 'No matched processing result is linked to this project. Notebook interpretation remains pending.';
     try {
       await navigator.clipboard.writeText(summary);
       showFeedback('Summary copied');
@@ -932,7 +952,7 @@ ${sourceRunLines}
                       {projectExperiments.map((experiment) => (
                         <button key={experiment.id} type="button" onClick={() => openExperimentNotebook(experiment.id, experiment.projectId)} className={`block w-full rounded px-2 py-1.5 text-left text-[11px] ${experiment.id === selectedExperimentId ? 'text-primary bg-primary/5' : 'text-text-muted hover:text-text-main hover:bg-surface-hover'}`}>
                           <span className="block truncate">{experiment.title}</span>
-                          <span className="block truncate text-[10px] text-text-dim">{experiment.technique} · {experiment.fileName}</span>
+                          <span className="block truncate text-[10px] text-text-dim">{experiment.technique} - {experiment.fileName}</span>
                         </button>
                       ))}
                     </div>
@@ -957,7 +977,7 @@ ${sourceRunLines}
                 >
                   {isProjectRailCollapsed ? <span className="block text-center">{nb.title.slice(0, 2).toUpperCase()}</span> : (
                     <>
-                      <span>{nb.title}</span>
+                      <span className="block truncate">{nb.title}</span>
                       <span className="mt-1 block text-[10px] text-text-dim">{modeLabel}</span>
                       <span className={`mt-0.5 block text-[10px] font-semibold ${statusColor}`}>
                         {statusLabel}
@@ -976,10 +996,10 @@ ${sourceRunLines}
               {/* Header */}
               <div className="mb-6">
                 <div className="flex items-center gap-2 text-[11px] text-text-muted mb-2">
-                  <span>Created: {new Date(activeWizardNotebook.createdDate).toLocaleDateString()}</span>
-                  <span>|</span>
-                  <span>Mode: {activeWizardNotebook.mode === 'research' ? 'Research' : activeWizardNotebook.mode === 'rd' ? 'R&D' : 'Analytical Job'}</span>
-                  <span>|</span>
+                  <span>{getNotebookTypeBadge(activeWizardNotebook.mode)}</span>
+                  <span>{activeWizardNotebook.projectId}</span>
+                  <span>{activeWizardNotebook.workflowStatus ?? 'setup_ready'}</span>
+                  <span>{activeWizardNotebook.createdDate || 'Draft'}</span>
                   <span className={activeWizardNotebook.workflowStatus === 'evidence_ready' ? 'text-primary font-semibold' : 'text-amber-600 font-semibold'}>
                     {activeWizardNotebook.workflowStatus === 'evidence_ready' ? 'Evidence ready' : 'Setup ready'}
                   </span>
@@ -1003,10 +1023,10 @@ ${sourceRunLines}
                 <h2 className="text-xs font-bold uppercase tracking-wider text-text-dim mb-2">Workflow</h2>
                 <p className="text-[11px] text-text-muted leading-relaxed">
                   {activeWizardNotebook.mode === 'research'
-                    ? 'Research Objective → Experimental Context → Evidence Workspace → Agent Reasoning → Validation Gap → Next Experiment / Decision → Decision Log → Notebook Memory → Report'
+                    ? 'Research Objective -> Experimental Context -> Evidence Workspace -> Agent Reasoning -> Validation Gap -> Next Experiment / Decision -> Decision Log -> Notebook Memory -> Report'
                     : activeWizardNotebook.mode === 'rd'
-                    ? 'R&D Objective → Development Context → Evidence Workspace → Agent Reasoning → Validation Gap → Next Action / Decision → Decision Log → Notebook Memory → Report'
-                    : 'Analytical Objective → Analytical Context → Evidence Workspace → Agent Reasoning → Validation Gap → Result Decision / Disposition → Decision Log → Notebook Memory → Report'}
+                    ? 'R&D Objective -> Development Context -> Evidence Workspace -> Agent Reasoning -> Validation Gap -> Next Action / Decision -> Decision Log -> Notebook Memory -> Report'
+                    : 'Analytical Objective -> Analytical Context -> Evidence Workspace -> Agent Reasoning -> Validation Gap -> Result Decision / Disposition -> Decision Log -> Notebook Memory -> Report'}
                 </p>
               </div>
 
@@ -1036,7 +1056,7 @@ ${sourceRunLines}
                 );
               })()}
 
-              {/* Setup fields — context section, non-empty values only */}
+              {/* Setup fields - context section, non-empty values only */}
               {(() => {
                 const sf = activeWizardNotebook.setupFields ?? {};
                 // For each mode, pick the context fields (exclude the one already shown as objective)
@@ -1163,51 +1183,54 @@ ${sourceRunLines}
           ) : (
             <>
               {/* Compact notebook header */}
-              <div className="sticky top-0 z-10 bg-surface/90 backdrop-blur border-b border-border px-4 py-2">
-                <div className="flex items-center justify-between gap-2 min-h-0">
-                  <div className="flex items-center gap-2 text-[11px] text-text-muted flex-wrap min-w-0">
-                    <span className="text-sm font-bold text-text-main">Notebook Lab</span>
-                    <span>·</span>
-                    <span className="font-semibold text-text-main">{project.name}</span>
-                    <span>·</span>
-                    <span>{notebookTemplate.label}</span>
-                    <span>·</span>
-                    <span className={hasMatchedNotebookData ? 'text-primary font-semibold' : 'text-amber-600 font-semibold'}>{displayNotebookStatus}</span>
-                    {(() => {
-                      const lockedContext = getLockedContext(project.id);
-                      return lockedContext ? (
-                        <span className="rounded border border-amber-500/30 bg-amber-500/5 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
-                          Locked context preserved
-                        </span>
-                      ) : null;
-                    })()}
+              <div className="sticky top-0 z-10 border-b border-border bg-surface/95 px-4 py-2 backdrop-blur">
+                <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2 text-[11px] text-text-muted">
+                      <span className="text-sm font-bold text-text-main">Notebook Lab / {registryProject.title}</span>
+                      <span>{jobTypeLabel(registryProject.jobType)} / {notebookTemplate.label}</span>
+                      <span className={hasMatchedNotebookData ? claimStatusColorClass(registryProject.claimStatus) : 'font-semibold text-amber-600'}>{displayNotebookStatus}</span>
+                    </div>
+                    <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-text-muted">
+                      <span>Mode: <span className="font-semibold text-text-main">{notebookTemplate.label}</span></span>
+                      <span>Claim status: <span className="font-semibold text-text-main">{displayNotebookStatus}</span></span>
+                      <span>Readiness: <span className="font-semibold text-text-main">{registryProject.reportReadiness}%</span></span>
+                      <span>Validation gaps: <span className="font-semibold text-text-main">{registryProject.validationGapCount}</span></span>
+                      <span>Export: <span className="font-semibold text-text-main">{registryProject.reportReadiness >= 80 ? 'Ready' : 'Blocked'}</span></span>
+                      {getLockedContext(project.id) ? (
+                        <span className="rounded border border-amber-500/30 bg-amber-500/5 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">Locked context preserved</span>
+                      ) : null}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
+
+                  <div className="flex shrink-0 items-center gap-1.5">
                     {feedback && (
-                      <span className="hidden sm:inline-flex items-center rounded border border-primary/20 bg-primary/10 px-2 text-[11px] font-semibold text-primary">
-                        {feedback}
-                      </span>
+                      <span className="hidden items-center rounded border border-primary/20 bg-primary/10 px-2 text-[11px] font-semibold text-primary sm:inline-flex">{feedback}</span>
                     )}
-                    <Button variant="outline" size="sm" className="gap-1.5 h-7 text-xs px-2" onClick={() => setIsEvidenceDrawerOpen(true)}><FlaskConical size={12} /> Evidence Trace</Button>
+                    <Button variant="outline" size="sm" className="h-7 gap-1.5 px-2 text-xs" onClick={() => setIsEvidenceDrawerOpen(true)}><FlaskConical size={12} /> Evidence Trace</Button>
+                    <Button variant="primary" size="sm" disabled={!hasMatchedNotebookData} title={!hasMatchedNotebookData ? 'Requires matched processing result before saving.' : undefined} className="h-7 gap-1.5 px-2 text-xs" onClick={saveWorkflowNotebookEntry}><Save size={12} /> Save Entry</Button>
+                    <Link
+                      to={`/reports?project=${project.id}&template=${templateMode}&entry=${workflowNotebookEntry.id}`}
+                      className="inline-flex h-7 items-center rounded-md border border-primary/30 bg-primary/5 px-2 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors"
+                    >
+                      Send to Report <ArrowRight size={12} className="ml-1" />
+                    </Link>
                     <div className="relative">
-                      <Button variant="outline" size="sm" disabled={!hasMatchedNotebookData} title={!hasMatchedNotebookData ? 'Requires matched processing result before export.' : undefined} className="gap-1.5 h-7 text-xs px-2" onClick={() => setExportMenuOpen((open) => !open)}><Download size={12} /> Export</Button>
+                    <Button variant="outline" size="sm" className="h-7 gap-1.5 px-2 text-xs" onClick={() => setExportMenuOpen((open) => !open)}><Download size={12} /> Export CSV</Button>
                       {exportMenuOpen && (
-                        <div className="absolute right-0 top-9 z-20 w-52 rounded-lg border border-border bg-white p-2 shadow-xl">
-                          <button type="button" onClick={() => exportNotebook('md')} className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs font-semibold text-text-main hover:bg-surface-hover">Export Markdown<Download size={13} /></button>
-                          <button type="button" onClick={() => exportNotebook('png')} className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs font-semibold text-text-main hover:bg-surface-hover">Export PNG Snapshot<Download size={13} /></button>
-                          {(['pdf', 'docx', 'csv'] as DemoExportFormat[]).map((format) => (
-                            <button key={format} type="button" disabled title="Available in the connected beta workflow." className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs font-semibold text-slate-400 cursor-not-allowed">{format.toUpperCase()} Export - Connected beta workflow</button>
-                          ))}
+                        <div className="absolute right-0 top-9 z-20 w-60 rounded-lg border border-border bg-white p-2 shadow-xl">
+                          <button type="button" disabled={!selectedEvidenceDataset} onClick={() => { exportNotebookCsv('raw'); setExportMenuOpen(false); }} className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs font-semibold text-text-main hover:bg-surface-hover disabled:cursor-not-allowed disabled:text-slate-400">Export raw signal CSV<Download size={13} /></button>
+                          <button type="button" disabled={!selectedEvidenceDataset} onClick={() => { exportNotebookCsv('features'); setExportMenuOpen(false); }} className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs font-semibold text-text-main hover:bg-surface-hover disabled:cursor-not-allowed disabled:text-slate-400">Export extracted features CSV<Download size={13} /></button>
+                          <button type="button" onClick={() => { exportNotebookCsv('summary'); setExportMenuOpen(false); }} className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs font-semibold text-text-main hover:bg-surface-hover">Export evidence summary CSV<Download size={13} /></button>
                         </div>
                       )}
                     </div>
-                    <Button variant="primary" size="sm" disabled={!hasMatchedNotebookData} title={!hasMatchedNotebookData ? 'Requires matched processing result before saving.' : undefined} className="gap-1.5 h-7 text-xs px-2" onClick={saveWorkflowNotebookEntry}><Save size={12} /> Save</Button>
                     <div className="relative">
-                      <Button variant="outline" size="sm" className="gap-1.5 h-7 text-xs px-2" onClick={() => setMoreMenuOpen((open) => !open)}><MoreHorizontal size={12} /> More</Button>
+                      <Button variant="outline" size="sm" className="h-7 gap-1.5 px-2 text-xs" onClick={() => setMoreMenuOpen((open) => !open)}><MoreHorizontal size={12} /> More</Button>
                       {moreMenuOpen && (
                         <div className="absolute right-0 top-9 z-20 w-44 rounded-lg border border-border bg-white p-2 shadow-xl">
                           <button type="button" onClick={() => { copyShareLink(); setMoreMenuOpen(false); }} className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-semibold text-text-main hover:bg-surface-hover"><Share2 size={12} /> Share</button>
-                          <button type="button" onClick={() => { printReport(); setMoreMenuOpen(false); }} disabled={!hasMatchedNotebookData} title={!hasMatchedNotebookData ? 'Requires matched processing result before printing.' : undefined} className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-semibold text-text-main hover:bg-surface-hover disabled:text-slate-400 disabled:cursor-not-allowed"><Printer size={12} /> Print</button>
+                          <button type="button" onClick={() => { printReport(); setMoreMenuOpen(false); }} disabled={!hasMatchedNotebookData} title={!hasMatchedNotebookData ? 'Requires matched processing result before printing.' : undefined} className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-semibold text-text-main hover:bg-surface-hover disabled:cursor-not-allowed disabled:text-slate-400"><Printer size={12} /> Print</button>
                           <button type="button" onClick={() => { setObservationOpen(true); setMoreMenuOpen(false); }} className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-semibold text-text-main hover:bg-surface-hover"><Plus size={12} /> Observe</button>
                           <button type="button" onClick={() => { setAttachRunOpen(true); setMoreMenuOpen(false); }} className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-semibold text-text-main hover:bg-surface-hover"><FileText size={12} /> Attach</button>
                         </div>
@@ -1215,25 +1238,17 @@ ${sourceRunLines}
                     </div>
                   </div>
                 </div>
-                <div className="mt-2 flex items-center gap-2 text-[11px] text-text-muted">
-                  <span className="font-semibold">Evidence linked: <span className="text-text-main">{hasMatchedNotebookData ? 'Linked' : 'Pending'}</span></span>
-                  <span>·</span>
-                  <span className="font-semibold">Validation gaps: <span className="text-text-main">{project.validationGaps.length ? `${project.validationGaps.length} open` : 'Closed'}</span></span>
-                  <span>·</span>
-                  <span className="font-semibold">Confidence: <span className="text-text-main">{confidenceLabel}</span></span>
-                  <span>·</span>
-                  <span className="font-semibold">Export: <span className="text-text-main">{hasMatchedNotebookData ? 'Ready' : 'Blocked'}</span></span>
-                </div>
-                <div className="flex items-center gap-0.5 mt-1.5 -mb-px">
+
+                <div className="mt-1.5 flex items-center gap-0.5 -mb-px overflow-x-auto">
                   {NOTEBOOK_TABS.map((tab) => (
                     <button
                       key={tab}
                       type="button"
                       onClick={() => setActiveNotebookTab(tab)}
-                      className={`px-3 py-1 text-[11px] font-semibold rounded-t border-b-2 transition-colors ${
+                      className={`whitespace-nowrap rounded-t border-b-2 px-3 py-1 text-[11px] font-semibold transition-colors ${
                         activeNotebookTab === tab
-                          ? 'text-primary border-primary bg-primary/5'
-                          : 'text-text-muted border-transparent hover:text-text-main hover:border-border'
+                          ? 'border-primary bg-primary/5 text-primary'
+                          : 'border-transparent text-text-muted hover:border-border hover:text-text-main'
                       }`}
                     >
                       {tab}
@@ -1241,7 +1256,6 @@ ${sourceRunLines}
                   ))}
                 </div>
               </div>
-
           {observationOpen && (
             <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/30 p-4">
               <div className="w-full max-w-lg rounded-xl border border-border bg-white p-5 shadow-2xl">
@@ -1299,7 +1313,22 @@ ${sourceRunLines}
           <div className="flex-1 overflow-y-auto">
           <div className="p-3 max-w-7xl w-full mx-auto">
 
-            {activeNotebookTab === 'Objective' && (() => {
+            {/* Invalid project fallback banner */}
+            {(() => {
+              const requested = searchParams.get('project');
+              if (requested && !isKnownProjectId(requested)) {
+                const fallback = getRegistryProject(null);
+                return (
+                  <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[11px] text-amber-900">
+                    <span className="font-semibold">Project not found.</span>{' '}
+                    Showing the default project context: {fallback.title}.
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
+            {activeNotebookTab === 'Objective / Context' && (() => {
               const lockedContext = getLockedContext(project.id);
               const characterizationGoal = hasMatchedNotebookData
                 ? projectNotebookContent.phaseLabel
@@ -1313,8 +1342,11 @@ ${sourceRunLines}
               const objectiveRows: Array<[string, React.ReactNode, boolean?]> = [
                 ['Research Objective', project.objective],
                 ['Sample system', lockedContext?.sampleIdentity ?? project.material],
+                ['Claim status', claimStatusLabel(registryProject.claimStatus)],
+                ['Job type / notebook mode', `${jobTypeLabel(registryProject.jobType)} / ${notebookTemplate.label}`],
                 ['Techniques', project.techniques.join(', ')],
                 ['Condition lock', experimentConditionStatus],
+                ['Workflow path', registryProject.workflowPath.join(' -> ')],
                 ...(lockedContext?.sourceDataset ? [['Source dataset', lockedContext.sourceDataset] as [string, React.ReactNode]] : []),
                 ['Characterization Goal', characterizationGoal],
                 ['Decision Question', decisionQuestion, true],
@@ -1324,7 +1356,7 @@ ${sourceRunLines}
                 {!hasMatchedNotebookData && (
                   <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2">
                     <span className="text-[11px] font-bold uppercase tracking-wider text-amber-700">Notebook status: </span>
-                    <span className="text-xs text-text-muted">No matched processing result. Load a compatible dataset to generate evidence and report discussion.</span>
+                    <span className="text-xs text-text-muted">No matched processing result. Load a compatible dataset to generate evidence and notebook interpretation.</span>
                   </div>
                 )}
                 <div className="rounded-md border border-border bg-surface divide-y divide-border">
@@ -1365,12 +1397,50 @@ ${sourceRunLines}
                   <span className="text-[10px] font-semibold uppercase tracking-wider text-text-dim">Peak Detection: </span>
                   <span className="text-sm text-text-main">{projectNotebookContent.peakDetection}</span>
                 </div>
+                <div className="rounded-md border border-primary/20 bg-surface px-3 py-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="text-[10px] font-semibold uppercase tracking-wider text-primary">Data Export</div>
+                      <p className="mt-0.5 truncate text-xs text-text-muted">
+                        {selectedEvidenceDataset
+                          ? `${selectedEvidenceDataset.fileName} / ${selectedEvidenceDataset.dataPoints.length} raw points`
+                          : 'No dataset is linked for the selected technique.'}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <select
+                        value={selectedTechniqueForExport}
+                        onChange={(event) => setSelectedEvidenceTechnique(event.target.value as Technique)}
+                        className="h-7 rounded-md border border-border bg-background px-2 text-xs font-semibold text-text-main outline-none focus:border-primary"
+                      >
+                        {project.techniques.map((technique) => (
+                          <option key={technique} value={technique}>{technique}</option>
+                        ))}
+                      </select>
+                      <Button variant="outline" size="sm" disabled={!selectedEvidenceDataset} className="h-7 gap-1.5 px-2 text-xs" onClick={() => exportNotebookCsv('raw')}>
+                        <Download size={12} /> Export Raw CSV
+                      </Button>
+                      <Button variant="outline" size="sm" disabled={!selectedEvidenceDataset} className="h-7 gap-1.5 px-2 text-xs" onClick={() => exportNotebookCsv('features')}>
+                        <Download size={12} /> Export Features CSV
+                      </Button>
+                      <Button variant="outline" size="sm" className="h-7 gap-1.5 px-2 text-xs" onClick={() => exportNotebookCsv('summary')}>
+                        <Download size={12} /> Export Evidence Summary CSV
+                      </Button>
+                      <Link
+                        to={`/reports?project=${project.id}&template=${templateMode}&entry=${workflowNotebookEntry.id}`}
+                        className="inline-flex h-7 items-center rounded-md border border-primary/30 bg-primary/5 px-2 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors"
+                      >
+                        Send to Report <ArrowRight size={12} className="ml-1" />
+                      </Link>
+                    </div>
+                  </div>
+                </div>
                 <div>
-                  <div className="text-[10px] font-semibold uppercase tracking-wider text-text-dim mb-1">Key Evidence</div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wider text-text-dim mb-1">Evidence Basis</div>
                   <div className="space-y-1">
                     {keyEvidenceItems.map((item) => (
                       <div key={item} className="flex items-start gap-2 rounded-md border border-border bg-surface px-2.5 py-1.5 text-sm text-text-main">
-                        <span className="text-primary mt-0.5 shrink-0">–</span>
+                        <span className="text-primary mt-0.5 shrink-0">-</span>
                         <span>{item}</span>
                       </div>
                     ))}
@@ -1433,13 +1503,13 @@ ${sourceRunLines}
                   </div>
                 </div>
                 <div className="rounded-md border border-primary/20 bg-surface px-3 py-2">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-primary mb-1">Reasoning Summary — {notebookTemplateDetails.primaryLabel}</div>
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-primary mb-1">Reasoning Summary - {notebookTemplateDetails.primaryLabel}</div>
                   <p className="text-sm leading-snug text-text-main">
                     {hasMatchedNotebookData ? projectNotebookContent.discussion : 'No matched processing result is linked to this notebook entry.'}
                   </p>
                   <div className="mt-1.5 rounded border border-primary/20 bg-primary/5 px-2 py-1">
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-primary">Discussion readiness: </span>
-                    <span className="text-xs font-semibold text-text-main">{displayNotebookStatus}: {hasMatchedNotebookData ? notebookTemplateDetails.output : 'Load compatible data before report-ready discussion.'}</span>
+                    <span className="text-xs font-semibold text-text-main">{displayNotebookStatus}: {hasMatchedNotebookData ? notebookTemplateDetails.output : 'Load compatible data before notebook interpretation.'}</span>
                   </div>
                 </div>
                 {hasMatchedNotebookData && projectNotebookContent.supportingData.length > 0 && (
@@ -1461,7 +1531,7 @@ ${sourceRunLines}
                     <div className="text-[10px] font-semibold uppercase tracking-wider text-amber-700 mb-1">Caveats</div>
                     <div className="space-y-0.5">
                       {projectNotebookContent.supportingData.map((item) => (
-                        <p key={`caveat-${item.technique}`} className="text-xs leading-snug text-text-muted">– <span className="font-semibold text-text-main">{item.technique}:</span> {item.caveat}</p>
+                        <p key={`caveat-${item.technique}`} className="text-xs leading-snug text-text-muted">- <span className="font-semibold text-text-main">{item.technique}:</span> {item.caveat}</p>
                       ))}
                     </div>
                   </div>
@@ -1532,6 +1602,17 @@ ${sourceRunLines}
                   </div>
                 </div>
                 <div className="rounded-md border border-border bg-surface px-3 py-2">
+                  <div className="text-[10px] font-semibold uppercase tracking-wider text-text-dim mb-1">Missing References And Boundary</div>
+                  <div className="space-y-1">
+                    <p className="text-sm leading-snug text-text-main">
+                      <span className="font-semibold">Boundary:</span> {registryProject.notebook.validationBoundary}
+                    </p>
+                    {registryProject.notebook.missingReferences.map((reference) => (
+                      <p key={reference} className="text-xs leading-snug text-text-muted">- {reference}</p>
+                    ))}
+                  </div>
+                </div>
+                <div className="rounded-md border border-border bg-surface px-3 py-2">
                   <div className="text-[10px] font-semibold uppercase tracking-wider text-text-dim mb-1">Missing Evidence</div>
                   {hasMatchedNotebookData ? (
                     <div className="space-y-1">
@@ -1563,7 +1644,7 @@ ${sourceRunLines}
                 <div className="rounded-md border border-border bg-surface px-3 py-2">
                   <div className="text-[10px] font-semibold uppercase tracking-wider text-text-dim">Publication Limitations</div>
                   <p className="mt-0.5 text-sm text-text-main">Claim status: <span className="font-semibold">{confidenceLabel}</span></p>
-                  <p className="text-xs leading-snug text-text-muted">Export state: {hasMatchedNotebookData ? 'Report-ready for internal review; publication-level claims remain validation-limited until open gaps are closed.' : `Publication not available for ${project.name} until matched evidence is linked.`}</p>
+                  <p className="text-xs leading-snug text-text-muted">Memory state: {hasMatchedNotebookData ? 'Ready to hand off to the Evidence-to-Report builder; publication-level claims remain validation-limited until open gaps are closed.' : `Publication not available for ${project.name} until matched evidence is linked.`}</p>
                 </div>
               </div>
             )}
@@ -1581,7 +1662,7 @@ ${sourceRunLines}
                 <div className="rounded-md border border-primary/20 bg-surface px-3 py-2">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-primary mb-0.5">Recommended Next Experiment</div>
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-primary mb-0.5">Next Decision</div>
                       <h3 className="text-sm font-bold text-text-main">{notebook.decision}</h3>
                       <p className="mt-1 text-sm leading-snug text-text-muted">{notebook.summary}</p>
                     </div>
@@ -1625,152 +1706,6 @@ ${sourceRunLines}
               );
             })()}
 
-            {activeNotebookTab === 'Report Draft' && (() => {
-              const readyTechniques = projectNotebookContent.supportingData
-                .filter((item) => item.strength === 'Ready')
-                .map((item) => item.technique);
-              const pendingTechniques = projectNotebookContent.supportingData
-                .filter((item) => item.strength !== 'Ready')
-                .map((item) => item.technique);
-              const evidenceBasis = hasMatchedNotebookData && readyTechniques.length > 0
-                ? readyTechniques.join(' + ')
-                : hasMatchedNotebookData && projectNotebookContent.supportingData.length > 0
-                  ? projectNotebookContent.supportingData.map((s) => s.technique).join(' + ')
-                  : 'Not linked';
-              const validationBoundary = !hasMatchedNotebookData
-                ? 'Matched processing result required'
-                : pendingTechniques.length > 0
-                  ? `${pendingTechniques.join(', ')} pending / publication-limited`
-                  : project.validationGaps.length > 0
-                    ? 'Publication-limited until open validation gaps close'
-                    : 'Cleared for internal scientific review';
-              const exportReadiness = hasMatchedNotebookData
-                ? 'Ready for internal scientific review'
-                : 'Blocked — matched evidence required';
-              const notebookSource = `Notebook Entry · ${workflowNotebookEntry.id}`;
-              const metadataRows: Array<[string, string]> = [
-                ['Source', notebookSource],
-                ['Evidence basis', evidenceBasis],
-                ['Validation boundary', validationBoundary],
-                ['Export readiness', exportReadiness],
-              ];
-              return (
-              <div className="space-y-2">
-                <div className="rounded-md border border-primary/20 bg-surface px-3 py-2">
-                  <div className="flex items-start justify-between gap-3 mb-1.5">
-                    <div className="min-w-0">
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-primary">Report Section Preview</div>
-                      <h3 className="text-sm font-bold text-text-main">{hasMatchedNotebookData ? workflowReportSection.heading : 'No report section available'}</h3>
-                      <p className="text-[11px] leading-snug text-text-muted">Evidence-linked report section generated from notebook reasoning.</p>
-                    </div>
-                    <Button variant="outline" size="sm" disabled title="Report route is not enabled in this demo." className="gap-1.5 h-7 text-xs px-2 shrink-0"><Download size={12} /> Export Section</Button>
-                  </div>
-                  <div className="rounded border border-border bg-background divide-y divide-border mb-1.5">
-                    {metadataRows.map(([label, value]) => (
-                      <div key={label} className="flex flex-col gap-0.5 px-2.5 py-1 sm:flex-row sm:items-baseline sm:gap-3">
-                        <div className="shrink-0 text-[10px] font-semibold uppercase tracking-wider text-text-dim sm:w-36">{label}</div>
-                        <div className="text-xs leading-snug text-text-main">{value}</div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="rounded border border-border bg-background px-2.5 py-1.5">
-                    <p className="text-sm leading-snug text-text-main">
-                      {hasMatchedNotebookData ? projectNotebookContent.reportPreview : 'No report-oriented section is available until a matched processing result is linked to this project.'}
-                    </p>
-                  </div>
-                  <p className="mt-1 text-[11px] text-text-muted">Report route is not enabled in this demo. Export-ready sections are generated from notebook entries.</p>
-                </div>
-                <div>
-                  <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-text-dim">Characterization Overview</div>
-                  {hasMatchedNotebookData ? (
-                    <AIInsightPanel result={getProjectInsight(project)} />
-                  ) : (
-                    <Card className="p-3">
-                      <div className="text-sm font-semibold text-text-main">Validation pending</div>
-                      <p className="mt-1 text-sm leading-snug text-text-muted">No matched processing result is linked to {project.name}.</p>
-                    </Card>
-                  )}
-                </div>
-                {hasMatchedNotebookData && projectNotebookContent.supportingData.length > 0 && (
-                  <div className="rounded-md border border-border bg-surface px-3 py-2">
-                    <div className="text-[10px] font-semibold uppercase tracking-wider text-text-dim mb-1">Supporting Data</div>
-                    <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-                      {projectNotebookContent.supportingData.map((item) => (
-                        <div key={`rpt-${item.technique}`} className="rounded border border-border bg-background px-2 py-1.5">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-xs font-bold text-text-main">{item.technique}</span>
-                            <span className={`text-[10px] font-semibold ${item.strength === 'Review' ? 'text-amber-600' : item.strength === 'Ready' ? 'text-primary' : 'text-cyan'}`}>{item.strength}</span>
-                          </div>
-                          <p className="mt-0.5 text-xs leading-snug text-text-main">{item.evidence}</p>
-                          <p className="text-[11px] text-text-dim">Dataset: {item.dataset}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {hasMatchedNotebookData && (
-                  <div className="rounded-md border border-border bg-surface px-3 py-2">
-                    <div className="text-[10px] font-semibold uppercase tracking-wider text-text-dim mb-1">Cross-Technique Insights</div>
-                    <ul className="space-y-0.5">
-                      {keyEvidenceItems.map((item) => (
-                        <li key={`xt-${item}`} className="flex items-start gap-2 text-sm leading-snug text-text-main">
-                          <span className="text-primary mt-0.5 shrink-0">–</span>
-                          <span>{item}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                <div className="rounded-md border border-primary/20 bg-surface px-3 py-2">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-primary mb-1">Interpretation</div>
-                  <div className="rounded border border-border bg-background px-2.5 py-1.5">
-                    <div className="text-[10px] font-semibold uppercase tracking-wider text-text-dim mb-0.5">
-                      {hasMatchedNotebookData ? primaryNotebookSection?.heading ?? notebookTemplateDetails.primaryLabel : 'No matched processing result'}
-                    </div>
-                    <p className="text-sm leading-snug text-text-main">
-                      {hasMatchedNotebookData ? projectNotebookContent.discussion : 'This project does not have a matched processing result. Load compatible data before creating report-ready discussion.'}
-                    </p>
-                  </div>
-                </div>
-                <div className="rounded-md border border-border bg-surface px-3 py-2">
-                  <div className="text-[10px] font-semibold uppercase tracking-wider text-text-dim">Conclusion</div>
-                  <p className="mt-0.5 text-sm leading-snug text-text-main">
-                    {hasMatchedNotebookData ? projectNotebookContent.summary : `Conclusion for ${project.name} will be generated once matched evidence is linked.`}
-                  </p>
-                  <p className="text-[11px] text-text-muted">Claim status: <span className="font-semibold">{confidenceLabel}</span></p>
-                </div>
-                <div className="rounded-md border border-amber-500/20 bg-surface px-3 py-2">
-                  <div className="text-[10px] font-semibold uppercase tracking-wider text-amber-700 mb-1">Limitations and Follow-up Validation</div>
-                  {project.validationGaps.length > 0 && (
-                    <div className="mb-1 space-y-0.5">
-                      {project.validationGaps.map((gap) => (
-                        <p key={`rpt-gap-${gap.id}`} className="text-xs leading-snug text-text-muted">– <span className="font-semibold text-text-main">{gap.description}</span> — {gap.suggestedResolution}</p>
-                      ))}
-                    </div>
-                  )}
-                  <div className="space-y-0.5">
-                    {(hasMatchedNotebookData ? projectNotebookContent.validationNotes : [`Load a matched processing result for ${project.name} before validation closure.`]).map((item) => (
-                      <p key={`rpt-val-${item}`} className="text-xs leading-snug text-text-muted">– {item}</p>
-                    ))}
-                  </div>
-                </div>
-                <div className="rounded-md border border-border bg-surface px-3 py-2">
-                  <div className="text-[10px] font-semibold uppercase tracking-wider text-text-dim mb-1">Export</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    <Button variant="outline" size="sm" disabled={!hasMatchedNotebookData} title={!hasMatchedNotebookData ? 'Requires matched processing result.' : undefined} className="gap-1.5 h-7 text-xs px-2" onClick={() => exportNotebook('md')}><Download size={12} /> Export Markdown</Button>
-                    <Button variant="outline" size="sm" disabled={!hasMatchedNotebookData} title={!hasMatchedNotebookData ? 'Requires matched processing result.' : undefined} className="gap-1.5 h-7 text-xs px-2" onClick={() => exportNotebook('png')}><Download size={12} /> Export PNG</Button>
-                    <Link to={workspaceRun ? getWorkspaceRoute(project, workspaceRun.technique, workspaceRun.datasetId) : getWorkspaceRoute(project)} className="inline-flex h-7 items-center rounded-md border border-border bg-surface px-2 text-xs font-semibold text-text-main hover:border-primary/40 transition-colors">
-                      {workspaceRun ? `Open ${workspaceRun.technique} Analysis` : 'Open Workspace'} <ArrowRight size={12} className="inline ml-1" />
-                    </Link>
-                    <Link to={hasMatchedNotebookData ? getAgentPath(project) : getWorkspaceRoute(project)} className="inline-flex h-7 items-center rounded-md border border-cyan/40 bg-surface px-2 text-xs font-semibold text-cyan hover:bg-cyan/10 transition-colors">
-                      {hasMatchedNotebookData ? 'Open Refinement' : 'Open Workspace'} <ArrowRight size={12} className="inline ml-1" />
-                    </Link>
-                  </div>
-                </div>
-              </div>
-              );
-            })()}
-
           </div>
           </div>
           {isEvidenceDrawerOpen && (
@@ -1804,7 +1739,7 @@ ${sourceRunLines}
                     <div className="mt-2 space-y-2">
                       {project.evidenceSources.map((source) => (
                         <div key={source.datasetId} className="rounded-md border border-border bg-surface p-2">
-                          <div className="text-xs font-bold text-text-main">{source.technique} · {source.datasetLabel}</div>
+                          <div className="text-xs font-bold text-text-main">{source.technique} - {source.datasetLabel}</div>
                           <p className="mt-1 text-[11px] leading-relaxed text-text-muted">{source.description}</p>
                         </div>
                       ))}
@@ -1909,7 +1844,7 @@ ${sourceRunLines}
 
             <details className="rounded-xl border border-border bg-surface">
               <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-text-main">
-                <span>Full template, refined discussion, and report section</span>
+                <span>Template selector and workflow details</span>
                 <span className="rounded-md border border-primary/20 bg-primary/5 px-2.5 py-1 text-[11px] text-primary">
                   Secondary record details
                 </span>
@@ -1917,9 +1852,9 @@ ${sourceRunLines}
               <div className="space-y-4 border-t border-border p-4">
               <details className="rounded-xl border border-border bg-surface">
                 <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-text-main">
-                  <span>Template selector and workflow details</span>
+                  <span>Template mode</span>
                   <span className="rounded-md border border-primary/20 bg-primary/5 px-2.5 py-1 text-[11px] text-primary">
-                    {notebookTemplate.label} · {notebookTemplateDetails.primaryLabel}
+                    {notebookTemplate.label} - {notebookTemplateDetails.primaryLabel}
                   </span>
                 </summary>
                 <div className="border-t border-border p-4">
@@ -2147,7 +2082,7 @@ ${sourceRunLines}
                   {[
                     ['Mode', notebookTemplate.label],
                     ['Source workflow', 'XRD processing + interpretation refinement'],
-                    ['Pipeline', 'Processing Result → Interpretation Refinement → Notebook Entry → Report Section'],
+                    ['Pipeline', 'Processing Result -> Interpretation Refinement -> Notebook Entry -> Report Section'],
                     ['Discussion readiness', displayNotebookStatus],
                     ['Report section', hasMatchedNotebookData ? workflowReportSection.heading : 'No report section available'],
                     ['Evidence status', hasMatchedNotebookData ? 'Requires validation' : 'No matched processing result'],
